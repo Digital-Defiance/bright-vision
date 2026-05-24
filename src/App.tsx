@@ -154,6 +154,15 @@ function App() {
   }, [config])
 
   const appendStderr = useCallback((payload: string) => {
+    const trimmed = payload.trim()
+    if (
+      !trimmed ||
+      trimmed.includes('\r') ||
+      /Scanning repo:\s*\d+%/.test(trimmed) ||
+      /\d+it\/s\]/.test(trimmed)
+    ) {
+      return
+    }
     const id = Date.now()
     setTerminalLines((prev) => [
       ...prev,
@@ -214,6 +223,8 @@ function App() {
         }
         break
       }
+      case 'progress':
+        break
       case 'tool_output':
       case 'tool_error':
       case 'tool_warning':

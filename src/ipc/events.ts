@@ -11,8 +11,18 @@ export type CoreEventType =
   | 'tool_warning'
   | 'confirm'
   | 'assistant_complete'
+  | 'progress'
   | 'done'
   | 'error'
+
+export interface CoreProgressEvent extends CoreEventBase {
+  type: 'progress'
+  label?: string
+  message?: string
+  current?: number
+  total?: number
+  fraction?: number
+}
 
 export interface CoreEventBase {
   type: CoreEventType | string

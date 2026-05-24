@@ -163,7 +163,8 @@ async fn start_core_api(
         .current_dir(&engine_root)
         .env("PYTHONPATH", &engine_root)
         .env("NO_COLOR", "1")
-        .env("AIDER_VISION_HEADLESS", "1");
+        .env("AIDER_VISION_HEADLESS", "1")
+        .env("TQDM_DISABLE", "1");
     if !extra_params.trim().is_empty() {
         cmd.env("LITELLM_EXTRA_PARAMS", &extra_params);
     }

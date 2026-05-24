@@ -89,6 +89,24 @@ export function ProcessProvider({ children }: { children: ReactNode }) {
 
   const ingestCoreEvent = useCallback((ev: CoreEventBase) => {
     switch (ev.type) {
+      case 'progress': {
+        const fraction =
+          typeof ev.fraction === 'number'
+            ? ev.fraction
+            : typeof ev.current === 'number' && typeof ev.total === 'number' && ev.total > 0
+              ? ev.current / ev.total
+              : null
+        dispatch({
+          type: 'apply',
+          update: {
+            phase: 'scan',
+            label: String(ev.label ?? PHASE_LABELS.scan),
+            detail: String(ev.message ?? '').slice(0, 120) || undefined,
+            progress: fraction,
+          },
+        })
+        break
+      }
       case 'token':
         dispatch({
           type: 'apply',

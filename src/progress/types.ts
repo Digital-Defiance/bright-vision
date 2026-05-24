@@ -8,6 +8,7 @@ export type ProcessPhase =
   | 'booting_api'
   | 'connecting'
   | 'session'
+  | 'scan'
   | 'reasoning'
   | 'tool'
   | 'confirm'
@@ -49,6 +50,7 @@ export const PHASE_LABELS: Record<ProcessPhase, string> = {
   booting_api: 'Starting engine',
   connecting: 'Connecting',
   session: 'Opening workspace',
+  scan: 'Scanning repository',
   reasoning: 'Thinking',
   tool: 'Running tools',
   confirm: 'Waiting for you',
