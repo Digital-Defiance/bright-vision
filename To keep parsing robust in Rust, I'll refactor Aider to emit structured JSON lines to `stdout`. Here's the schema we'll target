@@ -1,0 +1,6 @@
+{"type": "status", "payload": "Aider started"}
+{"type": "user", "payload": "Your prompt here"}
+{"type": "assistant", "payload": "Assistant response..."}
+{"type": "tool_call", "payload": {"name": "apply_patch", "input": "..."}}
+{"type": "tool_result", "payload": {"name": "apply_patch", "output": "Success"}}
+{"type": "error", "payload": "Something went wrong"}
