@@ -14,6 +14,27 @@ source activate.sh   # venv + pip install -e aider-vision-core + uvicorn
 yarn install
 ```
 
+## After a core PyPI release
+
+Pin the parent app to the published wheel and install into **aider-vision** `.venv` (not `aider-vision-core/.venv`):
+
+```bash
+cd aider-vision-core
+./build.sh v0.90.10.dev0 --sync-vision          # full release + sync
+./build.sh --sync-vision v0.90.10.dev0          # sync only (tag already exists)
+./scripts/sync_aider_vision.sh 0.90.10.dev0     # same, from core repo
+```
+
+From the parent repo:
+
+```bash
+yarn sync:core 0.90.10.dev0
+```
+
+This updates `requirements-core.txt`, checks out the submodule tag, and runs `pip install` in the parent venv. Optional: add `--commit` on the sync script to commit the pin in aider-vision.
+
+Use PyPI mode in activate: `AIDER_VISION_CORE_INSTALL=pypi source activate.sh`
+
 ## Run the desktop app
 
 From the **superproject root** (e.g. `/Volumes/Code/aider-vision`):
@@ -64,6 +85,17 @@ Import from `src/progress` or use `useProcess()` in components.
 ## macOS release DMG
 
 Universal (arm64 + x86_64) signed DMG: [BUILD_MACOS.md](./BUILD_MACOS.md).
+
+## Compatibility audit
+
+After changing `aider-vision-core`, run:
+
+```bash
+python aider-vision-core/scripts/audit_rename_compat.py
+pytest aider-vision-core/tests/basic/test_vision_runtime.py -q
+```
+
+See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for `No module named 'aider'` and headless/TUI issues.
 
 ## Architecture
 

@@ -1,0 +1,29 @@
+name: Core compatibility audit
+
+on:
+  pull_request:
+    paths:
+      - 'aider-vision-core/**'
+      - 'src/**'
+      - 'src-tauri/**'
+      - 'docs/**'
+      - 'package.json'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Rename / headless compat audit
+        run: python aider-vision-core/scripts/audit_rename_compat.py
+      - name: vision_runtime unit tests
+        working-directory: aider-vision-core
+        run: python -m unittest tests.basic.test_vision_runtime -v

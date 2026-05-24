@@ -8,7 +8,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "build:mac": "tauri build --target universal-apple-darwin --bundles dmg"
+    "build:mac": "tauri build --target universal-apple-darwin --bundles dmg",
+    "audit:core": "python aider-vision-core/scripts/audit_rename_compat.py",
+    "sync:core": "bash aider-vision-core/scripts/sync_aider_vision.sh"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

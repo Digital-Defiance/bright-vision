@@ -161,7 +161,17 @@ async fn start_core_api(
         .arg("--port")
         .arg(port.to_string())
         .current_dir(&engine_root)
-        .env("PYTHONPATH", &engine_root)
+        // Prefer submodule sources over an older pip-installed aider_vision_core.
+        .env(
+            "PYTHONPATH",
+            format!(
+                "{}{}",
+                engine_root.display(),
+                std::env::var("PYTHONPATH")
+                    .map(|p| format!(":{p}"))
+                    .unwrap_or_default()
+            ),
+        )
         .env("NO_COLOR", "1")
         .env("AIDER_VISION_HEADLESS", "1")
         .env("TQDM_DISABLE", "1");
