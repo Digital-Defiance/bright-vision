@@ -4,6 +4,7 @@ use tauri::{Emitter, Manager, State};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Child;
 use tokio::sync::Mutex;
+use serde_json::Value;
 
 struct AppState {
     child: Mutex<Option<Child>>,
@@ -53,7 +54,48 @@ async fn start_aider(
     tokio::spawn(async move {
         let mut reader = BufReader::new(stdout).lines();
         while let Ok(Some(line)) = reader.next_line().await {
-            let _ = app_handle_clone.emit("aider-output", line);
+            // Try to parse as JSON for structured IPC
+            if let Ok(json) = serde_json::from_str::<Value>(&line) {
+                if let Some(msg_type) = json.get("type").and_then(|v| v.as_str()) {
+                    match msg_type {
+                        "status" => {
+                            if let Some(payload) = json.get("payload").and_then(|v| v.as_str()) {
+                                let _ = app_handle_clone.emit("aider-status", payload);
+                            }
+                        }
+                        "user" | "assistant" => {
+                            if let Some(payload) = json.get("payload").and_then(|v| v.as_str()) {
+                                let _ = app_handle_clone.emit("aider-chat", serde_json::json!({
+                                    "role": msg_type,
+                                    "content": payload
+                                }));
+                            }
+                        }
+                        "tool_call" | "tool_result" => {
+                            if let Some(payload) = json.get("payload") {
+                                let _ = app_handle_clone.emit("aider-tool", serde_json::json!({
+                                    "type": msg_type,
+                                    "payload": payload
+                                }));
+                            }
+                        }
+                        "error" => {
+                            if let Some(payload) = json.get("payload").and_then(|v| v.as_str()) {
+                                let _ = app_handle_clone.emit("aider-error", payload);
+                            }
+                        }
+                        _ => {
+                            // Fallback to raw output if type is unknown
+                            let _ = app_handle_clone.emit("aider-output", line);
+                        }
+                    }
+                } else {
+                    let _ = app_handle_clone.emit("aider-output", line);
+                }
+            } else {
+                // Not JSON, emit as raw output
+                let _ = app_handle_clone.emit("aider-output", line);
+            }
         }
     });
 

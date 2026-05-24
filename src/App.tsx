@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Terminal, Settings, GitBranch, MessageSquare, Save, RotateCcw, Play, Square } from 'lucide-react'
+import { Terminal, Settings, GitBranch, MessageSquare, Save, RotateCcw, Play, Square, Send } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
 
@@ -9,6 +9,20 @@ interface AiderConfig {
   extraParams: string
   workingDir: string
   autoApproveLimit: number
+}
+
+interface ChatMessage {
+  id: number
+  role: 'user' | 'assistant' | 'system'
+  content: string
+}
+
+interface ToolEvent {
+  id: number
+  type: 'tool_call' | 'tool_result'
+  name?: string
+  input?: string
+  output?: string
 }
 
 interface TerminalLine {
@@ -30,10 +44,17 @@ function App() {
   const [config, setConfig] = useState<AiderConfig>(DEFAULT_CONFIG)
   const [savedConfig, setSavedConfig] = useState<AiderConfig>(DEFAULT_CONFIG)
   const [isRunning, setIsRunning] = useState(false)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [toolEvents, setToolEvents] = useState<ToolEvent[]>([])
   const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([])
   const [inputValue, setInputValue] = useState('')
   const [remainingAutoApproves, setRemainingAutoApproves] = useState(0)
+  const [statusMessage, setStatusMessage] = useState('')
+  const chatEndRef = useRef<HTMLDivElement>(null)
   const terminalEndRef = useRef<HTMLDivElement>(null)
+  const [unlistenChat, setUnlistenChat] = useState<UnlistenFn | null>(null)
+  const [unlistenTool, setUnlistenTool] = useState<UnlistenFn | null>(null)
+  const [unlistenStatus, setUnlistenStatus] = useState<UnlistenFn | null>(null)
   const [unlistenOutput, setUnlistenOutput] = useState<UnlistenFn | null>(null)
   const [unlistenError, setUnlistenError] = useState<UnlistenFn | null>(null)
 
@@ -52,6 +73,32 @@ function App() {
 
   useEffect(() => {
     const setupListeners = async () => {
+      const listenChat = await listen<{ role: string; content: string }>('aider-chat', (event) => {
+        setChatMessages(prev => [...prev, {
+          id: Date.now(),
+          role: event.payload.role as 'user' | 'assistant' | 'system',
+          content: event.payload.content
+        }])
+      })
+      setUnlistenChat(() => listenChat)
+
+      const listenTool = await listen<any>('aider-tool', (event) => {
+        setToolEvents(prev => [...prev, {
+          id: Date.now(),
+          type: event.payload.type,
+          name: event.payload.payload?.name,
+          input: event.payload.payload?.input,
+          output: event.payload.payload?.output
+        }])
+      })
+      setUnlistenTool(() => listenTool)
+
+      const listenStatus = await listen<string>('aider-status', (event) => {
+        setStatusMessage(event.payload)
+        setTerminalLines(prev => [...prev, { id: Date.now(), text: `[STATUS] ${event.payload}`, type: 'stdout' }])
+      })
+      setUnlistenStatus(() => listenStatus)
+
       const listenOutput = await listen<string>('aider-output', (event) => {
         setTerminalLines(prev => [...prev, { id: Date.now(), text: event.payload, type: 'stdout' }])
       })
@@ -64,6 +111,10 @@ function App() {
     }
     setupListeners()
   }, [])
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages])
 
   useEffect(() => {
     terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -91,7 +142,10 @@ function App() {
       })
       setIsRunning(true)
       setRemainingAutoApproves(savedConfig.autoApproveLimit)
+      setChatMessages([])
+      setToolEvents([])
       setTerminalLines([{ id: Date.now(), text: 'Aider process started.', type: 'stdout' }])
+      setStatusMessage('Aider started')
     } catch (err) {
       console.error(err)
       setTerminalLines(prev => [...prev, { id: Date.now(), text: `Error: ${err}`, type: 'stderr' }])
@@ -104,6 +158,7 @@ function App() {
       setIsRunning(false)
       setRemainingAutoApproves(0)
       setTerminalLines(prev => [...prev, { id: Date.now(), text: 'Aider process stopped.', type: 'stdout' }])
+      setStatusMessage('Aider stopped')
     } catch (err) {
       console.error(err)
     }
@@ -113,7 +168,7 @@ function App() {
     if (!inputValue.trim() || !isRunning) return
     try {
       await invoke('send_to_aider', { input: inputValue })
-      setTerminalLines(prev => [...prev, { id: Date.now(), text: `> ${inputValue}`, type: 'stdout' }])
+      setChatMessages(prev => [...prev, { id: Date.now(), role: 'user', content: inputValue }])
       if (remainingAutoApproves > 0) {
         setRemainingAutoApproves(prev => Math.max(0, prev - 1))
       }
@@ -169,7 +224,7 @@ function App() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <span className={`h-2 w-2 rounded-full ${isRunning ? 'bg-green-500' : 'bg-gray-500'}`}></span>
-              <span className="text-xs text-gray-400">{isRunning ? 'Aider Running' : 'Aider Stopped'}</span>
+              <span className="text-xs text-gray-400">{statusMessage || (isRunning ? 'Aider Running' : 'Aider Stopped')}</span>
             </div>
             {remainingAutoApproves > 0 && (
               <div className="flex items-center gap-1 bg-blue-900/50 text-blue-300 px-2 py-1 rounded text-xs">
@@ -181,18 +236,50 @@ function App() {
         
         <div className="flex-1 p-6 overflow-auto">
           {activeTab === 'chat' && (
-            <div className="max-w-3xl mx-auto space-y-4">
-              <div className="bg-gray-800 p-4 rounded-lg shadow-sm">
-                <p className="text-gray-300">Welcome to Aider Vision. Start a conversation to begin coding.</p>
+            <div className="flex flex-col h-full max-w-4xl mx-auto">
+              <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2">
+                {chatMessages.length === 0 && (
+                  <div className="bg-gray-800 p-4 rounded-lg shadow-sm text-center text-gray-400">
+                    <p>Welcome to Aider Vision. Start a conversation to begin coding.</p>
+                  </div>
+                )}
+                {chatMessages.map((msg) => (
+                  <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[80%] p-3 rounded-lg ${msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-200'}`}>
+                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                    </div>
+                  </div>
+                ))}
+                {toolEvents.map((tool) => (
+                  <div key={tool.id} className="flex justify-start">
+                    <div className="max-w-[80%] p-3 rounded-lg bg-gray-800/50 border border-gray-700 text-sm font-mono">
+                      <div className="text-yellow-400 mb-1">
+                        {tool.type === 'tool_call' ? `🛠 Calling ${tool.name || 'tool'}...` : `✅ ${tool.name || 'tool'} result:`}
+                      </div>
+                      <pre className="text-gray-300 overflow-x-auto whitespace-pre-wrap">
+                        {tool.type === 'tool_call' ? JSON.stringify(tool.input, null, 2) : JSON.stringify(tool.output, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
               </div>
               <div className="flex gap-2">
                 <input 
                   type="text" 
-                  placeholder="Ask Aider to modify your code..." 
-                  className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                  placeholder={isRunning ? "Ask Aider to modify your code..." : "Start Aider to interact..."}
+                  disabled={!isRunning}
+                  className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                 />
-                <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
-                  Send
+                <button 
+                  onClick={handleSend}
+                  disabled={!isRunning || !inputValue.trim()}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <Send size={18} /> Send
                 </button>
               </div>
             </div>
@@ -209,15 +296,6 @@ function App() {
               </div>
               <div className="p-4 border-t border-gray-800 bg-gray-900">
                 <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                    placeholder={isRunning ? "Type a command or prompt..." : "Start Aider to interact..."}
-                    disabled={!isRunning}
-                    className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                  />
                   <button 
                     onClick={handleStart} 
                     disabled={isRunning}
