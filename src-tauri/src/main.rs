@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
 use serde::Serialize;
-use tauri::{Emitter, Manager, State};
+use tauri::{Emitter, Manager, State, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
@@ -372,6 +372,22 @@ fn main() {
                 api_port: Mutex::new(8741),
                 engine_logs: Arc::new(Mutex::new(Vec::new())),
             });
+            
+            // Ensure core API process is terminated when the app quits to prevent port conflicts
+            let state = app.state::<AppState>();
+            if let Some(window) = app.get_webview_window("main") {
+                window.on_window_event(move |event| {
+                    if let WindowEvent::CloseRequested { .. } = event {
+                        let state = state.clone();
+                        tauri::async_runtime::spawn(async move {
+                            let mut guard = state.serve_child.lock().await;
+                            if let Some(mut child) = guard.take() {
+                                let _ = child.kill().await;
+                            }
+                        });
+                    }
+                });
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

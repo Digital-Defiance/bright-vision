@@ -1,5 +1,5 @@
 import SendIcon from '@mui/icons-material/Send'
-import { Box, Button, Container, Paper, Stack, TextField, Typography } from '@mui/material'
+import { Box, Button, Container, Paper, Stack, TextField, Typography, Alert } from '@mui/material'
 import { DISPLAY_CORE } from '../../brand'
 import type { VisionCommand } from '../../ipc/commands'
 import { ConfirmBanner } from '../ConfirmBanner'
@@ -14,7 +14,7 @@ export interface ChatMessage {
 
 export interface ToolEvent {
   id: number
-  type: 'tool_call' | 'tool_result'
+  type: 'tool_call' | 'tool_result' | 'tool_warning'
   name?: string
   input?: string
   output?: string
@@ -49,6 +49,11 @@ export function ChatPanel({
   commands,
   onPickCommand,
 }: ChatPanelProps) {
+  // Filter out empty tool outputs and noise to prevent duplication/clutter
+  const meaningfulToolEvents = toolEvents.filter(
+    (t) => t.output?.trim() || t.type === 'tool_call'
+  )
+
   return (
     <Container maxWidth="md" disableGutters sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {pendingConfirm && <ConfirmBanner confirm={pendingConfirm} onDismiss={onDismissConfirm} />}
@@ -57,8 +62,8 @@ export function ChatPanel({
           Agent is working — see the pulse bar above.
         </Typography>
       )}
-      <Box sx={{ flex: 1, overflow: 'auto', mb: 2 }}>
-        {messages.length === 0 && (
+      <Box sx={{ flex: 1, overflow: 'auto', mb: 2, p: 1 }}>
+        {messages.length === 0 && meaningfulToolEvents.length === 0 && (
           <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
             <Typography color="text.secondary">
               Start {DISPLAY_CORE} from the Terminal tab, then chat here.
@@ -95,33 +100,59 @@ export function ChatPanel({
               </Paper>
             </Box>
           ))}
-          {toolEvents.map((tool) => (
-            <Paper
-              key={tool.id}
-              variant="outlined"
-              sx={{ p: 2, maxWidth: '85%', fontFamily: 'monospace', fontSize: '0.8rem' }}
-            >
-              <Typography variant="caption" color="warning.light" display="block" gutterBottom>
-                {tool.name || 'tool'}
-              </Typography>
-              <Typography component="pre" variant="body2" sx={{ m: 0, whiteSpace: 'pre-wrap' }}>
-                {tool.output}
-              </Typography>
-            </Paper>
+          
+          {/* Group tool events logically with distinct styling */}
+          {meaningfulToolEvents.map((tool) => (
+            <Box key={tool.id} sx={{ width: '100%' }}>
+              {tool.type === 'tool_warning' ? (
+                <Alert severity="warning" sx={{ mb: 1 }}>
+                  <Typography variant="body2" component="span" fontWeight="bold">
+                    {tool.name || 'Warning'}: 
+                  </Typography>
+                  <Typography variant="body2" component="span" sx={{ ml: 1 }}>
+                    {tool.output}
+                  </Typography>
+                </Alert>
+              ) : (
+                <Paper
+                  variant="outlined"
+                  sx={{ 
+                    p: 2, 
+                    maxWidth: '90%', 
+                    fontFamily: 'monospace', 
+                    fontSize: '0.85rem',
+                    bgcolor: 'action.hover'
+                  }}
+                >
+                  <Typography variant="caption" color="primary.main" display="block" gutterBottom fontWeight="bold">
+                    {tool.type === 'tool_call' ? '🛠 Calling' : '✅ Result'}: {tool.name || 'tool'}
+                  </Typography>
+                  {(tool.input || tool.output) && (
+                    <Typography component="pre" variant="body2" sx={{ m: 0, whiteSpace: 'pre-wrap', overflowX: 'auto' }}>
+                      {tool.input || tool.output}
+                    </Typography>
+                  )}
+                </Paper>
+              )}
+            </Box>
           ))}
         </Stack>
         <div ref={chatEndRef} />
       </Box>
+      
       <CommandAssist
         commands={commands}
         inputValue={inputValue}
         disabled={!isRunning || isBusy}
         onPickCommand={onPickCommand}
       />
-      <Stack direction="row" spacing={1}>
+      
+      <Stack direction="row" spacing={1} sx={{ p: 1 }}>
         <TextField
           fullWidth
           size="small"
+          multiline
+          maxRows={6}
           value={inputValue}
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={(e) => {
@@ -146,6 +177,7 @@ export function ChatPanel({
           endIcon={<SendIcon />}
           onClick={onSend}
           disabled={!isRunning || isBusy || !inputValue.trim()}
+          sx={{ alignSelf: 'flex-end' }}
         >
           Send
         </Button>
