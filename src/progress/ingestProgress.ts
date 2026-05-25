@@ -22,6 +22,33 @@ export function phaseForProgressLabel(label: string, message: string): ProcessPh
   return 'scan'
 }
 
+function progressDisplayLabel(label: string, message: string, phase: ProcessPhase): string {
+  const hay = `${label} ${message}`.toLowerCase()
+  if (/waiting for/.test(hay)) return 'Waiting for model'
+  if (phase === 'scan') return label.trim() || PHASE_LABELS.scan
+  return label.trim() || PHASE_LABELS[phase]
+}
+
+export function isWaitingForModelProgress(update: ProcessUpdate): boolean {
+  const hay = `${update.label} ${update.detail ?? ''}`.toLowerCase()
+  return /waiting for/.test(hay)
+}
+
+/** After assistant tokens, avoid reverting the bar to “Waiting for model”. */
+export function progressUpdateAfterStreamedTokens(ev: CoreProgressEvent): ProcessUpdate {
+  const label = String(ev.label ?? '').trim()
+  const message = String(ev.message ?? '').trim()
+  const detail = (message || label).slice(0, 120)
+  return {
+    phase: 'reasoning',
+    label: 'Finishing turn',
+    detail: detail || 'Completing turn after answer',
+    progress: null,
+    current: null,
+    total: null,
+  }
+}
+
 /** Map core ``progress`` SSE to activity-bar state (determinate when current/total present). */
 export function progressEventToUpdate(ev: CoreProgressEvent): ProcessUpdate {
   const label = String(ev.label ?? '').trim()
@@ -31,7 +58,7 @@ export function progressEventToUpdate(ev: CoreProgressEvent): ProcessUpdate {
 
   return {
     phase,
-    label: label || PHASE_LABELS[phase],
+    label: progressDisplayLabel(label, message, phase),
     detail: (message || label).slice(0, 120) || undefined,
     progress: fraction,
     current: typeof ev.current === 'number' ? ev.current : undefined,

@@ -19,6 +19,11 @@ Run: `yarn test:full` or `sh scripts/test-local.sh full`. CI is optional.
 | **#26** Git poll (not inotify) | Partial | `git-polling.spec.ts`, `src/hooks/useGitStatus.test.ts` |
 | **#27** Git visualization | Done (desktop) | `tauri-git.spec.ts` (mock Tauri) |
 | **#28** Context attach | Partial | `chat-context.spec.ts`, `roadmap-gaps.spec.ts` |
+| **#32** Suggested files / queued `/add` | Partial | `suggestedFiles.test.ts`, `e2e/suggested-files.spec.ts`, `SuggestedFilesTray` |
+| **#34** Thinking timers | Partial | `thinkingTiming.test.ts`, `data-testid=thinking-timer`, Settings section |
+| **#35** Context / file counter | Partial | `contextUsage.test.ts`, `session-context.spec.ts`, `session-context-chip` |
+| **#36** LLM ping | Partial | `local-llm-ping.spec.ts`, `llm_ping` Tauri command |
+| **#33** Resource overlay | Partial | `resource-overlay.spec.ts`, `resource-overlay` test id |
 | **#30** Web parity | Partial | context + settings + path-completion (web branch) |
 | **#31** Release hygiene | Operator | `release-hygiene.spec.ts` (docs, submodule, optional verify) |
 | **#20–22** Kiro-depth spec | Open | `roadmap-gaps.spec.ts` (buttons only) |

@@ -4,10 +4,15 @@ import {
   useContext,
   useMemo,
   useReducer,
+  useRef,
   type ReactNode,
 } from 'react'
 import type { CoreEventBase, CoreProgressEvent } from '../ipc/events'
-import { progressEventToUpdate } from './ingestProgress'
+import {
+  isWaitingForModelProgress,
+  progressEventToUpdate,
+  progressUpdateAfterStreamedTokens,
+} from './ingestProgress'
 import {
   IDLE_SNAPSHOT,
   PHASE_LABELS,
@@ -69,6 +74,7 @@ const ProcessContext = createContext<ProcessController | null>(null)
 
 export function ProcessProvider({ children }: { children: ReactNode }) {
   const [snapshot, dispatch] = useReducer(reducer, IDLE_SNAPSHOT)
+  const streamedTokensThisTurnRef = useRef(false)
 
   const apply = useCallback((update: ProcessUpdate) => {
     dispatch({ type: 'apply', update })
@@ -81,6 +87,7 @@ export function ProcessProvider({ children }: { children: ReactNode }) {
       detail?: string,
       progress?: number | null
     ) => {
+      streamedTokensThisTurnRef.current = false
       dispatch({
         type: 'apply',
         update: {
@@ -99,18 +106,37 @@ export function ProcessProvider({ children }: { children: ReactNode }) {
 
   const ingestCoreEvent = useCallback((ev: CoreEventBase) => {
     switch (ev.type) {
-      case 'progress':
-        dispatch({
-          type: 'apply',
-          update: progressEventToUpdate(ev as CoreProgressEvent),
-        })
+      case 'progress': {
+        const raw = progressEventToUpdate(ev as CoreProgressEvent)
+        const update =
+          streamedTokensThisTurnRef.current && isWaitingForModelProgress(raw)
+            ? progressUpdateAfterStreamedTokens(ev as CoreProgressEvent)
+            : raw
+        dispatch({ type: 'apply', update })
         break
+      }
       case 'token':
+        streamedTokensThisTurnRef.current = true
         dispatch({
           type: 'apply',
           update: {
             phase: 'reasoning',
-            label: PHASE_LABELS.reasoning,
+            label: 'Answering',
+            detail: 'Streaming from model',
+            progress: null,
+            current: null,
+            total: null,
+          },
+        })
+        break
+      case 'assistant_complete':
+        streamedTokensThisTurnRef.current = true
+        dispatch({
+          type: 'apply',
+          update: {
+            phase: 'reasoning',
+            label: 'Finishing turn',
+            detail: 'Assistant reply complete',
             progress: null,
             current: null,
             total: null,
@@ -146,6 +172,7 @@ export function ProcessProvider({ children }: { children: ReactNode }) {
         break
       }
       case 'done':
+        streamedTokensThisTurnRef.current = false
         if (ev.commit_hash) {
           dispatch({
             type: 'apply',
@@ -162,6 +189,7 @@ export function ProcessProvider({ children }: { children: ReactNode }) {
         }
         break
       case 'error':
+        streamedTokensThisTurnRef.current = false
         dispatch({
           type: 'fail',
           message: String(ev.text ?? 'Unknown error'),

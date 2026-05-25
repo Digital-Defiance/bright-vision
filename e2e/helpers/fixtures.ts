@@ -79,6 +79,17 @@ export function slowTurnEvents() {
   ]
 }
 
+/** Assistant lists files to add — exercises roadmap #32 tray. */
+export function suggestedFilesTurnEvents() {
+  return [
+    {
+      type: 'token',
+      text: `► **ANSWER**\nAdd these next:\n\n- \`src/suggested-a.ts\`\n- \`src/suggested-b.ts\`\n\nPlease add these files when ready.\n`,
+    },
+    { type: 'done', edited_files: [] },
+  ]
+}
+
 /** Incomplete turn — mock route should hang until the client aborts (queue / stop tests). */
 export function hangingTurnEvents() {
   return [{ type: 'token', text: '► **REASONING**\nWorking…\n' }]

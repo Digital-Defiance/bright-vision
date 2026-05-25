@@ -12,8 +12,18 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
 import { DISPLAY_CORE, ErrorSource, prefixForTechnicalLog, prefixForUserFacing } from './brand'
 import { AppChrome } from './components/layout/AppChrome'
+import { ResourceOverlay } from './components/layout/ResourceOverlay'
 import { DEFAULT_CONFIG, defaultCoreApiUrl, type AiderConfig } from './ipc/config'
+import {
+  applyLocalLlmToConfig,
+  isOllamaVisionModel,
+  resolveLocalLlmForConfig,
+  type LocalLlmRuntimeStatus,
+  type LocalLlmSnapshot,
+} from './ipc/localLlm'
+import { LocalLlmPanel } from './components/local-llm/LocalLlmPanel'
 import { type CoreConfirmEvent, type CoreEventBase } from './ipc/events'
+import { SseIdleTimeoutError } from './ipc/sseIdle'
 import {
   appendStreamingToken,
   capList,
@@ -38,6 +48,11 @@ import { useCommandCatalog } from './hooks/useCommandCatalog'
 import { useGitStatus } from './hooks/useGitStatus'
 import { autoStageEditedFiles } from './ipc/gitStatus'
 import { useSessionActivity } from './hooks/useSessionActivity'
+import {
+  buildQueuedAddMessages,
+  filterPathsNotInChat,
+  mergeSuggestedPaths,
+} from './utils/suggestedFiles'
 import { ChatPanel, type ChatMessage, type ToolEvent } from './components/chat/ChatPanel'
 import { TodoPanel } from './components/todos/TodoPanel'
 import { GitPanel } from './components/GitPanel'
@@ -55,6 +70,37 @@ import {
   saveAppearance,
   type AppearanceConfig,
 } from './theme/appearance'
+import {
+  DEFAULT_THINKING_TIMING_PREFS,
+  loadThinkingTimingPrefs,
+  saveThinkingTimingPrefs,
+  type ThinkingTimingPrefs,
+} from './theme/thinkingTimingPrefs'
+import {
+  DEFAULT_RESOURCE_OVERLAY_PREFS,
+  loadResourceOverlayPrefs,
+  saveResourceOverlayPrefs,
+  type ResourceOverlayPrefs,
+} from './theme/resourceOverlayPrefs'
+import { useThinkingTiming } from './hooks/useThinkingTiming'
+import { useSessionStallWatch } from './hooks/useSessionStallWatch'
+import { useResourceOverlay } from './hooks/useResourceOverlay'
+import {
+  clearModelThinkingStats,
+  loadThinkingStats,
+  saveThinkingStats,
+} from './utils/thinkingStats'
+import type { TurnThinkingTiming } from './utils/thinkingTiming'
+import { estimatePathsContextChars } from './ipc/contextEstimate'
+import {
+  charsToEstimatedTokens,
+  EMPTY_CONTEXT_USAGE,
+  formatSessionContextChip,
+  formatTokenCount,
+  parseTokenUsageReport,
+  sessionContextTooltip,
+  type SessionContextUsage,
+} from './utils/contextUsage'
 import { createVisionTheme } from './theme'
 
 const WELCOME_DISMISSED_KEY = 'vision-welcome-dismissed'
@@ -74,6 +120,15 @@ function migrateConfig(raw: Partial<AiderConfig> & Record<string, unknown>): Aid
   }
   if (typeof merged.autoStageOnDone !== 'boolean') {
     merged.autoStageOnDone = true
+  }
+  if (typeof merged.ollamaApiBase !== 'string') {
+    merged.ollamaApiBase = ''
+  }
+  if (typeof merged.localLlmRoot !== 'string') {
+    merged.localLlmRoot = ''
+  }
+  if (typeof merged.manageLocalLlm !== 'boolean') {
+    merged.manageLocalLlm = true
   }
   if (!merged.coreApiUrl || merged.coreApiUrl === DEFAULT_CONFIG.coreApiUrl) {
     if (!isTauriRuntime()) merged.coreApiUrl = defaultCoreApiUrl()
@@ -104,9 +159,17 @@ const NAV: { id: TabId; label: string; icon: ReactNode }[] = [
 function AppShell({
   appearance,
   setAppearance,
+  thinkingTimingPrefs,
+  setThinkingTimingPrefs,
+  resourceOverlayPrefs,
+  setResourceOverlayPrefs,
 }: {
   appearance: AppearanceConfig
   setAppearance: React.Dispatch<React.SetStateAction<AppearanceConfig>>
+  thinkingTimingPrefs: ThinkingTimingPrefs
+  setThinkingTimingPrefs: React.Dispatch<React.SetStateAction<ThinkingTimingPrefs>>
+  resourceOverlayPrefs: ResourceOverlayPrefs
+  setResourceOverlayPrefs: React.Dispatch<React.SetStateAction<ResourceOverlayPrefs>>
 }) {
   const [activeTab, setActiveTab] = useState<TabId>('chat')
   const [config, setConfig] = useState<AiderConfig>(DEFAULT_CONFIG)
@@ -144,7 +207,32 @@ function AppShell({
   const reloadTodosRef = useRef<() => void | Promise<void>>(async () => {})
   const savedConfigRef = useRef(savedConfig)
   savedConfigRef.current = savedConfig
+  const chatMessagesRef = useRef(chatMessages)
+  chatMessagesRef.current = chatMessages
+  const ingestSuggestionsRef = useRef<(content: string) => void>(() => {})
+  const lastUserPromptCharsRef = useRef(0)
+  const turnTimingActiveRef = useRef(false)
+  const refreshSessionInfoRef = useRef<() => Promise<import('./ipc/httpClient').CoreSessionInfo | null>>(
+    async () => null
+  )
+  const syncSessionFilesRef = useRef<(files: string[]) => void>(() => {})
+
+  const thinkingTimingRef = useRef<{
+    beginTurn: (n: number) => void
+    syncContent: (content: string) => void
+    finalizeTurn: (content: string) => TurnThinkingTiming | null
+    reset: () => void
+    recordCompletedTurn: (t: TurnThinkingTiming) => void
+  }>({
+    beginTurn: () => {},
+    syncContent: () => {},
+    finalizeTurn: () => null,
+    reset: () => {},
+    recordCompletedTurn: () => {},
+  })
   const unlistenersRef = useRef<UnlistenFn[]>([])
+  const [suggestedPaths, setSuggestedPaths] = useState<string[]>([])
+  const [contextUsage, setContextUsage] = useState<SessionContextUsage>(EMPTY_CONTEXT_USAGE)
 
   useEffect(() => {
     const stored = localStorage.getItem('aider-vision-config')
@@ -167,14 +255,27 @@ function AppShell({
         merged.pythonPath.trim()
           ? Promise.resolve(merged.pythonPath)
           : invoke<string>('default_python_path'),
+        invoke<LocalLlmSnapshot>('read_local_llm_config', {
+          localLlmRoot: merged.localLlmRoot.trim() || null,
+        }),
       ])
-        .then(([dir, pythonPath]) => {
-          const next = {
+        .then(([dir, pythonPath, localLlm]) => {
+          let next = {
             ...merged,
             workingDir: dir,
             pythonPath: merged.pythonPath.trim() || pythonPath,
           }
-          if (dir !== merged.workingDir || next.pythonPath !== merged.pythonPath) {
+          if (!next.localLlmRoot.trim() && localLlm.repoLocalLlmRoot) {
+            next = { ...next, localLlmRoot: 'local-llm' }
+          }
+          next = applyLocalLlmToConfig(next, localLlm, true)
+          if (
+            dir !== merged.workingDir ||
+            next.pythonPath !== merged.pythonPath ||
+            next.localLlmRoot !== merged.localLlmRoot ||
+            next.ollamaApiBase !== merged.ollamaApiBase ||
+            next.model !== merged.model
+          ) {
             setSavedConfig(next)
             localStorage.setItem('aider-vision-config', JSON.stringify(next))
           }
@@ -289,7 +390,14 @@ function AppShell({
     setChatMessages((prev) => removeChatMessageById(prev, id))
   }, [])
 
+  const stallWatchRef = useRef<(type: string, detail?: string) => void>(() => {})
+
   const handleCoreEvent = useCallback((ev: CoreEventBase) => {
+    const progressDetail =
+      ev.type === 'progress'
+        ? String((ev as { message?: string }).message ?? (ev as { label?: string }).label ?? '')
+        : undefined
+    stallWatchRef.current(ev.type, progressDetail)
     process.ingestCoreEvent(ev)
     if (ev.type === 'done') bumpGitRefresh()
     const orderId = nextChatMessageId()
@@ -318,23 +426,34 @@ function AppShell({
         if (!chunk) break
         let sid = streamingAssistantId.current
         if (sid === null) {
+          if (!turnTimingActiveRef.current) {
+            thinkingTimingRef.current.beginTurn(lastUserPromptCharsRef.current)
+            turnTimingActiveRef.current = true
+          }
           sid = orderId
           streamingAssistantId.current = sid
-          setChatMessages((prev) =>
-            capList([...prev, { id: sid!, role: 'assistant' as const, content: chunk }], MAX_CHAT_MESSAGES)
-          )
-        } else {
-          const captureSid = sid
-          setChatMessages((prev) =>
-            capList(
-              prev.map((m) =>
-                m.id === captureSid
-                  ? { ...m, content: appendStreamingToken(m.content, chunk) }
-                  : m
-              ),
+          setChatMessages((prev) => {
+            const next = capList(
+              [...prev, { id: sid!, role: 'assistant' as const, content: chunk }],
               MAX_CHAT_MESSAGES
             )
-          )
+            thinkingTimingRef.current.syncContent(chunk)
+            return next
+          })
+        } else {
+          const captureSid = sid
+          setChatMessages((prev) => {
+            const next = capList(
+              prev.map((m) => {
+                if (m.id !== captureSid) return m
+                const content = appendStreamingToken(m.content, chunk)
+                thinkingTimingRef.current.syncContent(content)
+                return { ...m, content }
+              }),
+              MAX_CHAT_MESSAGES
+            )
+            return next
+          })
         }
         break
       }
@@ -345,6 +464,10 @@ function AppShell({
         const usage = parseTokenUsage(text)
         if (usage) {
           setTokenStats(usage)
+          const report = parseTokenUsageReport(text)
+          if (report) {
+            setContextUsage((prev) => ({ ...prev, lastReport: report }))
+          }
           break
         }
         if (!text.trim()) break
@@ -427,26 +550,42 @@ function AppShell({
           ev.edited_files && Array.isArray(ev.edited_files)
             ? (ev.edited_files as string[])
             : []
+        let turnTiming: TurnThinkingTiming | null = null
+        {
+          const prev = chatMessagesRef.current
+          for (let i = prev.length - 1; i >= 0; i--) {
+            const m = prev[i]
+            if (m.role === 'assistant' && m.content.trim()) {
+              turnTiming = thinkingTimingRef.current.finalizeTurn(m.content)
+              turnTimingActiveRef.current = false
+              if (turnTiming) thinkingTimingRef.current.recordCompletedTurn(turnTiming)
+              break
+            }
+          }
+        }
         streamingAssistantId.current = null
         setStatusMessage('Ready')
-        if (applied.length > 0) {
-          setChatMessages((prev) => {
-            let lastAssistantId: number | null = null
-            for (let i = prev.length - 1; i >= 0; i--) {
-              if (prev[i].role === 'assistant') {
-                lastAssistantId = prev[i].id
-                break
-              }
+        setChatMessages((prev) => {
+          let lastAssistantId: number | null = null
+          for (let i = prev.length - 1; i >= 0; i--) {
+            if (prev[i].role === 'assistant') {
+              lastAssistantId = prev[i].id
+              break
             }
-            if (lastAssistantId === null) return prev
-            return capList(
-              prev.map((m) =>
-                m.id === lastAssistantId ? { ...m, appliedFiles: applied } : m
-              ),
-              MAX_CHAT_MESSAGES
-            )
-          })
-        }
+          }
+          if (lastAssistantId === null) return prev
+          return capList(
+            prev.map((m) => {
+              if (m.id !== lastAssistantId) return m
+              return {
+                ...m,
+                ...(applied.length > 0 ? { appliedFiles: applied } : {}),
+                ...(turnTiming ? { turnTiming } : {}),
+              }
+            }),
+            MAX_CHAT_MESSAGES
+          )
+        })
         if (applied.length > 0) {
           setTerminalLines((prev) => [
             ...prev,
@@ -497,6 +636,19 @@ function AppShell({
               })
             })
         }
+        {
+          const prev = chatMessagesRef.current
+          for (let i = prev.length - 1; i >= 0; i--) {
+            const m = prev[i]
+            if (m.role === 'assistant' && m.content.trim()) {
+              ingestSuggestionsRef.current(m.content)
+              break
+            }
+          }
+        }
+        void refreshSessionInfoRef.current().then((info) => {
+          if (info?.files_in_chat) syncSessionFilesRef.current(info.files_in_chat)
+        })
         break
       }
       case 'error':
@@ -528,13 +680,25 @@ function AppShell({
     }
   }, [process, bumpGitRefresh, nextChatMessageId])
 
-  const { pendingConfirm, setPendingConfirm, dismissConfirm, lastGit, setFilesInChat, wrapHandler } =
+  const { pendingConfirm, setPendingConfirm, dismissConfirm, lastGit, filesInChat, setFilesInChat, wrapHandler } =
     useSessionActivity()
+
+  const filesInChatRef = useRef(filesInChat)
+  filesInChatRef.current = filesInChat
+
+  ingestSuggestionsRef.current = (content: string) => {
+    setSuggestedPaths((prev) => mergeSuggestedPaths(prev, content, filesInChatRef.current))
+  }
+
+  useEffect(() => {
+    setSuggestedPaths((prev) => filterPathsNotInChat(prev, filesInChat))
+  }, [filesInChat])
   const {
     isRunning,
     isStarting,
     isBusy,
     queuedCount,
+    clearQueue,
     sessionInfo,
     httpClient,
     start,
@@ -545,7 +709,66 @@ function AppShell({
     addFiles,
     uploadFiles,
     undo,
+    refreshSessionInfo,
+    patchSessionFiles,
   } = useAiderSession(wrapHandler(handleCoreEvent))
+
+  refreshSessionInfoRef.current = refreshSessionInfo
+
+  const syncSessionFiles = useCallback(
+    (files: string[]) => {
+      setFilesInChat(files)
+      patchSessionFiles(files)
+    },
+    [setFilesInChat, patchSessionFiles]
+  )
+
+  syncSessionFilesRef.current = syncSessionFiles
+
+  const recordAddedContextEstimate = useCallback(async (paths: string[]) => {
+    if (!paths.length) return
+    const chars = await estimatePathsContextChars(savedConfig.workingDir, paths)
+    const est = charsToEstimatedTokens(chars)
+    if (est <= 0) return
+    setContextUsage((prev) => ({
+      ...prev,
+      estimatedFromAdds: prev.estimatedFromAdds + est,
+    }))
+    return est
+  }, [savedConfig.workingDir])
+
+  const applyFilesAdded = useCallback(
+    async (paths: string[], info: { files_in_chat: string[] }, label?: string) => {
+      syncSessionFiles(info.files_in_chat)
+      const est = await recordAddedContextEstimate(paths)
+      const parts: string[] = []
+      if (label) parts.push(label)
+      if (est && est > 0) parts.push(`+~${formatTokenCount(est)} context`)
+      if (parts.length) {
+        setSnackbar({ message: parts.join(' · '), severity: 'info' })
+      }
+    },
+    [syncSessionFiles, recordAddedContextEstimate]
+  )
+
+  const stallWatch = useSessionStallWatch(isBusy, queuedCount)
+  const resourceOverlay = useResourceOverlay(resourceOverlayPrefs)
+  stallWatchRef.current = stallWatch.touchEvent
+
+  const thinkingTiming = useThinkingTiming(savedConfig.model, thinkingTimingPrefs, isBusy)
+  thinkingTimingRef.current = {
+    beginTurn: thinkingTiming.beginTurn,
+    syncContent: thinkingTiming.syncContent,
+    finalizeTurn: thinkingTiming.finalizeTurn,
+    reset: thinkingTiming.reset,
+    recordCompletedTurn: thinkingTiming.recordCompletedTurn,
+  }
+
+  const handleCancelSend = useCallback(() => {
+    thinkingTiming.reset()
+    turnTimingActiveRef.current = false
+    cancelSend()
+  }, [thinkingTiming, cancelSend])
 
   const lifecycleActive = isSessionLifecycleActive(
     process.snapshot,
@@ -646,6 +869,8 @@ function AppShell({
     setSavedConfig(config)
     localStorage.setItem('aider-vision-config', JSON.stringify(config))
     saveAppearance(appearance)
+    saveThinkingTimingPrefs(thinkingTimingPrefs)
+    saveResourceOverlayPrefs(resourceOverlayPrefs)
     setSnackbar({ message: 'Settings saved', severity: 'info' })
   }
 
@@ -656,6 +881,50 @@ function AppShell({
     setAppearance({ ...DEFAULT_APPEARANCE })
     localStorage.removeItem('aider-vision-appearance')
     applyAppearanceCssVars(DEFAULT_APPEARANCE)
+    setThinkingTimingPrefs({ ...DEFAULT_THINKING_TIMING_PREFS })
+    localStorage.removeItem('aider-vision-thinking-timing')
+    setResourceOverlayPrefs({ ...DEFAULT_RESOURCE_OVERLAY_PREFS })
+    localStorage.removeItem('aider-vision-resource-overlay')
+  }
+
+  const handleClearThinkingStatsForModel = useCallback(() => {
+    const next = clearModelThinkingStats(loadThinkingStats(), savedConfig.model)
+    saveThinkingStats(next)
+    thinkingTiming.refreshStats()
+    setSnackbar({ message: 'Thinking stats cleared for current model', severity: 'info' })
+  }, [savedConfig.model, thinkingTiming])
+
+  const appendTerminalLog = useCallback((lines: string[]) => {
+    if (!lines.length) return
+    setTerminalLines((prev) => [
+      ...prev,
+      ...lines.map((text, i) => ({
+        id: Date.now() + i,
+        text,
+        type: 'stdout' as const,
+        source: 'vision' as const,
+      })),
+    ])
+  }, [])
+
+  const ensureLocalLlm = async (): Promise<void> => {
+    if (!isTauriRuntime() || !savedConfig.manageLocalLlm || !isOllamaVisionModel(savedConfig.model)) {
+      return
+    }
+    const { ollamaHost, modelTag } = resolveLocalLlmForConfig(savedConfig)
+    if (!modelTag) return
+    process.apply({ phase: 'booting_api', label: 'Starting Local LLM', progress: 0.1 })
+    try {
+      const s = await invoke<LocalLlmRuntimeStatus>('local_llm_start_plain', {
+        ollamaHost,
+        modelTag,
+      })
+      appendTerminalLog(s.logs.map((l) => `[local-llm] ${l}`))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      appendTerminalLog([`[local-llm] ${msg}`])
+      throw new Error(`Local LLM: ${msg}`)
+    }
   }
 
   const handleStart = async () => {
@@ -664,6 +933,7 @@ function AppShell({
       process.idle()
     }
     try {
+      await ensureLocalLlm()
       const { info, workingDir } = await start(savedConfig)
       if (workingDir !== savedConfig.workingDir) {
         const next = { ...savedConfig, workingDir }
@@ -671,7 +941,8 @@ function AppShell({
         setConfig(next)
         localStorage.setItem('aider-vision-config', JSON.stringify(next))
       }
-      setFilesInChat(info.files_in_chat ?? [])
+      syncSessionFiles(info.files_in_chat ?? [])
+      setContextUsage(EMPTY_CONTEXT_USAGE)
       setRemainingAutoApproves(savedConfig.autoApproveLimit)
       todoInjectedIdRef.current = null
       streamingAssistantId.current = null
@@ -710,7 +981,11 @@ function AppShell({
     try {
       await stop()
       process.idle()
-      setFilesInChat([])
+      syncSessionFiles([])
+      setContextUsage(EMPTY_CONTEXT_USAGE)
+      setSuggestedPaths([])
+      thinkingTiming.reset()
+      turnTimingActiveRef.current = false
       setRemainingAutoApproves(0)
       setTerminalLines((prev) => [
         ...prev,
@@ -738,18 +1013,18 @@ function AppShell({
       })
       if (!paths.length) return
       const info = await addFiles(paths)
-      setFilesInChat(info.files_in_chat)
-      setSnackbar({
-        message: `Attached ${paths.length} file${paths.length === 1 ? '' : 's'} to the session`,
-        severity: 'info',
-      })
+      await applyFilesAdded(
+        paths,
+        info,
+        `Attached ${paths.length} file${paths.length === 1 ? '' : 's'} to the session`
+      )
     } catch (err) {
       setSnackbar({
         message: err instanceof Error ? err.message : String(err),
         severity: 'error',
       })
     }
-  }, [isRunning, savedConfig.workingDir, addFiles, setFilesInChat])
+  }, [isRunning, savedConfig.workingDir, addFiles, applyFilesAdded])
 
   const handleAttachFiles = useCallback(
     async (files: FileList) => {
@@ -764,11 +1039,12 @@ function AppShell({
           return
         }
         const info = await uploadFiles(parts)
-        setFilesInChat(info.files_in_chat)
-        setSnackbar({
-          message: `Attached ${parts.length} file${parts.length === 1 ? '' : 's'} to the session`,
-          severity: 'info',
-        })
+        const names = parts.map((p) => p.filename)
+        await applyFilesAdded(
+          names,
+          info,
+          `Attached ${parts.length} file${parts.length === 1 ? '' : 's'} to the session`
+        )
       } catch (err) {
         setSnackbar({
           message: err instanceof Error ? err.message : String(err),
@@ -776,7 +1052,7 @@ function AppShell({
         })
       }
     },
-    [isRunning, uploadFiles, setFilesInChat]
+    [isRunning, uploadFiles, applyFilesAdded]
   )
 
   const handleAttachTerminalTail = useCallback(() => {
@@ -802,15 +1078,14 @@ function AppShell({
       })
       if (!picked) return
       const info = await addFiles([picked])
-      setFilesInChat(info.files_in_chat)
-      setSnackbar({ message: 'Folder added to session context', severity: 'info' })
+      await applyFilesAdded([picked], info, 'Folder added to session context')
     } catch (err) {
       setSnackbar({
         message: err instanceof Error ? err.message : String(err),
         severity: 'error',
       })
     }
-  }, [isRunning, savedConfig.workingDir, addFiles, setFilesInChat])
+  }, [isRunning, savedConfig.workingDir, addFiles, applyFilesAdded])
 
   const handleAttachFolderPath = useCallback(
     async (relativePath: string) => {
@@ -819,8 +1094,7 @@ function AppShell({
       if (!path) return
       try {
         const info = await addFiles([path])
-        setFilesInChat(info.files_in_chat)
-        setSnackbar({ message: `Added folder ${path} to session context`, severity: 'info' })
+        await applyFilesAdded([path], info, `Added folder ${path} to session context`)
       } catch (err) {
         setSnackbar({
           message: err instanceof Error ? err.message : String(err),
@@ -828,8 +1102,100 @@ function AppShell({
         })
       }
     },
-    [isRunning, addFiles, setFilesInChat]
+    [isRunning, addFiles, applyFilesAdded]
   )
+
+  const handleDismissSuggested = useCallback((path: string) => {
+    setSuggestedPaths((prev) => prev.filter((p) => p !== path))
+  }, [])
+
+  const handleClearSuggested = useCallback(() => setSuggestedPaths([]), [])
+
+  const handleAddSuggestedOne = useCallback(
+    async (path: string) => {
+      if (!isRunning) return
+      try {
+        const info = await addFiles([path])
+        setSuggestedPaths((prev) => filterPathsNotInChat(prev, info.files_in_chat))
+        await applyFilesAdded([path], info, `Added ${path} to session`)
+      } catch (err) {
+        setSnackbar({
+          message: err instanceof Error ? err.message : String(err),
+          severity: 'error',
+        })
+      }
+    },
+    [isRunning, addFiles, applyFilesAdded]
+  )
+
+  const handleAddAllSuggested = useCallback(async () => {
+    if (!isRunning || suggestedPaths.length === 0) return
+    const paths = [...suggestedPaths]
+    try {
+      const info = await addFiles(paths)
+      setSuggestedPaths((prev) => filterPathsNotInChat(prev, info.files_in_chat))
+      await applyFilesAdded(
+        paths,
+        info,
+        `Added ${paths.length} file${paths.length === 1 ? '' : 's'} to session`
+      )
+    } catch (err) {
+      setSnackbar({
+        message: err instanceof Error ? err.message : String(err),
+        severity: 'error',
+      })
+    }
+  }, [isRunning, suggestedPaths, addFiles, applyFilesAdded])
+
+  const handleQueueSuggestedAdds = useCallback(async () => {
+    if (!isRunning || suggestedPaths.length === 0) return
+    const paths = [...suggestedPaths]
+    if (isBusy) {
+      try {
+        const info = await addFiles(paths)
+        setSuggestedPaths((prev) => filterPathsNotInChat(prev, info.files_in_chat))
+        await applyFilesAdded(
+          paths,
+          info,
+          `Added ${paths.length} file${paths.length === 1 ? '' : 's'} while the current turn finishes`
+        )
+      } catch (err) {
+        setSnackbar({
+          message: err instanceof Error ? err.message : String(err),
+          severity: 'error',
+        })
+      }
+      return
+    }
+    const msgs = buildQueuedAddMessages(paths)
+    for (const msg of msgs) appendUserMessageToChat(msg, true)
+    try {
+      const first = await send(msgs[0])
+      for (let i = 1; i < msgs.length; i++) void send(msgs[i])
+      setSnackbar({
+        message: first.queued
+          ? `Queued ${msgs.length} /add message${msgs.length === 1 ? '' : 's'}`
+          : `Sending ${msgs.length} /add message${msgs.length === 1 ? '' : 's'} when ready`,
+        severity: 'info',
+      })
+      setSuggestedPaths([])
+    } catch (err) {
+      for (let i = 0; i < msgs.length; i++) removeLastPendingUserMessage()
+      setSnackbar({
+        message: err instanceof Error ? err.message : String(err),
+        severity: 'error',
+      })
+    }
+  }, [
+    isRunning,
+    isBusy,
+    suggestedPaths,
+    addFiles,
+    applyFilesAdded,
+    appendUserMessageToChat,
+    send,
+    removeLastPendingUserMessage,
+  ])
 
   const handleStartWork = useCallback(
     async (todo: TodoItem) => {
@@ -927,6 +1293,9 @@ function AppShell({
     if (!inputValue.trim() || !isRunning) return
     const text = inputValue.trim()
     setInputValue('')
+    lastUserPromptCharsRef.current = text.length
+    stallWatch.touchEvent('user_send')
+
     appendUserMessageToChat(text, true)
     const injectSpec = Boolean(activeTodo && todoInjectedIdRef.current !== activeTodo.id)
     const todoOptions = activeTodo
@@ -951,7 +1320,12 @@ function AppShell({
       removeLastPendingUserMessage()
       setInputValue(text)
       setSnackbar({
-        message: err instanceof Error ? err.message : String(err),
+        message:
+          err instanceof SseIdleTimeoutError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : String(err),
         severity: 'error',
       })
     }
@@ -994,7 +1368,7 @@ function AppShell({
     return line.source === 'vision' ? 'warning.main' : 'error.main'
   }
 
-  const sessionFiles = sessionInfo?.files_in_chat
+  const sessionFiles = filesInChat
 
   const headerExtra = (
     <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
@@ -1010,10 +1384,11 @@ function AppShell({
       </Typography>
       {isRunning && sessionInfo && (
         <Chip
-          label={`${sessionInfo.files_in_chat?.length ?? 0} files`}
+          data-testid="session-context-chip"
+          label={formatSessionContextChip(sessionFiles.length, contextUsage)}
           size="small"
           variant="outlined"
-          title={sessionInfo.files_in_chat?.join('\n')}
+          title={sessionContextTooltip(sessionFiles, contextUsage)}
         />
       )}
       {remainingAutoApproves > 0 && (
@@ -1025,7 +1400,24 @@ function AppShell({
         />
       )}
       {queuedCount > 0 && (
-        <Chip label={`${queuedCount} queued`} size="small" color="info" variant="outlined" />
+        <>
+          <Chip label={`${queuedCount} queued`} size="small" color="info" variant="outlined" />
+          <Button
+            size="small"
+            variant="text"
+            color="inherit"
+            data-testid="clear-message-queue"
+            onClick={() => {
+              clearQueue()
+              setSnackbar({
+                message: 'Cleared queued messages — current turn still runs until Stop or done',
+                severity: 'info',
+              })
+            }}
+          >
+            Clear queue
+          </Button>
+        </>
       )}
       {activeTodo && (
         <Chip
@@ -1049,6 +1441,14 @@ function AppShell({
         process={process.snapshot}
         isRunning={isRunning}
         headerExtra={headerExtra}
+        footerOverlay={
+          resourceOverlay.enabled && resourceOverlay.snapshot ? (
+            <ResourceOverlay
+              snapshot={resourceOverlay.snapshot}
+              prefs={resourceOverlayPrefs}
+            />
+          ) : undefined
+        }
       >
           {activeTab === 'chat' && (
             <>
@@ -1079,7 +1479,16 @@ function AppShell({
               chatEndRef={chatEndRef}
               onInputChange={setInputValue}
               onSend={handleSend}
-              onCancelSend={cancelSend}
+              onCancelSend={handleCancelSend}
+              thinkingTimingPrefs={thinkingTimingPrefs}
+              liveThinking={thinkingTiming.live}
+              turnActivityHint={stallWatch.hint}
+              turnStalled={stallWatch.stalled}
+              lastEventAgoMs={
+                stallWatch.activity.kind !== 'idle'
+                  ? stallWatch.activity.sinceLastEventMs
+                  : null
+              }
               onConfirmAnswer={handleConfirmAnswer}
               onDismissMessage={handleDismissMessage}
               commands={commands}
@@ -1095,6 +1504,12 @@ function AppShell({
               onAttachFolderPath={
                 !isTauriRuntime() ? (path) => void handleAttachFolderPath(path) : undefined
               }
+              suggestedFilePaths={suggestedPaths}
+              onSuggestedAddOne={(path) => void handleAddSuggestedOne(path)}
+              onSuggestedAddAll={() => void handleAddAllSuggested()}
+              onSuggestedQueueAdds={() => void handleQueueSuggestedAdds()}
+              onSuggestedDismiss={handleDismissSuggested}
+              onSuggestedClearAll={handleClearSuggested}
             />
             </>
           )}
@@ -1163,6 +1578,14 @@ function AppShell({
 
           {activeTab === 'terminal' && (
             <Paper variant="outlined" sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <Box sx={{ px: 2, pt: 2 }}>
+                <LocalLlmPanel
+                  config={config}
+                  compact
+                  onManageChange={(manageLocalLlm) => setConfig({ ...config, manageLocalLlm })}
+                  onLogLines={appendTerminalLog}
+                />
+              </Box>
               <Typography
                 variant="caption"
                 color="text.secondary"
@@ -1233,6 +1656,12 @@ function AppShell({
                 sessionFiles={sessionFiles}
                 onChange={setConfig}
                 onAppearanceChange={setAppearance}
+                thinkingTimingPrefs={thinkingTimingPrefs}
+                onThinkingTimingPrefsChange={setThinkingTimingPrefs}
+                thinkingModelSummary={thinkingTiming.modelSummary}
+                onClearThinkingStatsForModel={handleClearThinkingStatsForModel}
+                resourceOverlayPrefs={resourceOverlayPrefs}
+                onResourceOverlayPrefsChange={setResourceOverlayPrefs}
                 onSave={handleSave}
                 onReset={handleReset}
               />
@@ -1258,6 +1687,12 @@ function AppShell({
 
 export default function App() {
   const [appearance, setAppearance] = useState<AppearanceConfig>(() => loadAppearance())
+  const [thinkingTimingPrefs, setThinkingTimingPrefs] = useState<ThinkingTimingPrefs>(() =>
+    loadThinkingTimingPrefs()
+  )
+  const [resourceOverlayPrefs, setResourceOverlayPrefs] = useState<ResourceOverlayPrefs>(() =>
+    loadResourceOverlayPrefs()
+  )
   const fonts = useMemo(() => resolveAppearanceFonts(appearance), [appearance])
   const theme = useMemo(() => createVisionTheme(fonts.ui), [fonts.ui])
 
@@ -1269,7 +1704,14 @@ export default function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <ProcessProvider>
-        <AppShell appearance={appearance} setAppearance={setAppearance} />
+        <AppShell
+          appearance={appearance}
+          setAppearance={setAppearance}
+          thinkingTimingPrefs={thinkingTimingPrefs}
+          setThinkingTimingPrefs={setThinkingTimingPrefs}
+          resourceOverlayPrefs={resourceOverlayPrefs}
+          setResourceOverlayPrefs={setResourceOverlayPrefs}
+        />
       </ProcessProvider>
     </ThemeProvider>
   )

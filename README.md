@@ -49,6 +49,9 @@ Living backlog: **[docs/ROADMAP.md](docs/ROADMAP.md)** (also on the [project sit
 | **19** | Partial | Submodule/multi-repo — automated verify green; manual A–D dogfood sign-off pending |
 | **26** | Partial | File awareness via git poll (8s); native FS watcher still open |
 | **28** | Partial | Context: images, `/add`, folder attach; file-tree picker open |
+| **32** | Partial | Suggested files tray — parse Answer paths; Add all / queue `/add` (#4) |
+| **33** | Longer-term | Optional CPU/RAM (GPU best-effort) overlay — bottom-left HUD, Tauri + Settings |
+| **34** | Partial | Thinking timers — live + per-section durations; per-model stats in Settings |
 | **30** | Partial | Web dev via Vite proxy; full desktop parity for `/add` Tab + generate-spec |
 | **31** | Open | Release hygiene (tag core, bump submodule) — when sharing builds |
 | **20–22** | Open | Kiro-depth spec UX (dedicated spec agent, EARS linter, repo-wide spec index) |
@@ -62,6 +65,21 @@ Living backlog: **[docs/ROADMAP.md](docs/ROADMAP.md)** (also on the [project sit
 - **Frontend**: React + TypeScript + Vite
 - **Styling**: MUI v6 + Emotion (`src/theme.ts`); global SCSS in `src/styles/`
 - **Package Manager**: Yarn (Plug'n'Play)
+
+## 🔒 Local LLM first (privacy-first)
+
+Aider Vision is aimed at **local inference** on your own hardware — not at sending proprietary code through rented cloud IDEs. The happy path:
+
+1. Install **[Ollama](https://ollama.com/)** (model runtime).
+2. Configure **`local-llm/local-llm.env`** (`DATA_MODEL`, optional `OLLAMA_HOST`) — symlink the [local-llm](https://github.com/Digital-Defiance/local-llm) repo at `./local-llm`.
+3. **Desktop:** **Terminal → Local LLM → Start** (built-in plain profile) or leave **Auto before session** on and press **Start** — no shell script required.
+4. **Terminal → Start** (Vision Core session), then chat.
+
+Shell `./local-llm.sh` is only needed for **indexed** (Qdrant/Roo) stacks. See **[docs/LOCAL_LLM.md](docs/LOCAL_LLM.md)**.
+
+**Cloud / other providers** still work: change the model string to any LiteLLM id (`openai/…`, `anthropic/…`, etc.) and set the usual API keys in your environment before launching the app. Defaults favor Ollama; they do not remove other providers.
+
+Full guide: **[docs/LOCAL_LLM.md](docs/LOCAL_LLM.md)**.
 
 ## Note:
 
@@ -80,7 +98,7 @@ brew install aider-vision
 
 This installs `Aider Vision.app` to `/Applications/`.
 
-Tap repository: [digital-defiance/homebrew-tap](https://github.com/digital-defiance/homebrew-tap)
+Tap repository: [digital-defiance/homebrew-tap](https://github.com/Digital-Defiance/homebrew-tap)
 
 ### From source
 
@@ -95,7 +113,7 @@ Tap repository: [digital-defiance/homebrew-tap](https://github.com/digital-defia
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/digitaldefiance/aider-vision.git
+   git clone https://github.com/Digital-Defiance/aider-vision.git
    cd aider-vision
    ```
 
@@ -116,7 +134,9 @@ Tap repository: [digital-defiance/homebrew-tap](https://github.com/digital-defia
 
 ## ⚙️ Configuration
 
-**Settings → Model & system:** LLM model, LiteLLM extra params (JSON), project workspace, context files, auto-approve limit, prompt-before-commit, auto-stage on done, engine path (desktop).
+**Settings → Model & system:** LLM model (default `ollama_chat/qwen3.6:27b-q4_K_M` for local Ollama), LiteLLM extra params (JSON), project workspace, context files, auto-approve limit, prompt-before-commit, auto-stage on done, engine path (desktop).
+
+See **[docs/LOCAL_LLM.md](docs/LOCAL_LLM.md)** for Ollama + local-llm setup and provider env vars.
 
 **Settings → Appearance:** UI font, chat font (default [Glass TTY VT220](src/assets/fonts/Glass_TTY_VT220.woff2)), terminal font.
 
@@ -126,6 +146,7 @@ See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and [docs/USER_WORKFLOW.md](docs/
 
 | Doc | Topic |
 |-----|--------|
+| [LOCAL_LLM.md](docs/LOCAL_LLM.md) | Ollama, local-llm helper, model names, `OLLAMA_API_BASE`, cloud providers |
 | [ROADMAP.md](docs/ROADMAP.md) | Status, dogfooding focus, fix order |
 | [TESTING.md](docs/TESTING.md) | Local-first tests (`yarn test:local` / `test:full`) |
 | [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Setup and conventions |

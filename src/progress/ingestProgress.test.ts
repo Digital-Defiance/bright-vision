@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { phaseForProgressLabel, progressEventToUpdate, progressFraction } from './ingestProgress'
+import {
+  isWaitingForModelProgress,
+  phaseForProgressLabel,
+  progressEventToUpdate,
+  progressFraction,
+} from './ingestProgress'
 
 describe('progressFraction', () => {
   it('uses fraction when provided', () => {
@@ -25,6 +30,15 @@ describe('progressEventToUpdate', () => {
     expect(u.total).toBe(200)
   })
 
+  it('detects waiting-for-model progress updates', () => {
+    const u = progressEventToUpdate({
+      type: 'progress',
+      label: 'Waiting for ollama_chat/foo',
+      message: 'Waiting for ollama_chat/foo',
+    })
+    expect(isWaitingForModelProgress(u)).toBe(true)
+  })
+
   it('maps waiting spinner to reasoning without fraction', () => {
     const u = progressEventToUpdate({
       type: 'progress',
@@ -32,6 +46,7 @@ describe('progressEventToUpdate', () => {
       message: 'Waiting for gpt-4',
     })
     expect(u.phase).toBe('reasoning')
+    expect(u.label).toBe('Waiting for model')
     expect(u.progress).toBeNull()
   })
 })

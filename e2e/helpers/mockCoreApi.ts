@@ -135,8 +135,13 @@ export async function installMockCoreApi(page: Page, opts: MockCoreOptions = {})
     let events = nextTurn()
     try {
       const body = route.request().postDataJSON() as { content?: string }
-      if (body?.content?.trim()) {
-        events = [{ type: 'user_message', text: body.content.trim() }, ...events]
+      const content = body?.content?.trim()
+      if (content) {
+        events = [{ type: 'user_message', text: content }, ...events]
+        const addMatch = content.match(/^\/add\s+(\S+)/)
+        if (addMatch?.[1]) {
+          filesInChat = [...new Set([...filesInChat, addMatch[1]])]
+        }
       }
     } catch {
       /* ignore */

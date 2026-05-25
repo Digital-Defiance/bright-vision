@@ -1,8 +1,8 @@
+import { parseTokenUsageReport } from './contextUsage'
+
 /** Parse token usage line from core tool_output (base_coder.show_usage_report). */
 export function parseTokenUsage(text: string): string | null {
-  const t = text.trim()
-  if (!t.startsWith('Tokens:')) return null
-  return t
+  return parseTokenUsageReport(text)?.raw ?? null
 }
 
 export type AssistantSectionKind = 'thinking' | 'answer' | 'reasoning' | 'body'
@@ -58,6 +58,12 @@ function findMarkerHits(content: string): MarkerHit[] {
     deduped.push(hit)
   }
   return deduped
+}
+
+/** Section currently being streamed (last marker in content), or `body` if none. */
+export function getActiveAssistantSection(content: string): AssistantSectionKind {
+  const hits = findMarkerHits(content)
+  return hits.length > 0 ? hits[hits.length - 1].kind : 'body'
 }
 
 /** Split assistant text into labeled sections when markers are present. */

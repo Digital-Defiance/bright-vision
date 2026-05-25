@@ -1,6 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod git_ops;
+mod local_llm_config;
+mod local_llm_runtime;
+mod resource_monitor;
 
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -165,6 +168,53 @@ fn kill_listeners_on_port(port: u16) {
 fn kill_listeners_on_port(_port: u16) {}
 
 #[tauri::command]
+fn read_local_llm_config(local_llm_root: Option<String>) -> local_llm_config::LocalLlmSnapshot {
+    local_llm_config::read_local_llm_config(local_llm_root)
+}
+
+#[tauri::command]
+async fn local_llm_status(
+    ollama_host: String,
+    model_tag: String,
+) -> Result<local_llm_runtime::LocalLlmRuntimeStatus, String> {
+    local_llm_runtime::local_llm_status(&ollama_host, &model_tag).await
+}
+
+#[tauri::command]
+async fn ollama_models_snapshot(
+    ollama_host: String,
+    model_tag: String,
+) -> Result<local_llm_runtime::OllamaModelsSnapshot, String> {
+    local_llm_runtime::ollama_models_snapshot(&ollama_host, &model_tag).await
+}
+
+#[tauri::command]
+async fn local_llm_start_plain(
+    ollama_host: String,
+    model_tag: String,
+) -> Result<local_llm_runtime::LocalLlmRuntimeStatus, String> {
+    local_llm_runtime::local_llm_start_plain(&ollama_host, &model_tag).await
+}
+
+#[tauri::command]
+async fn local_llm_stop_plain(
+    ollama_host: String,
+    model_tag: String,
+    keep_ollama: bool,
+) -> Result<Vec<String>, String> {
+    local_llm_runtime::local_llm_stop_plain(&ollama_host, &model_tag, keep_ollama).await
+}
+
+#[tauri::command]
+async fn llm_ping(
+    ollama_host: String,
+    model_tag: String,
+    core_api_url: Option<String>,
+) -> Result<local_llm_runtime::LlmPingResult, String> {
+    local_llm_runtime::llm_ping(&ollama_host, &model_tag, core_api_url).await
+}
+
+#[tauri::command]
 async fn start_core_api(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
@@ -172,6 +222,7 @@ async fn start_core_api(
     core_engine_path: String,
     python_path: String,
     extra_params: String,
+    ollama_api_base: String,
     port: u16,
 ) -> Result<String, String> {
     let mut guard = state.serve_child.lock().await;
@@ -223,6 +274,9 @@ async fn start_core_api(
         .env("TQDM_DISABLE", "1");
     if !extra_params.trim().is_empty() {
         cmd.env("LITELLM_EXTRA_PARAMS", &extra_params);
+    }
+    if !ollama_api_base.trim().is_empty() {
+        cmd.env("OLLAMA_API_BASE", ollama_api_base.trim());
     }
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
@@ -574,6 +628,33 @@ fn git_commit_graph(
     git_ops::commit_graph(&workspace, limit.unwrap_or(20))
 }
 
+const MAX_CONTEXT_ESTIMATE_PER_FILE: u64 = 512 * 1024;
+
+/// Rough context size for added paths (bytes capped per file; UI divides by ~4 for tokens).
+#[tauri::command]
+fn estimate_paths_context_chars(working_dir: String, paths: Vec<String>) -> Result<u64, String> {
+    let workspace = normalize_project_workspace(&working_dir);
+    if !workspace.is_dir() {
+        return Err(format!("Not a directory: {}", workspace.display()));
+    }
+    let mut total: u64 = 0;
+    for rel in paths {
+        let p = rel.trim().replace('\\', "/");
+        if p.is_empty() {
+            continue;
+        }
+        let full = workspace.join(&p);
+        if !full.starts_with(&workspace) {
+            continue;
+        }
+        if full.is_file() {
+            let len = std::fs::metadata(&full).map_err(|e| e.to_string())?.len();
+            total = total.saturating_add(len.min(MAX_CONTEXT_ESTIMATE_PER_FILE));
+        }
+    }
+    Ok(total)
+}
+
 const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "bmp", "webp", "tiff", "pdf"];
 
 fn is_image_ext(path: &Path) -> bool {
@@ -910,6 +991,12 @@ fn main() {
             default_python_path,
             detect_workspace,
             engine_install_path,
+            read_local_llm_config,
+            local_llm_status,
+            ollama_models_snapshot,
+            local_llm_start_plain,
+            local_llm_stop_plain,
+            llm_ping,
             git_workspace_status,
             git_file_diff,
             git_recent_commits,
@@ -923,6 +1010,8 @@ fn main() {
             read_workspace_todos,
             write_workspace_todos,
             import_todo_spec_files,
+            estimate_paths_context_chars,
+            resource_monitor::get_resource_snapshot,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

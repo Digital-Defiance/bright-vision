@@ -6,6 +6,7 @@ import {
   reconcileUserMessageInChat,
   removeChatMessageById,
   shiftPendingUserMessageId,
+  getActiveAssistantSection,
   splitAssistantSections,
   suffixPrefixOverlap,
 } from './chatStream'
@@ -21,6 +22,11 @@ describe('splitAssistantSections', () => {
     expect(sections.map((s) => s.kind)).toEqual(['thinking', 'answer'])
     expect(sections[0].content).toContain('plan')
     expect(sections[1].content).toContain('result')
+  })
+
+  it('reports active section while streaming', () => {
+    expect(getActiveAssistantSection('► **THINKING**\nplan\n')).toBe('thinking')
+    expect(getActiveAssistantSection('► **THINKING**\nplan\n► **ANSWER**\n')).toBe('answer')
   })
 
   it('includes reasoning section', () => {

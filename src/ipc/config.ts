@@ -7,6 +7,14 @@ export const CORE_ENGINE_DIR = 'aider-vision-core'
 
 export interface AiderConfig {
   model: string
+  /**
+   * Ollama API URL for LiteLLM (`OLLAMA_API_BASE`). Empty = do not inject; use shell / LiteLLM default.
+   */
+  ollamaApiBase: string
+  /** Optional path to a local-llm clone; used last when reading `local-llm.env`. */
+  localLlmRoot: string
+  /** Desktop: start Ollama + preload model before Vision session (plain local-llm). */
+  manageLocalLlm: boolean
   extraParams: string
   /** Git project the agent edits (any repo; does not need aider-vision-core inside it). */
   workingDir: string
@@ -31,6 +39,9 @@ export interface AiderConfig {
 
 export const DEFAULT_CONFIG: AiderConfig = {
   model: 'ollama_chat/qwen3.6:27b-q4_K_M',
+  ollamaApiBase: '',
+  localLlmRoot: '',
+  manageLocalLlm: true,
   extraParams: '{"think": false}',
   workingDir: '.',
   autoApproveLimit: 0,

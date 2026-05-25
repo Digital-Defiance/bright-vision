@@ -28,6 +28,13 @@ test.describe('Chat UX (roadmap #1–2, #9–10, #13)', () => {
     await expect(page.getByText('src/example.ts').first()).toBeVisible()
   })
 
+  test('thinking timer visible during turn', async ({ page }) => {
+    await page.getByTestId('chat-input').fill('think about this')
+    await page.getByTestId('chat-send').click()
+    await expect(page.getByTestId('thinking-timer')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('thinking-timer')).toContainText('turn')
+  })
+
   test('token stats footer after turn', async ({ page }) => {
     await page.getByTestId('chat-input').fill('stats please')
     await page.getByTestId('chat-send').click()

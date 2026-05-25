@@ -53,10 +53,56 @@ function defaultHandlers(log: TauriInvokeLog): Record<string, TauriHandler> {
       return ['docs/diagram.png']
     },
     pick_context_directory: async () => null,
+    estimate_paths_context_chars: async () => 8000,
     detect_workspace: async () => '.',
     stop_core_api: async () => null,
     /** Match {@link E2E_CONFIG.coreApiUrl} so Playwright routes in mockCoreApi intercept fetches. */
     start_core_api: async () => '/api/core',
+    local_llm_status: async () => ({
+      ollamaRunning: true,
+      modelPulled: true,
+      modelLoaded: true,
+      ollamaHost: 'http://127.0.0.1:11434',
+      modelTag: 'test/model',
+      logs: [],
+    }),
+    local_llm_start_plain: async () => ({
+      ollamaRunning: true,
+      modelPulled: true,
+      modelLoaded: true,
+      ollamaHost: 'http://127.0.0.1:11434',
+      modelTag: 'test/model',
+      logs: ['mock start'],
+    }),
+    local_llm_stop_plain: async () => ['mock stop'],
+    ollama_models_snapshot: async () => ({
+      ollamaHost: 'http://127.0.0.1:11434',
+      reachable: true,
+      configuredTag: 'test/model',
+      configuredInPs: true,
+      tagsText: '  • test/model (4.0 GB)',
+      psText: '  • test/model [VRAM 2.0 GB]',
+    }),
+    get_resource_snapshot: async () => ({
+      cpuPct: 12.5,
+      memUsedMb: 8192,
+      memTotalMb: 16384,
+      memPct: 50,
+      gpuPct: 8,
+      scope: 'system',
+    }),
+    llm_ping: async () => ({
+      ollamaReachable: true,
+      modelPulled: true,
+      modelLoaded: true,
+      generateOk: true,
+      latencyMs: 42,
+      responsePreview: 'p',
+      coreReachable: true,
+      coreLatencyMs: 5,
+      error: null,
+      logs: ['Ping mock/model @ http://127.0.0.1:11434', 'Generate OK in 42ms'],
+    }),
   }
 }
 

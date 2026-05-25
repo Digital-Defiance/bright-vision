@@ -3,6 +3,9 @@ import type { Page } from '@playwright/test'
 /** Minimal config for web e2e (core API mocked at /api/core). */
 export const E2E_CONFIG = {
   model: 'test/model',
+  ollamaApiBase: '',
+  localLlmRoot: '',
+  manageLocalLlm: false,
   extraParams: '{}',
   workingDir: '.',
   autoApproveLimit: 0,

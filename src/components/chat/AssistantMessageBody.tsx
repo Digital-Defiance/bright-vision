@@ -1,17 +1,27 @@
 import { Box, Chip, Stack, Typography } from '@mui/material'
 import { splitAssistantSections } from '../../utils/chatStream'
 import {
+  formatDurationMs,
+  sectionDurationByIndex,
+  type TurnThinkingTiming,
+} from '../../utils/thinkingTiming'
+import {
   isProposedEditApplied,
   parseAssistantContent,
   type AssistantContentSegment,
 } from '../../utils/proposedEdits'
 import { ProposedEditBlock } from './ProposedEditBlock'
 
-function sectionLabel(kind: string): string {
-  if (kind === 'thinking') return 'Thinking'
-  if (kind === 'answer') return 'Answer'
-  if (kind === 'reasoning') return 'Reasoning'
-  return ''
+function sectionLabel(kind: string, durationMs?: number): string {
+  let base = ''
+  if (kind === 'thinking') base = 'Thinking'
+  else if (kind === 'answer') base = 'Answer'
+  else if (kind === 'reasoning') base = 'Reasoning'
+  if (!base) return ''
+  if (durationMs !== undefined && durationMs > 0) {
+    return `${base} · ${formatDurationMs(durationMs)}`
+  }
+  return base
 }
 
 function renderSegment(
@@ -42,16 +52,42 @@ function renderSegment(
 interface AssistantMessageBodyProps {
   content: string
   appliedFiles?: string[]
+  turnTiming?: TurnThinkingTiming
+  showSectionDurations?: boolean
+  showTurnTotal?: boolean
 }
 
-export function AssistantMessageBody({ content, appliedFiles = [] }: AssistantMessageBodyProps) {
+export function AssistantMessageBody({
+  content,
+  appliedFiles = [],
+  turnTiming,
+  showSectionDurations = true,
+  showTurnTotal = true,
+}: AssistantMessageBodyProps) {
+  const sections = splitAssistantSections(content)
+  const durationByIndex =
+    turnTiming && showSectionDurations
+      ? sectionDurationByIndex(sections, turnTiming.sections)
+      : new Map<number, number>()
+
   return (
     <Stack spacing={1} sx={{ pr: 3 }}>
-      {splitAssistantSections(content).map((sec, si) => (
+      {showTurnTotal && turnTiming && turnTiming.turnDurationMs > 0 && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          data-testid="message-turn-timing"
+          sx={{ fontFamily: 'var(--vision-font-chat, monospace)', fontSize: '0.7rem' }}
+        >
+          Turn {formatDurationMs(turnTiming.turnDurationMs)}
+          {turnTiming.thoughtMs > 0 && ` · thought ${formatDurationMs(turnTiming.thoughtMs)}`}
+        </Typography>
+      )}
+      {sections.map((sec, si) => (
         <Box key={si}>
-          {sectionLabel(sec.kind) && (
+          {sectionLabel(sec.kind, durationByIndex.get(si)) && (
             <Chip
-              label={sectionLabel(sec.kind)}
+              label={sectionLabel(sec.kind, durationByIndex.get(si))}
               size="small"
               variant="outlined"
               sx={{ mb: 0.5, fontSize: '0.7rem' }}

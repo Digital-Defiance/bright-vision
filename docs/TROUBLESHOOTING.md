@@ -1,5 +1,32 @@
 # Troubleshooting Aider Vision
 
+## Local LLM / Ollama
+
+See **[LOCAL_LLM.md](./LOCAL_LLM.md)** for the full setup (Ollama + [local-llm](https://github.com/Digital-Defiance/local-llm)).
+
+**Quick checks:**
+
+```bash
+curl -s http://127.0.0.1:11434/api/tags   # Ollama up?
+
+**Desktop:** Settings or Terminal → Local LLM → **Ping LLM** (1-token generate + core `/health`, no repo edits).
+```
+
+- **Settings → LLM model** must use the LiteLLM form `ollama_chat/<tag>` where `<tag>` matches `ollama list` / `DATA_MODEL` in local-llm.
+- **Settings → Ollama API base** — leave empty for default; set if Ollama is not on the default host (same URL as `OLLAMA_HOST` in local-llm).
+- Cloud models: use `openai/…` / `anthropic/…` and set `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` in the environment **before** launching the app.
+
+## Answer shown but “Thinking” / queued `/add` never runs
+
+The chat can show a full **Answer** while the header still says **Thinking** or **Waiting for … ollama_chat/…** and **N queued** stays put. That usually means the Vision core HTTP turn never sent `done` (often Ollama unloaded the model — empty `/api/ps` — or the core is still doing repo work).
+
+**What to do:**
+
+1. **Settings → Local LLM → Refresh** — check **/api/ps**; if your model is missing, run **Start** or `ollama run <tag>` / **Ping LLM**.
+2. **Stop** the current turn, then **Ping LLM**, then retry.
+3. Prefer **Add all** on the suggested-files tray (uses the files API and does not wait for the stuck turn). **Queue /add** while a turn is busy now uses the same fast path.
+4. If nothing changes for ~90s after the answer appeared, the app aborts the stalled SSE stream and shows an error; use **Clear queue** if you no longer want queued messages.
+
 ## Stuck on “Connecting” (desktop)
 
 The activity bar can show **Connecting** to `http://127.0.0.1:8741` while the header says **Stopped** if a **Start** is still in progress or a previous start left the UI in a bad state.

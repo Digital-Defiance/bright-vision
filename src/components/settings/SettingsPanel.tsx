@@ -1,6 +1,7 @@
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import SaveIcon from '@mui/icons-material/Save'
-import { useEffect, useState } from 'react'
+import SyncIcon from '@mui/icons-material/Sync'
+import { useCallback, useEffect, useState } from 'react'
 import { Box, Button, Paper, Stack, TextField, Typography } from '@mui/material'
 import { invoke } from '@tauri-apps/api/core'
 import {
@@ -10,9 +11,20 @@ import {
   type AiderConfig,
 } from '../../ipc/config'
 import { isTauriRuntime } from '../../ipc/isTauri'
+import {
+  applyLocalLlmToConfig,
+  formatLocalLlmSources,
+  type LocalLlmSnapshot,
+} from '../../ipc/localLlm'
 import { WorkspaceBar } from '../WorkspaceBar'
 import type { AppearanceConfig } from '../../theme/appearance'
 import { AppearanceSection } from './AppearanceSection'
+import { ThinkingTimingSection } from './ThinkingTimingSection'
+import { ResourceOverlaySection } from './ResourceOverlaySection'
+import type { ResourceOverlayPrefs } from '../../theme/resourceOverlayPrefs'
+import { LocalLlmPanel } from '../local-llm/LocalLlmPanel'
+import type { ThinkingTimingPrefs } from '../../theme/thinkingTimingPrefs'
+import type { ModelThinkingSummary } from '../../utils/thinkingStats'
 
 interface SettingsPanelProps {
   config: AiderConfig
@@ -21,6 +33,12 @@ interface SettingsPanelProps {
   sessionFiles?: string[]
   onChange: (config: AiderConfig) => void
   onAppearanceChange: (appearance: AppearanceConfig) => void
+  thinkingTimingPrefs: ThinkingTimingPrefs
+  onThinkingTimingPrefsChange: (prefs: ThinkingTimingPrefs) => void
+  thinkingModelSummary: ModelThinkingSummary | null
+  onClearThinkingStatsForModel: () => void
+  resourceOverlayPrefs: ResourceOverlayPrefs
+  onResourceOverlayPrefsChange: (prefs: ResourceOverlayPrefs) => void
   onSave: () => void
   onReset: () => void
 }
@@ -32,10 +50,26 @@ export function SettingsPanel({
   sessionFiles,
   onChange,
   onAppearanceChange,
+  thinkingTimingPrefs,
+  onThinkingTimingPrefsChange,
+  thinkingModelSummary,
+  onClearThinkingStatsForModel,
+  resourceOverlayPrefs,
+  onResourceOverlayPrefsChange,
   onSave,
   onReset,
 }: SettingsPanelProps) {
   const [bundledEnginePath, setBundledEnginePath] = useState<string>('')
+  const [localLlmSnap, setLocalLlmSnap] = useState<LocalLlmSnapshot | null>(null)
+
+  const refreshLocalLlm = useCallback(() => {
+    if (!isTauriRuntime()) return
+    invoke<LocalLlmSnapshot>('read_local_llm_config', {
+      localLlmRoot: config.localLlmRoot.trim() || null,
+    })
+      .then(setLocalLlmSnap)
+      .catch(() => setLocalLlmSnap(null))
+  }, [config.localLlmRoot])
 
   useEffect(() => {
     if (!isTauriRuntime()) return
@@ -43,6 +77,10 @@ export function SettingsPanel({
       .then(setBundledEnginePath)
       .catch(() => setBundledEnginePath(''))
   }, [config.coreEnginePath])
+
+  useEffect(() => {
+    refreshLocalLlm()
+  }, [refreshLocalLlm])
 
   return (
     <Stack spacing={3}>
@@ -62,7 +100,75 @@ export function SettingsPanel({
             size="small"
             value={config.model}
             onChange={(e) => onChange({ ...config, model: e.target.value })}
+            helperText="Local Ollama: ollama_chat/<tag> (see docs/LOCAL_LLM.md). Cloud: openai/…, anthropic/… + API keys in your environment."
           />
+          <TextField
+            label="Ollama API base (optional)"
+            fullWidth
+            size="small"
+            value={config.ollamaApiBase}
+            onChange={(e) => onChange({ ...config, ollamaApiBase: e.target.value })}
+            placeholder={
+              localLlmSnap?.ollamaHost?.trim() || 'http://127.0.0.1:11434'
+            }
+            slotProps={{ input: { sx: { fontFamily: 'monospace', fontSize: '0.85rem' } } }}
+            helperText={
+              localLlmSnap?.ollamaHost
+                ? `local-llm OLLAMA_HOST: ${localLlmSnap.ollamaHost} — saved here as OLLAMA_API_BASE on Start.`
+                : 'Sets OLLAMA_API_BASE when spawning the engine (desktop). Leave empty for default Ollama.'
+            }
+          />
+          <LocalLlmPanel
+            config={config}
+            onManageChange={(manageLocalLlm) => onChange({ ...config, manageLocalLlm })}
+          />
+          {isTauriRuntime() && (
+            <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'action.hover' }}>
+              <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                local-llm.env
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                component="pre"
+                sx={{ m: 0, mb: 1, fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}
+              >
+                {localLlmSnap ? formatLocalLlmSources(localLlmSnap) : 'Loading…'}
+              </Typography>
+              <TextField
+                label="local-llm directory (optional)"
+                fullWidth
+                size="small"
+                value={config.localLlmRoot}
+                onChange={(e) => onChange({ ...config, localLlmRoot: e.target.value })}
+                placeholder="local-llm"
+                slotProps={{ input: { sx: { fontFamily: 'monospace', fontSize: '0.8rem' } } }}
+                helperText={
+                  localLlmSnap?.repoLocalLlmRoot
+                    ? `Symlink: ${localLlmSnap.repoLocalLlmRoot}`
+                    : 'Symlink: ln -s ~/Code/local-llm local-llm'
+                }
+                onBlur={refreshLocalLlm}
+              />
+              <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<SyncIcon />}
+                  disabled={!localLlmSnap?.sources.length}
+                  onClick={() => {
+                    if (!localLlmSnap) return
+                    onChange(applyLocalLlmToConfig(config, localLlmSnap, false))
+                  }}
+                >
+                  Sync settings from .env
+                </Button>
+                <Button size="small" onClick={refreshLocalLlm}>
+                  Refresh
+                </Button>
+              </Stack>
+            </Paper>
+          )}
           <TextField
             label="LiteLLM extra params (JSON)"
             fullWidth
@@ -196,6 +302,19 @@ export function SettingsPanel({
       </Paper>
 
       <AppearanceSection appearance={appearance} onChange={onAppearanceChange} />
+
+      <ThinkingTimingSection
+        prefs={thinkingTimingPrefs}
+        modelSummary={thinkingModelSummary}
+        currentModel={config.model}
+        onChange={onThinkingTimingPrefsChange}
+        onClearModelStats={onClearThinkingStatsForModel}
+      />
+
+      <ResourceOverlaySection
+        prefs={resourceOverlayPrefs}
+        onChange={onResourceOverlayPrefsChange}
+      />
 
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Typography variant="subtitle2" color="text.secondary" gutterBottom>

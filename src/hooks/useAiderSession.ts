@@ -4,7 +4,9 @@ import { DEFAULT_CONFIG, type AiderConfig } from '../ipc/config'
 import type { CoreHttpClient, CoreSessionInfo, SendMessageOptions } from '../ipc/httpClient'
 import type { CoreEventBase } from '../ipc/events'
 import { isTauriRuntime } from '../ipc/isTauri'
+import { SseIdleTimeoutError } from '../ipc/sseIdle'
 import { createVisionApiSession, type VisionApiSession } from '../ipc/visionApi'
+import { parseAddCommandPath } from '../utils/suggestedFiles'
 import { useProcess } from '../progress/processStore'
 
 export function useAiderSession(onCoreEvent: (event: CoreEventBase) => void) {
@@ -18,9 +20,13 @@ export function useAiderSession(onCoreEvent: (event: CoreEventBase) => void) {
   const [httpClient, setHttpClient] = useState<CoreHttpClient | null>(null)
   const sessionRef = useRef<VisionApiSession | null>(null)
   const pendingStartRef = useRef<VisionApiSession | null>(null)
-  const busyRef = useRef(false)
+  const inflightRef = useRef(0)
   const queueRef = useRef<string[]>([])
   const drainQueueRef = useRef<() => Promise<void>>(async () => {})
+
+  const setBusyFromInflight = useCallback(() => {
+    setIsBusy(inflightRef.current > 0)
+  }, [])
 
   const syncQueueCount = useCallback(() => {
     setQueuedCount(queueRef.current.length)
@@ -103,8 +109,8 @@ export function useAiderSession(onCoreEvent: (event: CoreEventBase) => void) {
       ])
       sessionRef.current = null
       setIsRunning(false)
+      inflightRef.current = 0
       setIsBusy(false)
-      busyRef.current = false
       setSessionInfo(null)
       setApiUrl(null)
       setHttpClient(null)
@@ -126,25 +132,51 @@ export function useAiderSession(onCoreEvent: (event: CoreEventBase) => void) {
   const sendOne = useCallback(
     async (content: string, todoOptions?: SendMessageOptions) => {
       if (!sessionRef.current) throw new Error('Session not started')
-      busyRef.current = true
-      setIsBusy(true)
+      const addPath = parseAddCommandPath(content)
+      if (addPath) {
+        inflightRef.current += 1
+        setBusyFromInflight()
+        process.begin('tool', 'Adding files')
+        try {
+          const { info } = await sessionRef.current.addFiles([addPath])
+          setSessionInfo(info)
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err)
+          process.fail(message)
+          throw err
+        } finally {
+          inflightRef.current = Math.max(0, inflightRef.current - 1)
+          setBusyFromInflight()
+          if (inflightRef.current === 0) process.idle()
+          void drainQueueRef.current()
+        }
+        return
+      }
+      inflightRef.current += 1
+      setBusyFromInflight()
       process.begin('reasoning', 'Sending')
       try {
         await sessionRef.current.send(content, todoOptions)
       } catch (err) {
-        process.fail(err instanceof Error ? err.message : String(err))
+        const message =
+          err instanceof SseIdleTimeoutError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : String(err)
+        process.fail(message)
         throw err
       } finally {
-        busyRef.current = false
-        setIsBusy(false)
+        inflightRef.current = Math.max(0, inflightRef.current - 1)
+        setBusyFromInflight()
         void drainQueueRef.current()
       }
     },
-    [process]
+    [process, setBusyFromInflight]
   )
 
   const drainQueue = useCallback(async () => {
-    while (queueRef.current.length > 0 && sessionRef.current && !busyRef.current) {
+    while (queueRef.current.length > 0 && sessionRef.current && inflightRef.current === 0) {
       const next = queueRef.current.shift()!
       syncQueueCount()
       await sendOne(next)
@@ -156,7 +188,11 @@ export function useAiderSession(onCoreEvent: (event: CoreEventBase) => void) {
   const send = useCallback(
     async (content: string, todoOptions?: SendMessageOptions) => {
       if (!sessionRef.current) throw new Error('Session not started')
-      if (busyRef.current) {
+      if (parseAddCommandPath(content)) {
+        await sendOne(content, todoOptions)
+        return { queued: false as const }
+      }
+      if (inflightRef.current > 0) {
         queueRef.current.push(content)
         syncQueueCount()
         return { queued: true as const }
@@ -175,8 +211,6 @@ export function useAiderSession(onCoreEvent: (event: CoreEventBase) => void) {
 
   const cancelSend = useCallback(() => {
     sessionRef.current?.cancelSend()
-    busyRef.current = false
-    setIsBusy(false)
     process.idle()
   }, [process])
 
@@ -211,6 +245,10 @@ export function useAiderSession(onCoreEvent: (event: CoreEventBase) => void) {
     return info
   }, [])
 
+  const patchSessionFiles = useCallback((files: string[]) => {
+    setSessionInfo((prev) => (prev ? { ...prev, files_in_chat: files } : prev))
+  }, [])
+
   return {
     isRunning,
     isStarting,
@@ -226,6 +264,7 @@ export function useAiderSession(onCoreEvent: (event: CoreEventBase) => void) {
     addFiles,
     uploadFiles,
     refreshSessionInfo,
+    patchSessionFiles,
     cancelSend,
     submitConfirm,
     undo,

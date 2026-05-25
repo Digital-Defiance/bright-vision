@@ -63,6 +63,7 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 | 3 | **Done** | Stop in-flight turn (`cancelSend` + AbortSignal on fetch) |
 | 4 | **Done** | Queue messages while busy (`useAiderSession` queue + Queue button in `ChatPanel`) |
 | 12 | **Done** | `/add` / `/drop` path completion via Tauri `complete_workspace_path` + Tab in chat |
+| **32** | **Partial** | **Suggested files tray** — parse assistant **Answer** for repo-relative paths; tray above chat input with **Add all**, **Queue `/add`**, dismiss; uses `addFiles` + message queue (#4). **Open:** e2e polish, tree picker tie-in (#28). See [§ #32 design](#32-suggested-files--queued-add) |
 
 ## Approvals, workspace & engine
 
@@ -79,6 +80,10 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 | # | Status | Item |
 |---|--------|------|
 | 16 | **Done** | Attach images/PDF via chat (Tauri picker + browser upload → `/sessions/{id}/files`) |
+| **33** | **Partial** | **Resource overlay** — bottom-left CPU/RAM/GPU HUD (system-wide; GPU via `nvidia-smi` when present); Settings toggles. Tauri desktop only. See [§ #33](#33-resource-overlay-cpugpu) |
+| **34** | **Partial** | **Thinking timers** — live elapsed on current section; durations on completed Thinking/Reasoning/Answer chips; per-model averages vs prompt length in Settings (`localStorage`). See [§ #34 design](#34-thinking-timers) |
+| **35** | **Partial** | **Context window awareness** — header chip: file count + last `Tokens:` sent / ~added estimate; sync `files_in_chat` after `done` + `/add`; desktop byte estimate on `addFiles`. See [§ #35](#35-context-window--file-counter) |
+| **36** | **Partial** | **LLM ping** — Terminal/Settings **Ping LLM**: Ollama tags + 1-token generate + optional core `/health`; no repo edits. See [§ #36](#36-llm-ping) |
 
 ## Spec-driven development (#18)
 
@@ -118,9 +123,142 @@ Maps the high-level product charter to tracked work. Items **23–24** are large
 | **25** | **Done** | (overlap) Richer chat sections | Same as chat **#25** |
 | **26** | **Partial** | File system watcher | Git status polls on **Git** tab + while session runs (8s); native FS notify still open |
 | **27** | **Done** | Git visualization (charter §3) | Working tree, inline diffs, commit graph + details, stage all/file, auto-stage on `done`, undo + refresh. **Nice-to-have:** syntax-highlighted diffs |
-| **28** | **Partial** | Context awareness (charter §5) | **Done:** images/PDF, `/add` paths, terminal tail, Tauri folder picker, **web folder path** dialog → `addFiles`. **Open:** file-tree picker, modified-file highlights (**#26**) |
+| **28** | **Partial** | Context awareness (charter §5) | **Done:** images/PDF, `/add` paths, terminal tail, Tauri folder picker, **web folder path** dialog → `addFiles`, **suggested-files tray (#32)**. **Open:** file-tree picker, modified-file highlights (**#26**) |
 | **29** | **Longer-term** | Plugin / extension system | Custom Rust commands, third-party LLM providers, packaged extensions |
 | **30** | **Partial** | Web / non-Tauri parity | **Done:** folder path attach, localStorage todos, Vite `/api/core` proxy; `/add` Tab on **desktop** (#12). **Open:** `/add` Tab on web-only dev; full generate-spec UX without desktop (dogfood Tasks tab on desktop first). |
+
+---
+
+## #32 — Suggested files & queued `/add`
+
+**Problem:** The model often ends with a bullet list of paths (“Please add these files…”) but the user must copy each path into chat as `/add …` one by one.
+
+**Goal:** First-class context UX aligned with dogfooding and spec work (#18–22).
+
+### Behavior (target)
+
+1. **Detect** — After an assistant turn, parse the **Answer** section (► **ANSWER**, `**ANSWER**`, or `Answer` heading) for workspace-relative paths: backtick paths in bullet lists, e.g. `` `src/todos/types.ts` ``.
+2. **Accumulate** — Merge into a session-scoped **Suggested** list (dedupe, drop paths already in `files_in_chat`).
+3. **Tray UI** — Chips or list near chat input: path, remove, “Add”, “Add all”, “Queue `/add`s”.
+4. **Queue `/add`s** — Enqueue one user message per file (`/add aider-vision-core/.../session.py`, …) via existing `useAiderSession` queue (#4) so core handles each add like typed input.
+5. **Add all (fast path)** — Optional single `addFiles(paths)` API call when batch attach is enough (no per-file `/add` narration).
+
+### Parser spike (in repo)
+
+`src/utils/suggestedFiles.ts` + tests — extracts the Kiro/spec example list into seven paths and builds:
+
+```text
+/add aider-vision-core/aider_vision_core/todo_spec_generate.py
+/add aider-vision-core/aider_vision_core/workspace_todos.py
+… (one queued message per path)
+```
+
+**Shipped (Partial):** `SuggestedFilesTray` in `ChatPanel`, session state in `App.tsx` (ingest on `done`, prune when `files_in_chat` updates). Remaining: structured SSE from core, optional auto-queue.
+
+### Out of scope (v1)
+
+- Core emitting structured `suggested_files` SSE (parser-first in UI).
+- Auto-queue without confirmation.
+- `/drop` suggestions.
+
+---
+
+## #33 — Resource overlay (CPU/GPU %)
+
+**Problem:** Long local-LLM / core sessions spike CPU/GPU; users want at-a-glance load without leaving Vision or opening Activity Monitor / `nvidia-smi`.
+
+**Goal:** Small, non-intrusive HUD — default **bottom-left** of the main content area (above snackbars, not covering the left nav rail). Configurable in **Settings → Appearance** (or **System**): enable overlay, refresh interval (e.g. 1–5 s), metric set, optional warn tint above threshold.
+
+### Multi-platform feasibility
+
+| Metric | macOS | Linux | Windows | Notes |
+|--------|-------|-------|---------|--------|
+| **CPU %** (system or process) | Yes | Yes | Yes | Rust [`sysinfo`](https://crates.io/crates/sysinfo) in Tauri; poll on background task, `invoke('get_resource_snapshot')` |
+| **RAM** (used / %) | Yes | Yes | Yes | Same crate; cheap and reliable |
+| **GPU %** (utilization) | Partial | Partial | Partial | **Not one portable API.** v1 may omit GPU or show “—” with tooltip “GPU stats unavailable on this OS” |
+| **Web / `yarn dev` only** | N/A | N/A | N/A | Hide overlay or show disabled chip — aligns with **#30** (no fake numbers from browser) |
+
+**GPU v2 options (pick per OS in Rust, behind feature flags):**
+
+- **macOS:** IOKit / `powermetrics`-style sampling, or vendor tools if installed; Apple Silicon often reports GPU via `ioreg` / Metal counters — needs spike per target OS version.
+- **Linux:** Parse `nvidia-smi` / `rocm-smi` when present; AMD/Intel via sysfs where exposed; fallback none.
+- **Windows:** DXGI / Performance Counters / `nvidia-smi` — separate code path.
+
+**Process-scoped mode (recommended v1):** Aggregate CPU/RAM for PIDs Vision already knows — `aider` / core Python, optional **Ollama** when `manageLocalLlm` + local model — so the overlay answers “is *my session* melting the machine?” without claiming full-system GPU on every laptop.
+
+### Suggested implementation sketch
+
+1. **Rust:** `resource_monitor.rs` — `sysinfo` refresh every N ms; optional child-PID list from session spawn handles; serde snapshot `{ cpu_pct, mem_used_mb, mem_pct, gpu_pct?: number | null, label }`.
+2. **Tauri command** + event emit optional (`resource-snapshot` every poll) to avoid polling from JS.
+3. **React:** `ResourceOverlay.tsx` — `position: fixed; left: …; bottom: …; pointer-events: none` (or `auto` for expand-on-hover); respect `AppearanceConfig` + `prefers-reduced-motion` (pause animation, still allow static %).
+4. **Settings:** toggles persisted in `localStorage` / config JSON like appearance fonts.
+5. **e2e:** mock `get_resource_snapshot` fixed values; assert overlay visible when enabled.
+
+### Difficulty (honest)
+
+| Scope | Rating |
+|-------|--------|
+| CPU + RAM overlay, system-wide, macOS + Linux | **~4/10** |
+| + process-scoped (core + ollama children) | **~5/10** |
+| + GPU % with graceful fallback on all three OSes | **~7/10** |
+| Always-on-top / screen-wide overlay (true HUD outside window) | **Out of scope** — separate window / OS APIs; not bottom-left *in-app* |
+
+### Out of scope (v1)
+
+- Historical graphs / logging to disk.
+- Per-GPU die temperature fan curves.
+- Replacing macOS Menu Bar widgets or Linux `conky`.
+
+**Shipped (Partial):** `get_resource_snapshot` (sysinfo) + `ResourceOverlay` fixed bottom-left; Settings → Resource overlay (interval, GPU line, CPU warn threshold).
+
+**Open:** Process-scoped CPU (core + Ollama PIDs); Apple/AMD GPU without `nvidia-smi`; history sparkline.
+
+---
+
+## #34 — Thinking timers
+
+**Problem:** Long “Thinking” stretches feel opaque; no way to compare model latency across prompts.
+
+**Shipped (Partial):**
+
+1. **Live bar** above chat input (`ThinkingTimerBar`) while the agent is busy — current section label + active elapsed + turn elapsed.
+2. **Completed messages** — chip labels like `Thinking · 4.2s`; caption `Turn 12.1s · thought 8.0s` when markers present.
+3. **Settings → Thinking timers** — toggles for live timer, section durations, turn total, model stats panel.
+4. **Persistence** — `aider-vision-thinking-stats` in `localStorage`: rolling samples per `config.model`, avg thought ms and ~ms per 1k prompt chars.
+
+**Detection:** Section boundaries from streamed `► **THINKING**` / `**REASONING**` / `**ANSWER**` markers (`getActiveAssistantSection`); timer runs for the whole turn until `done` (survives tool_output gaps that split assistant bubbles).
+
+**Open / v2:**
+
+- Burndown chart or trend line in Settings / Tasks.
+- Export stats JSON; sync across machines.
+- Core SSE fields (`section_started`, `thought_ms`) instead of parser-only.
+- Include queued-wait time separately from model “thought” time.
+
+---
+
+## #35 — Context window & file counter
+
+**Problem:** Top-right file count stayed on `sessionInfo` from session start; `/add` via chat never refreshed. No visibility into context growth from added files.
+
+**Shipped (Partial):**
+
+1. **Unified `filesInChat`** — header chip uses `filesInChat` synced with `patchSessionFiles` on every `addFiles` / upload / `GET session` after `done`.
+2. **Header chip** — `N files · 12.0k sent` or `N files · ~2.1k added` (`data-testid="session-context-chip"`).
+3. **`/add` via chat** — after each `done`, `refreshSessionInfo()` pulls current `files_in_chat` from core.
+4. **Add estimate (desktop)** — Tauri `estimate_paths_context_chars` → cumulative `~tokens` in snackbar + tooltip; web relies on `Tokens:` line after turns.
+
+**Open:** Core-reported context % / repo-map size; per-file breakdown; model context limit bar.
+
+---
+
+## #36 — LLM ping
+
+**Problem:** Hard to tell Ollama load vs hung vs core down without starting a full chat turn.
+
+**Shipped (Partial):** **Ping LLM** on Local LLM panel (Terminal + Settings): `GET /api/tags`, `/api/ps`, `POST /api/generate` with `num_predict: 1` (no workspace files), optional `GET {coreApiUrl}/health`. Logs to Terminal; result alert with latency.
+
+**Open:** Ping from header when session stuck; cloud provider ping (non-Ollama); session-level dry-run ping in core.
 
 ---
 
@@ -143,10 +281,11 @@ Maps the high-level product charter to tracked work. Items **23–24** are large
 
 1. **#19 dogfooding** — [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) A–D on `yarn tauri dev` (superproject root); Tasks generate-spec + one **Implement** step on a real task.
 2. **Friction from dogfood** — promote to **Open** rows or fix immediately (lifecycle, git tab, context attach, tasks sync).
-3. **#28** (if context picking hurts) — file-tree / modified-file highlights over **#26** watcher unless git poll is insufficient.
+3. **#28 / #32** (if context picking hurts) — **#32** suggested-files tray + queued `/add`; file-tree / modified-file highlights over **#26** watcher unless git poll is insufficient.
 4. **#31** — [RELEASE.md](./RELEASE.md) when sharing builds or pinning submodule for collaborators.
 5. **#20–22** — Kiro-depth spec product (after dogfood stabilizes core loop).
 6. **#29, #30** — Plugins, remaining web parity (longer horizon).
+7. **#33** — Resource overlay when local LLM / long runs make CPU/GPU visibility painful (CPU/RAM first; GPU best-effort).
 
 ## Related docs
 

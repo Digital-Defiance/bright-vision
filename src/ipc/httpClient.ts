@@ -6,6 +6,7 @@
 import type { PatchTodoResult, TodoItem, TodoStore } from '../todos/types'
 import { normalizeStore, normalizeTodo } from '../todos/storage'
 import type { CoreEventBase } from './events'
+import { readStreamChunkWithIdleTimeout } from './sseIdle'
 
 export interface SendMessageOptions {
   activeTodoId?: string
@@ -523,9 +524,10 @@ export class CoreHttpClient {
       }
     }
 
+    let gotEvent = false
     try {
       while (true) {
-        const { done, value } = await reader.read()
+        const { done, value } = await readStreamChunkWithIdleTimeout(reader, gotEvent)
         if (value) {
           buffer += decoder.decode(value, { stream: true })
         }
@@ -535,7 +537,10 @@ export class CoreHttpClient {
           break
         }
         buffer = parts.pop() ?? ''
-        yield* emitParts(parts)
+        for (const event of emitParts(parts)) {
+          gotEvent = true
+          yield event
+        }
       }
     } finally {
       try {

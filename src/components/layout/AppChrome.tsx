@@ -18,9 +18,10 @@ interface AppChromeProps {
   isRunning: boolean
   headerExtra?: ReactNode
   children: ReactNode
+  footerOverlay?: ReactNode
 }
 
-const SIDEBAR_W = 92
+export const VISION_SIDEBAR_W = 92
 
 export function AppChrome({
   nav,
@@ -30,6 +31,7 @@ export function AppChrome({
   isRunning,
   headerExtra,
   children,
+  footerOverlay,
 }: AppChromeProps) {
   return (
     <Box sx={{ display: 'flex', height: '100vh', bgcolor: 'background.default' }}>
@@ -38,7 +40,7 @@ export function AppChrome({
         square
         className="vision-rail"
         sx={{
-          width: SIDEBAR_W,
+          width: VISION_SIDEBAR_W,
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -125,7 +127,10 @@ export function AppChrome({
           <VisionActivityBar process={process} />
         </Paper>
 
-        <Box sx={{ flex: 1, overflow: 'auto', p: 3 }}>{children}</Box>
+        <Box sx={{ flex: 1, overflow: 'auto', p: 3, position: 'relative' }}>
+          {children}
+        </Box>
+        {footerOverlay}
       </Box>
     </Box>
   )

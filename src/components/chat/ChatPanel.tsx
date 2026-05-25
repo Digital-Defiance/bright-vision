@@ -23,7 +23,12 @@ import { AssistantMessageBody } from './AssistantMessageBody'
 import { ChatFolderAttach } from './ChatFolderAttach'
 import { ChatImageAttach } from './ChatImageAttach'
 import { CommandAssist } from './CommandAssist'
+import { SuggestedFilesTray } from './SuggestedFilesTray'
+import { ThinkingTimerBar } from './ThinkingTimerBar'
 import { TokenStatsBar } from './TokenStatsBar'
+import type { LiveThinkingState } from '../../hooks/useThinkingTiming'
+import type { TurnThinkingTiming } from '../../utils/thinkingTiming'
+import type { ThinkingTimingPrefs } from '../../theme/thinkingTimingPrefs'
 
 export interface ChatMessage {
   id: number
@@ -31,6 +36,8 @@ export interface ChatMessage {
   content: string
   /** Paths reported in the following `done` event for this turn. */
   appliedFiles?: string[]
+  /** Section + turn durations captured when the turn completes. */
+  turnTiming?: TurnThinkingTiming
 }
 
 export interface ToolEvent {
@@ -67,6 +74,17 @@ interface ChatPanelProps {
   terminalTailAvailable?: boolean
   onAttachContextDirectory?: () => void
   onAttachFolderPath?: (relativePath: string) => void
+  suggestedFilePaths?: string[]
+  onSuggestedAddOne?: (path: string) => void
+  onSuggestedAddAll?: () => void
+  onSuggestedQueueAdds?: () => void
+  onSuggestedDismiss?: (path: string) => void
+  onSuggestedClearAll?: () => void
+  thinkingTimingPrefs?: ThinkingTimingPrefs
+  liveThinking?: LiveThinkingState | null
+  turnActivityHint?: string
+  turnStalled?: boolean
+  lastEventAgoMs?: number | null
 }
 
 export function ChatPanel({
@@ -95,6 +113,17 @@ export function ChatPanel({
   terminalTailAvailable = false,
   onAttachContextDirectory,
   onAttachFolderPath,
+  suggestedFilePaths = [],
+  onSuggestedAddOne,
+  onSuggestedAddAll,
+  onSuggestedQueueAdds,
+  onSuggestedDismiss,
+  onSuggestedClearAll,
+  thinkingTimingPrefs,
+  liveThinking = null,
+  turnActivityHint = '',
+  turnStalled = false,
+  lastEventAgoMs = null,
 }: ChatPanelProps) {
   const pathTabIndex = useRef(0)
   const pathPrefix = parseFileCommandInput(inputValue)?.pathPrefix ?? ''
@@ -120,16 +149,17 @@ export function ChatPanel({
       {pendingConfirm && (
         <ConfirmBanner confirm={pendingConfirm} onAnswer={onConfirmAnswer} />
       )}
-      {(isBusy || queuedCount > 0) && (
-        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, px: 1 }}>
-          {isBusy ? 'Agent is working — use Stop to cancel the current turn.' : ''}
-          {queuedCount > 0 && (
-            <>
-              {isBusy ? ' ' : ''}
-              {queuedCount} message{queuedCount === 1 ? '' : 's'} queued.
-            </>
-          )}
-        </Typography>
+      {(isBusy || queuedCount > 0) && turnActivityHint && (
+        <Alert
+          severity={turnStalled ? 'warning' : 'info'}
+          variant="outlined"
+          sx={{ mb: 1, mx: 1, py: 0.25 }}
+          data-testid="turn-activity-hint"
+        >
+          <Typography variant="caption" component="span">
+            {turnActivityHint}
+          </Typography>
+        </Alert>
       )}
       <Box sx={{ flex: 1, overflow: 'auto', mb: 1, px: 1 }}>
         {messages.length === 0 && meaningfulToolEvents.length === 0 && (
@@ -185,6 +215,9 @@ export function ChatPanel({
                     <AssistantMessageBody
                       content={entry.item.content}
                       appliedFiles={entry.item.appliedFiles}
+                      turnTiming={entry.item.turnTiming}
+                      showSectionDurations={thinkingTimingPrefs?.showSectionDurations ?? true}
+                      showTurnTotal={thinkingTimingPrefs?.showMessageTurnTotal ?? true}
                     />
                   ) : (
                     <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', pr: 3 }}>
@@ -240,6 +273,26 @@ export function ChatPanel({
       </Box>
 
       <TokenStatsBar stats={tokenStats} />
+
+      {liveThinking && (
+        <ThinkingTimerBar live={liveThinking} lastEventAgoMs={lastEventAgoMs} />
+      )}
+
+      {onSuggestedAddOne &&
+        onSuggestedAddAll &&
+        onSuggestedQueueAdds &&
+        onSuggestedDismiss &&
+        onSuggestedClearAll && (
+          <SuggestedFilesTray
+            paths={suggestedFilePaths}
+            disabled={!isRunning}
+            onAddOne={onSuggestedAddOne}
+            onAddAll={onSuggestedAddAll}
+            onQueueAdds={onSuggestedQueueAdds}
+            onDismiss={onSuggestedDismiss}
+            onClearAll={onSuggestedClearAll}
+          />
+        )}
 
       <CommandAssist
         commands={commands}

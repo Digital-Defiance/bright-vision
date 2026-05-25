@@ -95,6 +95,7 @@ export function createVisionApiSession(
             coreEnginePath: cfg.coreEnginePath,
             pythonPath: cfg.pythonPath,
             extraParams: cfg.extraParams,
+            ollamaApiBase: cfg.ollamaApiBase,
             port: 8741,
           })
           desktopStartedServe = true
