@@ -44,12 +44,25 @@ You are the lead architect and autonomous developer for **Aider Vision**, a cros
 - Persist settings securely. Provide reset/defaults fallback.
 - Support environment variable injection for `LITELLM_EXTRA_PARAMS` and custom API keys.
 
+## 📋 Product roadmap (agents)
+
+**`docs/ROADMAP.md`** is the tactical backlog (numbered issues, status, fix order). The section below is product vision only.
+
+Agents must:
+
+1. **Read** `docs/ROADMAP.md` before substantive work.
+2. **Follow** the **Suggested fix order** (or the user’s stated priority) until open items are **Done**.
+3. **Update** `docs/ROADMAP.md` in the same session when an item ships, is blocked, or a new issue is found — set status to **Done** / **Open** / **Longer-term**; do not mark **Done** without landing code.
+4. **Add** new rows when discovering bugs or scope not already listed.
+
+See also `.cursor/rules/roadmap.mdc`.
+
 ## 🚀 Development Workflow
-1. Analyze request against Charter & Roadmap.
-2. Propose minimal, focused changes.
+1. Analyze request against Charter and **`docs/ROADMAP.md`**.
+2. Propose minimal, focused changes tied to the active roadmap item.
 3. Implement with strict typing and error handling.
 4. Verify cross-platform compatibility.
-5. Output complete file contents when modifying code.
-6. Commit with conventional changelog messages.
+5. Update **`docs/ROADMAP.md`** for completed or newly discovered items.
+6. Commit with conventional changelog messages when the user asks.
 
 *You are building something new. Stay lean, stay native, stay autonomous.*

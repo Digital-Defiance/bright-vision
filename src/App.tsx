@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from 'react'
 import ChatIcon from '@mui/icons-material/Chat'
+import ChecklistRtlIcon from '@mui/icons-material/ChecklistRtl'
 import GitHubIcon from '@mui/icons-material/GitHub'
 import SettingsIcon from '@mui/icons-material/Settings'
 import TerminalIcon from '@mui/icons-material/Terminal'
@@ -11,21 +12,37 @@ import { listen, UnlistenFn } from '@tauri-apps/api/event'
 import { DISPLAY_CORE, ErrorSource, prefixForTechnicalLog, prefixForUserFacing } from './brand'
 import { AppChrome } from './components/layout/AppChrome'
 import { DEFAULT_CONFIG, defaultCoreApiUrl, type AiderConfig } from './ipc/config'
-import { type CoreEventBase } from './ipc/events'
+import { type CoreConfirmEvent, type CoreEventBase } from './ipc/events'
+import {
+  capList,
+  MAX_CHAT_MESSAGES,
+  MAX_TERMINAL_LINES,
+  MAX_TOOL_EVENTS,
+  parseTokenUsage,
+} from './utils/chatStream'
 import { isTauriRuntime } from './ipc/isTauri'
+import { CoreHttpClient } from './ipc/httpClient'
 import { useAiderSession } from './hooks/useAiderSession'
+import { usePathCompletion } from './hooks/usePathCompletion'
+import { filesToUploadParts } from './utils/imageUpload'
+import { buildImplementStepMessage, buildStartWorkMessage } from './todos/formatContext'
+import type { ImplementationStep } from './todos/tasksMd'
+import type { TodoItem } from './todos/types'
 import { useCommandCatalog } from './hooks/useCommandCatalog'
 import { useGitStatus } from './hooks/useGitStatus'
+import { autoStageEditedFiles } from './ipc/gitStatus'
 import { useSessionActivity } from './hooks/useSessionActivity'
 import { ChatPanel, type ChatMessage, type ToolEvent } from './components/chat/ChatPanel'
+import { TodoPanel } from './components/todos/TodoPanel'
 import { GitPanel } from './components/GitPanel'
+import { useWorkspaceTodos } from './hooks/useWorkspaceTodos'
 import { WelcomePanel } from './components/onboarding/WelcomePanel'
 import { SettingsPanel } from './components/settings/SettingsPanel'
 import { useProcess } from './progress/processStore'
 
 const WELCOME_DISMISSED_KEY = 'vision-welcome-dismissed'
 
-type TabId = 'chat' | 'terminal' | 'git' | 'settings'
+type TabId = 'chat' | 'terminal' | 'git' | 'settings' | 'tasks'
 
 function migrateConfig(raw: Partial<AiderConfig> & Record<string, unknown>): AiderConfig {
   const merged: AiderConfig = { ...DEFAULT_CONFIG, ...raw }
@@ -34,6 +51,12 @@ function migrateConfig(raw: Partial<AiderConfig> & Record<string, unknown>): Aid
   }
   if (!Array.isArray(merged.contextFiles)) {
     merged.contextFiles = []
+  }
+  if (typeof merged.promptBeforeCommit !== 'boolean') {
+    merged.promptBeforeCommit = false
+  }
+  if (typeof merged.autoStageOnDone !== 'boolean') {
+    merged.autoStageOnDone = true
   }
   if (!merged.coreApiUrl || merged.coreApiUrl === DEFAULT_CONFIG.coreApiUrl) {
     if (!isTauriRuntime()) merged.coreApiUrl = defaultCoreApiUrl()
@@ -55,6 +78,7 @@ interface TerminalLine {
 
 const NAV: { id: TabId; label: string; icon: ReactNode }[] = [
   { id: 'chat', label: 'Chat', icon: <ChatIcon /> },
+  { id: 'tasks', label: 'Tasks', icon: <ChecklistRtlIcon /> },
   { id: 'terminal', label: 'Terminal', icon: <TerminalIcon /> },
   { id: 'git', label: 'Git', icon: <GitHubIcon /> },
   { id: 'settings', label: 'Settings', icon: <SettingsIcon /> },
@@ -69,6 +93,13 @@ function App() {
   const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([])
   const [inputValue, setInputValue] = useState('')
   const [remainingAutoApproves, setRemainingAutoApproves] = useState(0)
+  const [tokenStats, setTokenStats] = useState<string | null>(null)
+  const submitConfirmRef = useRef<(confirmId: string, answer: boolean) => Promise<void>>(
+    async () => {}
+  )
+  const setPendingConfirmRef = useRef<(c: CoreConfirmEvent | null) => void>(() => {})
+  const remainingAutoRef = useRef(0)
+  remainingAutoRef.current = remainingAutoApproves
   const [statusMessage, setStatusMessage] = useState('')
   const [snackbar, setSnackbar] = useState<{ message: string; severity: 'error' | 'info' } | null>(
     null
@@ -78,9 +109,16 @@ function App() {
   )
   const [engineInstallPath, setEngineInstallPath] = useState<string | undefined>()
   const [gitRefreshKey, setGitRefreshKey] = useState(0)
+  const [specGenerating, setSpecGenerating] = useState(false)
+  const specGenerateAbortRef = useRef<AbortController | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const terminalEndRef = useRef<HTMLDivElement>(null)
   const streamingAssistantId = useRef<number | null>(null)
+  const todoInjectedIdRef = useRef<string | null>(null)
+  const recordTurnLinksRef = useRef<(links: string[]) => void | Promise<void>>(async () => {})
+  const reloadTodosRef = useRef<() => void | Promise<void>>(async () => {})
+  const savedConfigRef = useRef(savedConfig)
+  savedConfigRef.current = savedConfig
   const unlistenersRef = useRef<UnlistenFn[]>([])
 
   useEffect(() => {
@@ -204,63 +242,135 @@ function App() {
 
     switch (ev.type) {
       case 'user_message':
-        setChatMessages((prev) => [
-          ...prev,
-          { id, role: 'user', content: String(ev.text ?? '') },
-        ])
+        streamingAssistantId.current = null
+        setChatMessages((prev) =>
+          capList(
+            [...prev, { id, role: 'user' as const, content: String(ev.text ?? '') }],
+            MAX_CHAT_MESSAGES
+          )
+        )
         break
       case 'token': {
         const chunk = String(ev.text ?? '')
         if (!chunk) break
         if (streamingAssistantId.current === null) {
           streamingAssistantId.current = id
-          setChatMessages((prev) => [...prev, { id, role: 'assistant', content: chunk }])
+          setChatMessages((prev) =>
+            capList([...prev, { id, role: 'assistant' as const, content: chunk }], MAX_CHAT_MESSAGES)
+          )
         } else {
           const sid = streamingAssistantId.current
           setChatMessages((prev) =>
-            prev.map((m) => (m.id === sid ? { ...m, content: m.content + chunk } : m))
+            capList(
+              prev.map((m) => (m.id === sid ? { ...m, content: m.content + chunk } : m)),
+              MAX_CHAT_MESSAGES
+            )
           )
         }
         break
       }
       case 'progress':
         break
-      case 'tool_output':
-      case 'tool_error':
-      case 'tool_warning':
-        setToolEvents((prev) => [
-          ...prev,
-          {
-            id,
-            type: 'tool_result',
-            name: ev.type,
-            output: String(ev.text ?? ''),
-          },
-        ])
-        setTerminalLines((prev) => [
-          ...prev,
-          { id, text: `[${ev.type}] ${ev.text ?? ''}`, type: 'stdout' },
-        ])
+      case 'tool_output': {
+        const text = String(ev.text ?? '')
+        const usage = parseTokenUsage(text)
+        if (usage) {
+          setTokenStats(usage)
+          break
+        }
+        if (!text.trim()) break
+        setToolEvents((prev) =>
+          capList(
+            [
+              ...prev,
+              {
+                id,
+                type: 'tool_result' as const,
+                name: 'output',
+                output: text,
+              },
+            ],
+            MAX_TOOL_EVENTS
+          )
+        )
+        setTerminalLines((prev) =>
+          capList([...prev, { id, text, type: 'stdout' as const }], MAX_TERMINAL_LINES)
+        )
         break
-      case 'confirm':
-        setTerminalLines((prev) => [
-          ...prev,
-          {
-            id,
-            text: `[confirm] ${ev.question ?? ''}${ev.auto_answered ? ' (auto)' : ''}`,
-            type: 'stdout',
-          },
-        ])
+      }
+      case 'tool_error': {
+        const text = String(ev.text ?? '')
+        if (!text.trim()) break
+        setToolEvents((prev) =>
+          capList(
+            [...prev, { id, type: 'tool_result' as const, name: 'error', output: text }],
+            MAX_TOOL_EVENTS
+          )
+        )
         break
-      case 'done':
+      }
+      case 'tool_warning': {
+        const text = String(ev.text ?? '')
+        if (!text.trim()) break
+        setToolEvents((prev) =>
+          capList(
+            [...prev, { id, type: 'tool_warning' as const, name: 'warning', output: text }],
+            MAX_TOOL_EVENTS
+          )
+        )
+        break
+      }
+      case 'confirm': {
+        const c = ev as CoreConfirmEvent
+        setTerminalLines((prev) =>
+          capList(
+            [
+              ...prev,
+              {
+                id,
+                text: `[confirm] ${c.question ?? ''}${c.auto_answered ? ' (auto)' : ''}`,
+                type: 'stdout' as const,
+              },
+            ],
+            MAX_TERMINAL_LINES
+          )
+        )
+        if (c.auto_answered || !c.confirm_id) break
+        if (remainingAutoRef.current > 0) {
+          void submitConfirmRef.current(c.confirm_id, true).then(() => {
+            setRemainingAutoApproves((p) => Math.max(0, p - 1))
+          })
+        } else {
+          setPendingConfirmRef.current(c)
+        }
+        break
+      }
+      case 'assistant_complete':
+        break
+      case 'done': {
+        const applied =
+          ev.edited_files && Array.isArray(ev.edited_files)
+            ? (ev.edited_files as string[])
+            : []
+        const assistantId = streamingAssistantId.current
         streamingAssistantId.current = null
         setStatusMessage('Ready')
-        if (ev.edited_files && Array.isArray(ev.edited_files) && ev.edited_files.length > 0) {
+        if (assistantId && applied.length > 0) {
+          setChatMessages((prev) =>
+            capList(
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, appliedFiles: applied } : m
+              ),
+              MAX_CHAT_MESSAGES
+            )
+          )
+        }
+        if (applied.length > 0) {
           setTerminalLines((prev) => [
             ...prev,
             {
               id,
-              text: `Edited: ${(ev.edited_files as string[]).join(', ')}`,
+              text: `Edited: ${applied.join(', ')}`,
               type: 'stdout',
             },
           ])
@@ -275,7 +385,38 @@ function App() {
             },
           ])
         }
+        {
+          const links: string[] = [...applied]
+          if (ev.commit_hash) links.push(`commit:${String(ev.commit_hash)}`)
+          if (links.length) {
+            void recordTurnLinksRef.current(links)
+            void reloadTodosRef.current()
+          }
+        }
+        if (applied.length > 0) {
+          const cfg = savedConfigRef.current
+          void autoStageEditedFiles(cfg.workingDir, applied, {
+            enabled: cfg.autoStageOnDone,
+            engineCommitted: Boolean(ev.commit_hash),
+          })
+            .then((n) => {
+              if (n > 0) {
+                bumpGitRefresh()
+                setSnackbar({
+                  message: `Staged ${n} edited file${n === 1 ? '' : 's'} for review`,
+                  severity: 'info',
+                })
+              }
+            })
+            .catch((err) => {
+              setSnackbar({
+                message: err instanceof Error ? err.message : String(err),
+                severity: 'error',
+              })
+            })
+        }
         break
+      }
       case 'error':
         streamingAssistantId.current = null
         setTerminalLines((prev) => [
@@ -305,17 +446,85 @@ function App() {
     }
   }, [process, bumpGitRefresh])
 
-  const { pendingConfirm, dismissConfirm, lastGit, setFilesInChat, wrapHandler } =
+  const { pendingConfirm, setPendingConfirm, dismissConfirm, lastGit, setFilesInChat, wrapHandler } =
     useSessionActivity()
-  const { isRunning, isBusy, sessionInfo, httpClient, start, stop, send, undo } = useAiderSession(
-    wrapHandler(handleCoreEvent)
+  const {
+    isRunning,
+    isBusy,
+    queuedCount,
+    sessionInfo,
+    httpClient,
+    start,
+    stop,
+    send,
+    cancelSend,
+    submitConfirm,
+    addFiles,
+    uploadFiles,
+    undo,
+  } = useAiderSession(wrapHandler(handleCoreEvent))
+
+  const todoApiClient = useMemo(
+    () => new CoreHttpClient(savedConfig.coreApiUrl, savedConfig.coreApiToken || undefined),
+    [savedConfig.coreApiUrl, savedConfig.coreApiToken]
   )
+
+  const { paths: pathSuggestions, active: pathAssistActive } = usePathCompletion(
+    savedConfig.workingDir,
+    inputValue
+  )
+  const {
+    store: todoStore,
+    loading: todosLoading,
+    activeTodo,
+    createTodo,
+    updateTodo,
+    deleteTodo,
+    moveTodo,
+    syncSpecFromDisk,
+    setActiveTodo,
+    markDone,
+    recordTurnLinks,
+    reload: reloadTodos,
+    exportMarkdown,
+    importMarkdown,
+    httpReady: todosHttpReady,
+    tauriLocal: todosTauriLocal,
+  } = useWorkspaceTodos(
+    savedConfig.workingDir,
+    { client: httpClient ?? todoApiClient, workspace: savedConfig.workingDir },
+    () => {
+      setSnackbar({
+        message: 'Task marked done — all checklist items complete',
+        severity: 'info',
+      })
+      void reloadTodos()
+    }
+  )
+
+  recordTurnLinksRef.current = recordTurnLinks
+  reloadTodosRef.current = reloadTodos
+
+  useEffect(() => {
+    if (!activeTodo) todoInjectedIdRef.current = null
+  }, [activeTodo?.id])
+
+  useEffect(() => {
+    if (activeTab === 'tasks') void reloadTodos()
+  }, [activeTab, reloadTodos])
+
+  useEffect(() => {
+    void reloadTodos()
+  }, [savedConfig.workingDir, reloadTodos])
+
+  submitConfirmRef.current = submitConfirm
+  setPendingConfirmRef.current = setPendingConfirm
   const { commands } = useCommandCatalog(httpClient, sessionInfo?.session_id ?? null)
   const {
     status: gitStatus,
     loading: gitLoading,
     refresh: refreshGit,
-  } = useGitStatus(savedConfig.workingDir, gitRefreshKey, isRunning)
+  } = useGitStatus(savedConfig.workingDir, gitRefreshKey, isRunning, activeTab === 'git')
 
   useEffect(() => {
     if (!isTauriRuntime()) return
@@ -362,6 +571,7 @@ function App() {
       }
       setFilesInChat(info.files_in_chat ?? [])
       setRemainingAutoApproves(savedConfig.autoApproveLimit)
+      todoInjectedIdRef.current = null
       streamingAssistantId.current = null
       setChatMessages([])
       setToolEvents([])
@@ -416,14 +626,217 @@ function App() {
     }
   }
 
+  const handleNativeAttachImages = useCallback(async () => {
+    if (!isRunning) return
+    try {
+      const paths = await invoke<string[]>('pick_and_stage_chat_images', {
+        workingDir: savedConfig.workingDir,
+      })
+      if (!paths.length) return
+      const info = await addFiles(paths)
+      setFilesInChat(info.files_in_chat)
+      setSnackbar({
+        message: `Attached ${paths.length} file${paths.length === 1 ? '' : 's'} to the session`,
+        severity: 'info',
+      })
+    } catch (err) {
+      setSnackbar({
+        message: err instanceof Error ? err.message : String(err),
+        severity: 'error',
+      })
+    }
+  }, [isRunning, savedConfig.workingDir, addFiles, setFilesInChat])
+
+  const handleAttachFiles = useCallback(
+    async (files: FileList) => {
+      if (!isRunning) return
+      try {
+        const parts = await filesToUploadParts(files)
+        if (!parts.length) {
+          setSnackbar({
+            message: 'Choose PNG, JPEG, GIF, WebP, TIFF, or PDF files',
+            severity: 'error',
+          })
+          return
+        }
+        const info = await uploadFiles(parts)
+        setFilesInChat(info.files_in_chat)
+        setSnackbar({
+          message: `Attached ${parts.length} file${parts.length === 1 ? '' : 's'} to the session`,
+          severity: 'info',
+        })
+      } catch (err) {
+        setSnackbar({
+          message: err instanceof Error ? err.message : String(err),
+          severity: 'error',
+        })
+      }
+    },
+    [isRunning, uploadFiles, setFilesInChat]
+  )
+
+  const handleAttachTerminalTail = useCallback(() => {
+    if (!isRunning) return
+    const lines = terminalLines
+      .slice(-40)
+      .map((l) => l.text)
+      .join('\n')
+      .trim()
+    if (!lines) {
+      setSnackbar({ message: 'No terminal output to attach', severity: 'info' })
+      return
+    }
+    const block = `[Terminal output]\n\`\`\`\n${lines}\n\`\`\`\n\n`
+    setInputValue((prev) => (prev.endsWith('\n') || !prev ? prev + block : `${prev}\n\n${block}`))
+  }, [isRunning, terminalLines])
+
+  const handleAttachContextDirectory = useCallback(async () => {
+    if (!isRunning || !isTauriRuntime()) return
+    try {
+      const picked = await invoke<string | null>('pick_context_directory', {
+        workingDir: savedConfig.workingDir,
+      })
+      if (!picked) return
+      const info = await addFiles([picked])
+      setFilesInChat(info.files_in_chat)
+      setSnackbar({ message: 'Folder added to session context', severity: 'info' })
+    } catch (err) {
+      setSnackbar({
+        message: err instanceof Error ? err.message : String(err),
+        severity: 'error',
+      })
+    }
+  }, [isRunning, savedConfig.workingDir, addFiles, setFilesInChat])
+
+  const handleStartWork = useCallback(
+    async (todo: TodoItem) => {
+      await setActiveTodo(todo.id)
+      await updateTodo(todo.id, {
+        title: todo.title,
+        spec: todo.spec,
+        requirements: todo.requirements,
+        design: todo.design,
+        tasks_md: todo.tasks_md,
+        depends_on: todo.depends_on,
+        branch: todo.branch,
+        pr_url: todo.pr_url,
+        checklist: todo.checklist,
+      })
+      todoInjectedIdRef.current = null
+      setActiveTab('chat')
+      setInputValue(buildStartWorkMessage(todo, todoStore?.todos ?? []))
+      setSnackbar({ message: `Active task: ${todo.title}`, severity: 'info' })
+    },
+    [setActiveTodo, updateTodo, todoStore?.todos]
+  )
+
+  const handleGenerateSpec = useCallback(
+    async (todoId: string, prompt: string, mode: 'generate' | 'refine') => {
+      const sid = sessionInfo?.session_id
+      const client = httpClient ?? todoApiClient
+      if (!sid || !isRunning) {
+        setSnackbar({ message: 'Start a session to generate specs with AI', severity: 'info' })
+        return
+      }
+      specGenerateAbortRef.current?.abort()
+      const ac = new AbortController()
+      specGenerateAbortRef.current = ac
+      setSpecGenerating(true)
+      setSnackbar({
+        message: 'Generating spec in background — chat stays available',
+        severity: 'info',
+      })
+      try {
+        await client.generateWorkspaceTodoSpec(
+          savedConfig.workingDir,
+          sid,
+          todoId,
+          { prompt, mode, apply: true, background: true },
+          ac.signal
+        )
+        await reloadTodos()
+        setSnackbar({
+          message: mode === 'refine' ? 'Spec refined and saved' : 'Spec generated and saved',
+          severity: 'info',
+        })
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+        setSnackbar({
+          message: err instanceof Error ? err.message : String(err),
+          severity: 'error',
+        })
+        throw err
+      } finally {
+        if (specGenerateAbortRef.current === ac) {
+          specGenerateAbortRef.current = null
+        }
+        setSpecGenerating(false)
+      }
+    },
+    [sessionInfo?.session_id, httpClient, todoApiClient, isRunning, savedConfig.workingDir, reloadTodos]
+  )
+
+  const handleImplementStep = useCallback(
+    async (todo: TodoItem, step: ImplementationStep) => {
+      await setActiveTodo(todo.id)
+      await updateTodo(todo.id, {
+        title: todo.title,
+        requirements: todo.requirements,
+        design: todo.design,
+        tasks_md: todo.tasks_md,
+        depends_on: todo.depends_on,
+        branch: todo.branch,
+        pr_url: todo.pr_url,
+        checklist: todo.checklist,
+      })
+      todoInjectedIdRef.current = null
+      setActiveTab('chat')
+      setInputValue(buildImplementStepMessage(step, todo))
+      setSnackbar({
+        message: `Implementing step ${step.number}: ${step.text}`,
+        severity: 'info',
+      })
+    },
+    [setActiveTodo, updateTodo]
+  )
+
   const handleSend = async () => {
     if (!inputValue.trim() || !isRunning) return
+    const text = inputValue.trim()
+    const injectSpec = Boolean(activeTodo && todoInjectedIdRef.current !== activeTodo.id)
+    const todoOptions = activeTodo
+      ? { activeTodoId: activeTodo.id, injectTodoSpec: injectSpec }
+      : undefined
     try {
-      await send(inputValue)
-      if (remainingAutoApproves > 0) {
-        setRemainingAutoApproves((prev) => Math.max(0, prev - 1))
-      }
+      const result = await send(text, todoOptions)
+      if (injectSpec && activeTodo) todoInjectedIdRef.current = activeTodo.id
       setInputValue('')
+      if (result.queued) {
+        setSnackbar({
+          message: 'Queued — will send when the agent finishes the current turn',
+          severity: 'info',
+        })
+      } else {
+        void reloadTodos()
+      }
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        setStatusMessage('Stopped')
+        return
+      }
+      setSnackbar({
+        message: err instanceof Error ? err.message : String(err),
+        severity: 'error',
+      })
+    }
+  }
+
+  const handleConfirmAnswer = async (accepted: boolean) => {
+    const c = pendingConfirm
+    if (!c?.confirm_id) return
+    try {
+      await submitConfirm(c.confirm_id, accepted)
+      dismissConfirm()
     } catch (err) {
       setSnackbar({
         message: err instanceof Error ? err.message : String(err),
@@ -432,9 +845,14 @@ function App() {
     }
   }
 
+  const handleDismissMessage = (messageId: number) => {
+    setChatMessages((prev) => prev.filter((m) => m.id !== messageId))
+  }
+
   const handleUndo = async () => {
     try {
       await undo()
+      bumpGitRefresh()
     } catch (err) {
       setSnackbar({
         message: err instanceof Error ? err.message : String(err),
@@ -473,6 +891,19 @@ function App() {
           variant="outlined"
         />
       )}
+      {queuedCount > 0 && (
+        <Chip label={`${queuedCount} queued`} size="small" color="info" variant="outlined" />
+      )}
+      {activeTodo && (
+        <Chip
+          label={`Task: ${activeTodo.title}`}
+          size="small"
+          color="secondary"
+          variant="outlined"
+          onClick={() => setActiveTab('tasks')}
+          sx={{ cursor: 'pointer', maxWidth: 200 }}
+        />
+      )}
     </Stack>
   )
 
@@ -507,15 +938,91 @@ function App() {
               inputValue={inputValue}
               isRunning={isRunning}
               isBusy={isBusy}
+              queuedCount={queuedCount}
               pendingConfirm={pendingConfirm}
+              pathSuggestions={pathSuggestions}
+              pathAssistActive={pathAssistActive}
+              tokenStats={tokenStats}
               chatEndRef={chatEndRef}
               onInputChange={setInputValue}
               onSend={handleSend}
-              onDismissConfirm={dismissConfirm}
+              onCancelSend={cancelSend}
+              onConfirmAnswer={handleConfirmAnswer}
+              onDismissMessage={handleDismissMessage}
               commands={commands}
               onPickCommand={(cmd) => setInputValue(cmd)}
+              useNativeImagePicker={isTauriRuntime()}
+              onNativeAttachImages={() => void handleNativeAttachImages()}
+              onAttachFiles={(files) => void handleAttachFiles(files)}
+              onAttachTerminalTail={handleAttachTerminalTail}
+              terminalTailAvailable={terminalLines.some((l) => l.text.trim().length > 0)}
+              onAttachContextDirectory={
+                isTauriRuntime() ? () => void handleAttachContextDirectory() : undefined
+              }
             />
             </>
+          )}
+
+          {activeTab === 'tasks' && (
+            <TodoPanel
+              loading={todosLoading}
+              todos={todoStore?.todos ?? []}
+              activeId={todoStore?.activeId ?? null}
+              templates={todoStore?.templates}
+              onCreate={(title, spec, template) => void createTodo(title, spec, template)}
+              onUpdate={(id, patch) => void updateTodo(id, patch)}
+              onDelete={(id) => void deleteTodo(id)}
+              onMoveTodo={(id, dir) => void moveTodo(id, dir)}
+              onSyncSpecFromDisk={async (id) => {
+                try {
+                  await syncSpecFromDisk(id)
+                  setSnackbar({ message: 'Spec layers loaded from disk', severity: 'info' })
+                } catch (err) {
+                  setSnackbar({
+                    message: err instanceof Error ? err.message : String(err),
+                    severity: 'error',
+                  })
+                }
+              }}
+              onCancelSpecGenerate={() => specGenerateAbortRef.current?.abort()}
+              onSetActive={(id) => void setActiveTodo(id)}
+              onMarkDone={(id) => void markDone(id)}
+              onStartWork={(todo) => void handleStartWork(todo)}
+              onImplementStep={(todo, step) => void handleImplementStep(todo, step)}
+              httpReady={todosHttpReady}
+              tauriLocal={todosTauriLocal}
+              currentBranch={gitStatus?.branch ?? null}
+              sessionReady={isRunning && Boolean(sessionInfo?.session_id) && todosHttpReady}
+              sessionBusy={isBusy}
+              specGenerating={specGenerating}
+              onGenerateSpec={(id, prompt, mode) => handleGenerateSpec(id, prompt, mode)}
+              onExportMarkdown={async () => {
+                try {
+                  const md = await exportMarkdown()
+                  await navigator.clipboard.writeText(md)
+                  setSnackbar({ message: 'Tasks copied to clipboard (markdown)', severity: 'info' })
+                } catch (err) {
+                  setSnackbar({
+                    message: err instanceof Error ? err.message : String(err),
+                    severity: 'error',
+                  })
+                }
+              }}
+              onImportMarkdown={async (markdown, merge) => {
+                try {
+                  await importMarkdown(markdown, merge)
+                  setSnackbar({
+                    message: merge ? 'Tasks merged from markdown' : 'Tasks imported from markdown',
+                    severity: 'info',
+                  })
+                } catch (err) {
+                  setSnackbar({
+                    message: err instanceof Error ? err.message : String(err),
+                    severity: 'error',
+                  })
+                }
+              }}
+            />
           )}
 
           {activeTab === 'terminal' && (
@@ -567,12 +1074,14 @@ function App() {
           {activeTab === 'git' && (
             <Box sx={{ height: '100%', overflow: 'auto', py: 1 }}>
               <GitPanel
+                workingDir={savedConfig.workingDir}
                 lastGit={lastGit}
                 gitStatus={gitStatus}
                 gitLoading={gitLoading}
                 onRefreshGit={refreshGit}
                 onUndo={handleUndo}
                 isRunning={isRunning}
+                refreshToken={gitRefreshKey}
               />
             </Box>
           )}

@@ -141,7 +141,7 @@ export function SettingsPanel({
             onChange={(e) => onChange({ ...config, coreApiToken: e.target.value })}
           />
           <TextField
-            label="Auto-approve countdown (UI)"
+            label="Auto-approve countdown"
             fullWidth
             size="small"
             type="number"
@@ -149,7 +149,43 @@ export function SettingsPanel({
             onChange={(e) =>
               onChange({ ...config, autoApproveLimit: parseInt(e.target.value, 10) || 0 })
             }
+            helperText="Automatically answer Yes on the next N confirmation prompts (0 = always ask)."
           />
+          <TextField
+            label="Prompt before commit"
+            fullWidth
+            size="small"
+            select
+            SelectProps={{ native: true }}
+            value={config.promptBeforeCommit ? 'yes' : 'no'}
+            onChange={(e) => {
+              const manual = e.target.value === 'yes'
+              onChange({
+                ...config,
+                promptBeforeCommit: manual,
+                autoStageOnDone: manual ? true : config.autoStageOnDone,
+              })
+            }}
+            helperText="When enabled, the engine will not auto-commit; use the Git tab to commit."
+          >
+            <option value="no">Auto-commit (default)</option>
+            <option value="yes">Manual commit only</option>
+          </TextField>
+          <TextField
+            label="Auto-stage edits after turn"
+            fullWidth
+            size="small"
+            select
+            SelectProps={{ native: true }}
+            value={config.autoStageOnDone ? 'yes' : 'no'}
+            onChange={(e) =>
+              onChange({ ...config, autoStageOnDone: e.target.value === 'yes' })
+            }
+            helperText="When the engine does not commit, stage edited files so the Git tab shows staged diffs (desktop)."
+          >
+            <option value="yes">Yes (recommended with manual commit)</option>
+            <option value="no">No</option>
+          </TextField>
         </Stack>
       </Paper>
 

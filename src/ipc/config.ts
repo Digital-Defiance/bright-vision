@@ -10,7 +10,12 @@ export interface AiderConfig {
   extraParams: string
   /** Git project the agent edits (any repo; does not need aider-vision-core inside it). */
   workingDir: string
+  /** Auto-answer up to N confirmations per session (0 = always prompt). */
   autoApproveLimit: number
+  /** When true, disable engine auto-commits (user commits via git). */
+  promptBeforeCommit: boolean
+  /** Stage edited files after each turn when the engine did not commit (desktop only). */
+  autoStageOnDone: boolean
   /** Relative path to core under the AV app install (desktop spawn only). */
   coreEnginePath: string
   pythonPath: string
@@ -29,6 +34,8 @@ export const DEFAULT_CONFIG: AiderConfig = {
   extraParams: '{"think": false}',
   workingDir: '.',
   autoApproveLimit: 0,
+  promptBeforeCommit: false,
+  autoStageOnDone: true,
   coreEnginePath: CORE_ENGINE_DIR,
   pythonPath: '',
   coreApiUrl: 'http://127.0.0.1:8741',

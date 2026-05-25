@@ -1,6 +1,6 @@
 # Aider Vision Roadmap
 
-Living backlog for chat UX, engine behavior, and longer-term product direction.
+Living backlog for chat UX, engine behavior, spec-driven work, and charter-level evolution ([AGENTS.md](../AGENTS.md) § Evolution).
 
 **Agents:** Read this file before substantive work; follow **Suggested fix order** until open items are **Done**; update statuses in the same session when you ship or learn something new. Instructions: `AGENTS.md` (Product roadmap) and `.cursor/rules/roadmap.mdc`.
 
@@ -8,8 +8,9 @@ Living backlog for chat UX, engine behavior, and longer-term product direction.
 
 | Status | Meaning |
 |--------|---------|
-| Done | Shipped in repo |
+| Done | Shipped in repo (parent UI and/or `aider-vision-core` submodule) |
 | Open | Not started or in progress |
+| Partial | Some behavior exists; gaps documented |
 | Longer-term | Strategic; design before build |
 | **Priority** | Do before routine UX backlog unless user says otherwise |
 
@@ -20,6 +21,7 @@ Living backlog for chat UX, engine behavior, and longer-term product direction.
 | # | Status | Item |
 |---|--------|------|
 | **19** | **Done** | Submodule / multi-repo verified: `yarn verify:submodule` + `test_superproject_integration.py` (RepoSet, `/add` paths, Session). Manual UI pass still useful for SEARCH/REPLACE + commit. See [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md). |
+| **31** | **Open** | **Release hygiene** — commit/tag `aider-vision-core`, bump submodule pointer, verify ([RELEASE.md](./RELEASE.md)). Code is landed locally; not yet tagged in git. |
 
 ---
 
@@ -36,6 +38,7 @@ Living backlog for chat UX, engine behavior, and longer-term product direction.
 | 13 | **Done** | Token stats footer (`TokenStatsBar`, parses `Tokens:` tool_output) |
 | 15 | **Done** | Suppress empty `tool_output` in `App.tsx` + `ChatPanel` |
 | 6 | **Done** | Full-width chat (`ChatPanel` drops `maxWidth="md"`) |
+| **25** | **Done** | Richer assistant section parser — multiple markers per message (`**THINKING**` / `**ANSWER**` / `**REASONING**`) |
 
 ## Input & session control
 
@@ -53,7 +56,7 @@ Living backlog for chat UX, engine behavior, and longer-term product direction.
 | 7 | **Done** | Confirm flow: `yes=False` default, `POST /sessions/{id}/confirm`, UI Yes/No + auto-approve countdown |
 | 14 | **Done** | No longer pass workspace dir as chat file (`Session.create` empty `fnames`) |
 | 17 | **Done** | Settings: prompt before commit → `auto_commits: false` on session create |
-| — | **Done** | Terminate `:8741` core API on app quit |
+| — | **Done** | Terminate `:8741` core API on app quit (Tauri) |
 
 ## Multi-modal & platform
 
@@ -61,31 +64,74 @@ Living backlog for chat UX, engine behavior, and longer-term product direction.
 |---|--------|------|
 | 16 | **Done** | Attach images/PDF via chat (Tauri picker + browser upload → `/sessions/{id}/files`) |
 
-## Longer-term product
+## Spec-driven development (#18)
+
+**Goal:** Kiro-*inspired* spec-driven work without cloning Kiro’s IDE. Shipped v1–v5; gaps vs Kiro tracked as **#20–22** below.
+
+| Phase | Status | Scope |
+|-------|--------|--------|
+| v1 | **Done** | Tasks tab, `.aider-vision/todos.json`, active task chip, spec inject, `/todo` in core |
+| v2 | **Done** | Session todos HTTP API, `active_todo_id` / `inject_todo_spec`, templates, checklist |
+| v3 | **Done** | Workspace todos HTTP, checklist auto-complete, markdown import/export |
+| v4a | **Done** | Three-layer specs, `depends_on`, `spec-driven` template, `.aider-vision/specs/{id}/` sync |
+| v4b | **Done** | AI generate/refine spec, steered **Implement** per implementation task |
+| v5 | **Done** | Background `generate-spec` jobs; ephemeral session; job poll |
 
 | # | Status | Item |
 |---|--------|------|
-| 18 | **Done** | Spec-driven tasks: Tasks tab, HTTP todos API, `active_todo_id` on messages, templates + checklist — [SPEC_DRIVEN_DEV.md](./SPEC_DRIVEN_DEV.md) |
+| 18a–18e | **Done** | Core/UI todos API, generate/refine, steered steps, reload spec from disk |
+
+### Kiro / spec parity (from [SPEC_DRIVEN_DEV.md](./SPEC_DRIVEN_DEV.md))
+
+| # | Status | Item |
+|---|--------|------|
+| **20** | **Open** | Dedicated spec-agent UX — separate surface/thread for spec work (not only ephemeral jobs + Tasks tab) |
+| **21** | **Open** | EARS / requirements linter — validate WHEN/SHALL structure; beyond LLM “Refine spec” |
+| **22** | **Open** | Repo-wide spec index — discover and sync all `.aider-vision/specs/**`; “Sync Files” style maintenance |
+
+---
+
+## Charter evolution ([AGENTS.md](../AGENTS.md) § Evolution Roadmap)
+
+Maps the high-level product charter to tracked work. Items **23–24** are largely satisfied by the tactical rows above; **25–29** carry the remaining charter intent.
+
+| # | Status | Charter theme | Tactical mapping / gap |
+|---|--------|---------------|-------------------------|
+| **23** | **Done** | Process & terminal integration | Vision HTTP/SSE, `useAiderSession`, stop/queue, Tauri core spawn, terminal stream |
+| **24** | **Done** | LLM chat interface | Chat panel, markdown, proposed edits, confirms, token stats |
+| **25** | **Done** | (overlap) Richer chat sections | Same as chat **#25** |
+| **26** | **Partial** | File system watcher | Git status polls on **Git** tab + while session runs (8s); native FS notify still open |
+| **27** | **Done** | Git visualization (charter §3) | Working tree, inline diffs, commit graph + details, stage all/file, auto-stage on `done`, undo + refresh. **Nice-to-have:** syntax-highlighted diffs |
+| **28** | **Partial** | Context awareness (charter §5) | **Done:** session files (images/PDF), `/add` paths, terminal tail + **folder picker** (Tauri) → `addFiles`. **Open:** web folder attach, file-tree picker, modified-file highlights (**#26**) |
+| **29** | **Longer-term** | Plugin / extension system | Custom Rust commands, third-party LLM providers, packaged extensions |
+| **30** | **Open** | Web / non-Tauri parity | Browser: localStorage todos; no Tauri git picker, path Tab complete, or full generate-spec without core |
 
 ---
 
 ## Known context
 
-- **#19:** Use `yarn verify:submodule` from repo root. `Session.create` must pass superproject as `git_dname` (already does). Untracked submodule files (e.g. new `brand.py`) may not appear in `path_in_repo` until committed — use tracked paths like `session.py` for `/add`.
-- **`POST /sessions/{id}/confirm`**: body `{ "confirm_id", "answer": true|false }` — core blocks until answered when `auto_yes` is false.
-- **Auto-approve countdown**: decrements on each auto-answered confirm, not on every send.
-- **Section parser**: simple marker split; may need richer parsing for nested reasoning models.
-- **Message queue**: queued sends drain automatically when the current turn finishes; Stop cancels the in-flight turn only (queue is kept).
-- **`/add` completion**: desktop Tauri only; type `/add path/prefix` then Tab or pick from the path list.
-- **Images**: use the image button in chat (staged under `.aider-vision/attachments/`). Model must support vision (`supports_vision` in model metadata).
+- **#19 / #31:** Submodule verification passes; release still needs git tag + pointer bump.
+- **`POST /sessions/{id}/confirm`**: body `{ "confirm_id", "answer": true|false }`.
+- **Message queue**: drain on turn end; Stop does not clear queue.
+- **`/add` completion**: desktop Tauri only.
+- **Tasks:** `.aider-vision/todos.json`; desktop mirrors via Tauri when core is down.
+- **18d:** Task list uses **manual order** (Up/Down); `depends_on` shows **blocked** chip, not auto-sort.
 
 ## Suggested fix order
 
-1. Optional #18 v3 polish (see [SPEC_DRIVEN_DEV.md](./SPEC_DRIVEN_DEV.md))  
+1. **#31** — [RELEASE.md](./RELEASE.md): commit/tag core, bump submodule, `yarn verify:submodule`
+2. **#19** — Manual UI pass (submodule edit + Tasks generate/implement)
+3. **#28** — Web folder attach; file-tree / modified-file highlights (**#26**)
+4. **#20–22** — Kiro-depth spec features (when prioritizing spec product)
+6. **#29, #30** — Plugins, web parity (longer horizon)
 
 ## Related docs
 
 - [DEVELOPMENT.md](./DEVELOPMENT.md) — local setup  
-- [IPC.md](./IPC.md) — Vision HTTP / SSE events  
+- [IPC.md](./IPC.md) — Vision HTTP / SSE events, todos API  
+- [SPEC_DRIVEN_DEV.md](./SPEC_DRIVEN_DEV.md) — spec-driven tasks (shipped vs Kiro)  
+- [RELEASE.md](./RELEASE.md) — commit/tag checklist  
+- [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) — superproject + submodule  
 - [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) — common failures  
 - [BUILD_MACOS.md](./BUILD_MACOS.md) — DMG / signing  
+- [TESTING.md](./TESTING.md) — Vitest, Rust git tests, Playwright e2e  

@@ -18,8 +18,9 @@ source activate.sh
 From **aider-vision** root (after `source activate.sh`):
 
 ```bash
+source activate.sh   # creates .venv and installs editable core
 yarn verify:submodule
-# or: python scripts/verify_submodule_workspace.py
+# uses .venv/bin/python when present (see scripts/verify_submodule.sh)
 ```
 
 Core unit + integration tests:

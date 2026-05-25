@@ -101,6 +101,19 @@ pytest aider-vision-core/tests/basic/test_vision_runtime.py -q
 
 See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for `No module named 'aider'` and headless/TUI issues.
 
+## Submodule verification
+
+```bash
+source activate.sh
+yarn verify:submodule
+```
+
+See [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md).
+
+## Cutting a release
+
+See [RELEASE.md](./RELEASE.md) for commit/tag/bump/verify steps when shipping core + parent together.
+
 ## Architecture
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) and [IPC.md](./IPC.md).

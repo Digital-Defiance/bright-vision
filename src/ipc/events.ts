@@ -42,11 +42,13 @@ export interface CoreDoneEvent extends CoreEventBase {
   commit_hash?: string
   commit_message?: string
   commits?: unknown
+  active_todo_id?: string
   error?: boolean
 }
 
 export interface CoreConfirmEvent extends CoreEventBase {
   type: 'confirm'
+  confirm_id?: string | null
   question: string
   subject?: string
   default?: boolean

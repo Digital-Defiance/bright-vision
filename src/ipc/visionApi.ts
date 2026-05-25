@@ -5,7 +5,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { AiderConfig } from './config'
 import type { CoreEventBase } from './events'
-import type { CoreSessionInfo } from './httpClient'
+import type { CoreSessionInfo, SendMessageOptions } from './httpClient'
 import { CoreHttpClient } from './httpClient'
 import { waitForVisionApi } from './health'
 import { isTauriRuntime } from './isTauri'
@@ -17,7 +17,14 @@ export type ProcessPhaseHandler = (update: ProcessUpdate) => void
 export interface VisionApiSession {
   start(config: AiderConfig): Promise<CoreSessionInfo>
   stop(): Promise<void>
-  send(content: string): Promise<void>
+  send(content: string, options?: SendMessageOptions): Promise<void>
+  addFiles(paths: string[]): Promise<{ info: CoreSessionInfo; events: CoreEventBase[] }>
+  uploadFiles(files: { filename: string; content_base64: string }[]): Promise<{
+    info: CoreSessionInfo
+    events: CoreEventBase[]
+  }>
+  cancelSend(): void
+  submitConfirm(confirmId: string, answer: boolean): Promise<void>
   undo(): Promise<void>
   getApiUrl(): string | null
   getSessionInfo(): CoreSessionInfo | null
@@ -34,6 +41,7 @@ export function createVisionApiSession(
   let sessionInfo: CoreSessionInfo | null = null
   let apiUrl: string | null = null
   let desktopStartedServe = false
+  let sendAbort: AbortController | null = null
 
   return {
     getApiUrl: () => apiUrl,
@@ -64,6 +72,8 @@ export function createVisionApiSession(
         workspace: cfg.workingDir,
         model: cfg.model,
         files: cfg.contextFiles?.length ? cfg.contextFiles : undefined,
+        auto_yes: false,
+        auto_commits: !cfg.promptBeforeCommit,
       })
       sessionId = session.session_id
       sessionInfo = session
@@ -88,13 +98,66 @@ export function createVisionApiSession(
       apiUrl = null
     },
 
-    async send(content) {
+    async send(content, options) {
       if (!client || !sessionId) {
         throw new Error('Vision API session is not started')
       }
-      for await (const event of client.sendMessage(sessionId, content)) {
-        onEvent(event)
+      sendAbort?.abort()
+      sendAbort = new AbortController()
+      const signal = sendAbort.signal
+      try {
+        for await (const event of client.sendMessage(sessionId, content, signal, options)) {
+          onEvent(event)
+        }
+      } finally {
+        sendAbort = null
       }
+    },
+
+    async addFiles(paths) {
+      if (!client || !sessionId) {
+        throw new Error('Vision API session is not started')
+      }
+      const result = await client.addSessionFiles(sessionId, paths)
+      sessionInfo = {
+        session_id: sessionId,
+        workspace: sessionInfo?.workspace ?? '',
+        model: sessionInfo?.model ?? '',
+        files_in_chat: result.files_in_chat,
+      }
+      for (const event of result.events) {
+        onEvent(event as CoreEventBase)
+      }
+      return { info: sessionInfo, events: result.events as CoreEventBase[] }
+    },
+
+    async uploadFiles(files) {
+      if (!client || !sessionId) {
+        throw new Error('Vision API session is not started')
+      }
+      const result = await client.uploadSessionFiles(sessionId, files)
+      sessionInfo = {
+        session_id: sessionId,
+        workspace: sessionInfo?.workspace ?? '',
+        model: sessionInfo?.model ?? '',
+        files_in_chat: result.files_in_chat,
+      }
+      for (const event of result.events) {
+        onEvent(event as CoreEventBase)
+      }
+      return { info: sessionInfo, events: result.events as CoreEventBase[] }
+    },
+
+    cancelSend() {
+      sendAbort?.abort()
+      sendAbort = null
+    },
+
+    async submitConfirm(confirmId, answer) {
+      if (!client || !sessionId) {
+        throw new Error('Vision API session is not started')
+      }
+      await client.submitConfirm(sessionId, confirmId, answer)
     },
 
     async undo() {

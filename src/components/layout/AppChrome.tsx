@@ -59,6 +59,7 @@ export function AppChrome({
               <Stack
                 component="button"
                 type="button"
+                data-testid={`nav-${item.id}`}
                 onClick={() => onTabChange(item.id)}
                 alignItems="center"
                 spacing={0.5}

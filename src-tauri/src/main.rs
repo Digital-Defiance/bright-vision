@@ -1,9 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod git_ops;
+
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, State, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -250,20 +252,6 @@ struct GitWorkspaceStatus {
     error: Option<String>,
 }
 
-fn run_git(workspace: &Path, args: &[&str]) -> Result<String, String> {
-    let out = std::process::Command::new("git")
-        .arg("-C")
-        .arg(workspace)
-        .args(args)
-        .output()
-        .map_err(|e| format!("git failed to run: {e}"))?;
-    if !out.status.success() {
-        let stderr = String::from_utf8_lossy(&out.stderr);
-        return Err(stderr.trim().to_string());
-    }
-    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
-}
-
 #[tauri::command]
 fn git_workspace_status(working_dir: String) -> GitWorkspaceStatus {
     let workspace = normalize_project_workspace(&working_dir);
@@ -281,17 +269,17 @@ fn git_workspace_status(working_dir: String) -> GitWorkspaceStatus {
             ..empty
         };
     }
-    if run_git(&workspace, &["rev-parse", "--is-inside-work-tree"]).is_err() {
+    if git_ops::run_git(&workspace, &["rev-parse", "--is-inside-work-tree"]).is_err() {
         return GitWorkspaceStatus {
             error: Some("Not a git repository".into()),
             ..empty
         };
     }
-    let branch = run_git(&workspace, &["branch", "--show-current"])
+    let branch = git_ops::run_git(&workspace, &["branch", "--show-current"])
         .ok()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
-    let porcelain = match run_git(
+    let porcelain = match git_ops::run_git(
         &workspace,
         &["status", "--porcelain=v1", "-b", "--untracked-files=all"],
     ) {
@@ -352,6 +340,462 @@ fn git_workspace_status(working_dir: String) -> GitWorkspaceStatus {
     }
 }
 
+const MAX_GIT_DIFF_CHARS: usize = 48_000;
+const MAX_GIT_COMMIT_DETAIL_CHARS: usize = 64_000;
+
+#[derive(Serialize)]
+struct GitFileDiff {
+    text: String,
+    truncated: bool,
+}
+
+fn truncate_git_text(mut text: String, max: usize) -> (String, bool) {
+    if text.len() <= max {
+        return (text, false);
+    }
+    let truncated: String = text.chars().take(max).collect();
+    text = truncated;
+    text.push_str("\n\n… output truncated …\n");
+    (text, true)
+}
+
+fn synthetic_untracked_diff(workspace: &Path, path: &str) -> Result<String, String> {
+    let full = workspace.join(path);
+    if !full.is_file() {
+        return Ok(format!("(untracked: {path})\n"));
+    }
+    let content = std::fs::read_to_string(&full).map_err(|e| e.to_string())?;
+    let mut diff = format!("--- /dev/null\n+++ b/{path}\n");
+    for (i, line) in content.lines().enumerate() {
+        if i >= 400 {
+            diff.push_str("… file truncated …\n");
+            break;
+        }
+        diff.push('+');
+        diff.push_str(line);
+        diff.push('\n');
+    }
+    Ok(diff)
+}
+
+#[tauri::command]
+fn git_file_diff(
+    working_dir: String,
+    path: String,
+    index: String,
+    worktree: String,
+) -> GitFileDiff {
+    let workspace = normalize_project_workspace(&working_dir);
+    let empty = GitFileDiff {
+        text: String::new(),
+        truncated: false,
+    };
+    if !workspace.is_dir() {
+        return GitFileDiff {
+            text: format!("Not a directory: {}", workspace.display()),
+            ..empty
+        };
+    }
+    let untracked = index == "?" && worktree == "?";
+    let raw = if untracked {
+        git_ops::run_git(
+            &workspace,
+            &["diff", "--no-index", "--", "/dev/null", path.as_str()],
+        )
+        .or_else(|_| synthetic_untracked_diff(&workspace, &path))
+    } else {
+        let mut parts: Vec<String> = Vec::new();
+        if let Ok(staged) = git_ops::run_git(&workspace, &["diff", "--cached", "--", path.as_str()]) {
+            if !staged.trim().is_empty() {
+                parts.push(format!("--- staged ---\n{staged}"));
+            }
+        }
+        if let Ok(unstaged) = git_ops::run_git(&workspace, &["diff", "--", path.as_str()]) {
+            if !unstaged.trim().is_empty() {
+                parts.push(format!("--- unstaged ---\n{unstaged}"));
+            }
+        }
+        if parts.is_empty() {
+            git_ops::run_git(&workspace, &["diff", "HEAD", "--", path.as_str()])
+        } else {
+            Ok(parts.join("\n"))
+        }
+    };
+    match raw {
+        Ok(text) => {
+            let (text, truncated) = truncate_git_text(text, MAX_GIT_DIFF_CHARS);
+            GitFileDiff { text, truncated }
+        }
+        Err(e) => GitFileDiff {
+            text: e,
+            truncated: false,
+        },
+    }
+}
+
+#[derive(Serialize, Clone)]
+struct GitCommitEntry {
+    hash: String,
+    short_hash: String,
+    subject: String,
+    author: String,
+    timestamp: i64,
+}
+
+#[tauri::command]
+fn git_recent_commits(working_dir: String, limit: Option<u32>) -> Result<Vec<GitCommitEntry>, String> {
+    let workspace = normalize_project_workspace(&working_dir);
+    if !workspace.is_dir() {
+        return Err(format!("Not a directory: {}", workspace.display()));
+    }
+    let n = limit.unwrap_or(20).clamp(1, 50);
+    let out = git_ops::run_git(
+        &workspace,
+        &[
+            "log",
+            &format!("-{n}"),
+            "--format=%H\x1f%h\x1f%s\x1f%an\x1f%ct",
+        ],
+    )?;
+    let mut commits = Vec::new();
+    for line in out.lines() {
+        let mut fields = line.split('\x1f');
+        let Some(hash) = fields.next() else { continue };
+        let Some(short_hash) = fields.next() else { continue };
+        let Some(subject) = fields.next() else { continue };
+        let Some(author) = fields.next() else { continue };
+        let Some(ts) = fields.next() else { continue };
+        let timestamp = ts.parse::<i64>().unwrap_or(0);
+        commits.push(GitCommitEntry {
+            hash: hash.to_string(),
+            short_hash: short_hash.to_string(),
+            subject: subject.to_string(),
+            author: author.to_string(),
+            timestamp,
+        });
+    }
+    Ok(commits)
+}
+
+#[derive(Serialize)]
+struct GitCommitDetail {
+    text: String,
+    truncated: bool,
+}
+
+#[tauri::command]
+fn git_commit_detail(working_dir: String, hash: String) -> Result<GitCommitDetail, String> {
+    if hash.len() < 7 || !hash.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err("Invalid commit hash".into());
+    }
+    let workspace = normalize_project_workspace(&working_dir);
+    let out = git_ops::run_git(
+        &workspace,
+        &["show", "--stat", "--patch", "--no-color", &hash],
+    )?;
+    let (text, truncated) = truncate_git_text(out, MAX_GIT_COMMIT_DETAIL_CHARS);
+    Ok(GitCommitDetail { text, truncated })
+}
+
+#[tauri::command]
+fn git_stage_paths(working_dir: String, paths: Option<Vec<String>>) -> Result<(), String> {
+    let workspace = normalize_project_workspace(&working_dir);
+    if !workspace.is_dir() {
+        return Err(format!("Not a directory: {}", workspace.display()));
+    }
+    match paths {
+        None => git_ops::run_git(&workspace, &["add", "-A"]).map(|_| ()),
+        Some(list) if list.is_empty() => Err("No paths to stage".into()),
+        Some(list) => {
+            let mut args = vec!["add"];
+            for p in &list {
+                args.push(p.as_str());
+            }
+            git_ops::run_git(&workspace, &args).map(|_| ())
+        }
+    }
+}
+
+#[tauri::command]
+fn git_commit_graph(
+    working_dir: String,
+    limit: Option<u32>,
+) -> Result<Vec<git_ops::GitGraphNode>, String> {
+    let workspace = normalize_project_workspace(&working_dir);
+    git_ops::commit_graph(&workspace, limit.unwrap_or(20))
+}
+
+const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "bmp", "webp", "tiff", "pdf"];
+
+fn is_image_ext(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| IMAGE_EXTENSIONS.iter().any(|ext| ext.eq_ignore_ascii_case(e)))
+        .unwrap_or(false)
+}
+
+fn workspace_todos_path(working_dir: &str) -> PathBuf {
+    normalize_project_workspace(working_dir)
+        .join(".aider-vision")
+        .join("todos.json")
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ChecklistItemJson {
+    id: String,
+    text: String,
+    #[serde(default)]
+    done: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TodoItemJson {
+    id: String,
+    title: String,
+    #[serde(default)]
+    spec: String,
+    #[serde(default)]
+    requirements: String,
+    #[serde(default)]
+    design: String,
+    #[serde(default)]
+    tasks_md: String,
+    #[serde(default)]
+    depends_on: Vec<String>,
+    #[serde(default)]
+    branch: String,
+    #[serde(default)]
+    pr_url: String,
+    #[serde(default = "default_todo_status")]
+    status: String,
+    #[serde(default)]
+    links: Vec<String>,
+    #[serde(default)]
+    checklist: Vec<ChecklistItemJson>,
+    created_at: String,
+    updated_at: String,
+}
+
+fn default_todo_status() -> String {
+    "open".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct TodoStoreJson {
+    #[serde(default = "default_todo_version")]
+    version: u32,
+    #[serde(rename = "activeId", default)]
+    active_id: Option<String>,
+    #[serde(default)]
+    todos: Vec<TodoItemJson>,
+}
+
+fn default_todo_version() -> u32 {
+    1
+}
+
+#[tauri::command]
+fn read_workspace_todos(working_dir: String) -> Result<TodoStoreJson, String> {
+    let path = workspace_todos_path(&working_dir);
+    if !path.is_file() {
+        return Ok(TodoStoreJson::default());
+    }
+    let data = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&data).map_err(|e| format!("Invalid todos.json: {e}"))
+}
+
+#[tauri::command]
+fn write_workspace_todos(working_dir: String, store: TodoStoreJson) -> Result<(), String> {
+    let path = workspace_todos_path(&working_dir);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let data = serde_json::to_string_pretty(&store).map_err(|e| e.to_string())?;
+    std::fs::write(&path, format!("{data}\n")).map_err(|e| e.to_string())
+}
+
+fn todo_specs_dir(working_dir: &str, todo_id: &str) -> PathBuf {
+    normalize_project_workspace(working_dir)
+        .join(".aider-vision")
+        .join("specs")
+        .join(todo_id)
+}
+
+/// Load requirements/design/tasks markdown from ``.aider-vision/specs/{id}/`` into todos.json.
+#[tauri::command]
+fn import_todo_spec_files(working_dir: String, todo_id: String) -> Result<TodoItemJson, String> {
+    let folder = todo_specs_dir(&working_dir, &todo_id);
+    if !folder.is_dir() {
+        return Err(format!("No spec folder: {}", folder.display()));
+    }
+    let read_layer = |name: &str| -> Option<String> {
+        let path = folder.join(name);
+        if path.is_file() {
+            std::fs::read_to_string(&path).ok()
+        } else {
+            None
+        }
+    };
+    let requirements = read_layer("requirements.md").unwrap_or_default();
+    let design = read_layer("design.md").unwrap_or_default();
+    let tasks_md = read_layer("tasks.md").unwrap_or_default();
+    if requirements.is_empty() && design.is_empty() && tasks_md.is_empty() {
+        return Err("Spec folder has no requirements.md, design.md, or tasks.md".into());
+    }
+    let mut store = read_workspace_todos(working_dir.clone())?;
+    let idx = store
+        .todos
+        .iter()
+        .position(|t| t.id == todo_id)
+        .ok_or_else(|| format!("Unknown task: {todo_id}"))?;
+    let item = &mut store.todos[idx];
+    if !requirements.is_empty() {
+        item.requirements = requirements;
+    }
+    if !design.is_empty() {
+        item.design = design;
+    }
+    if !tasks_md.is_empty() {
+        item.tasks_md = tasks_md;
+    }
+    let out = item.clone();
+    write_workspace_todos(working_dir, store)?;
+    Ok(out)
+}
+
+/// Pick image/PDF files and copy into ``.aider-vision/attachments/``; returns workspace-relative paths.
+#[tauri::command]
+async fn pick_and_stage_chat_images(
+    app: tauri::AppHandle,
+    working_dir: String,
+) -> Result<Vec<String>, String> {
+    let picked = app
+        .dialog()
+        .file()
+        .set_title("Attach images for the model")
+        .add_filter("Images & PDF", IMAGE_EXTENSIONS)
+        .blocking_pick_files();
+
+    let Some(paths) = picked else {
+        return Ok(vec![]);
+    };
+
+    let workspace = normalize_project_workspace(&working_dir);
+    if !workspace.is_dir() {
+        return Err(format!("Not a directory: {}", workspace.display()));
+    }
+
+    let attach_dir = workspace.join(".aider-vision").join("attachments");
+    std::fs::create_dir_all(&attach_dir).map_err(|e| e.to_string())?;
+
+    let mut rel_paths: Vec<String> = Vec::new();
+    for file in paths {
+        let src = PathBuf::from(file.to_string());
+        if !src.is_file() {
+            continue;
+        }
+        if !is_image_ext(&src) {
+            continue;
+        }
+        let name = src
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "image.png".to_string());
+        let mut dest = attach_dir.join(&name);
+        let stem = dest.file_stem().and_then(|s| s.to_str()).unwrap_or("image").to_string();
+        let ext = dest
+            .extension()
+            .and_then(|s| s.to_str())
+            .map(|s| format!(".{s}"))
+            .unwrap_or_default();
+        let mut n = 1;
+        while dest.exists() {
+            dest = attach_dir.join(format!("{stem}-{n}{ext}"));
+            n += 1;
+        }
+        std::fs::copy(&src, &dest).map_err(|e| format!("Failed to copy {}: {e}", src.display()))?;
+        let rel = dest
+            .strip_prefix(&workspace)
+            .map_err(|e| e.to_string())?
+            .to_string_lossy()
+            .replace('\\', "/");
+        rel_paths.push(rel);
+    }
+
+    Ok(rel_paths)
+}
+
+/// Path completions relative to workspace (for `/add` / `/drop` in the chat input).
+#[tauri::command]
+fn complete_workspace_path(working_dir: String, prefix: String, limit: Option<usize>) -> Result<Vec<String>, String> {
+    let limit = limit.unwrap_or(25).min(100);
+    let workspace = normalize_project_workspace(&working_dir);
+    if !workspace.is_dir() {
+        return Err(format!("Not a directory: {}", workspace.display()));
+    }
+
+    let prefix = prefix.replace('\\', "/");
+    let (browse_dir, fragment) = if let Some(idx) = prefix.rfind('/') {
+        let dir_part = &prefix[..idx];
+        let frag = prefix[idx + 1..].to_string();
+        let dir = workspace.join(dir_part);
+        (dir, frag)
+    } else {
+        (workspace.clone(), prefix)
+    };
+
+    let browse_dir = if browse_dir.is_dir() {
+        browse_dir
+    } else {
+        workspace.clone()
+    };
+
+    let fragment_lower = fragment.to_lowercase();
+    let mut matches: Vec<String> = Vec::new();
+
+    let entries = std::fs::read_dir(&browse_dir).map_err(|e| e.to_string())?;
+    for entry in entries {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name == "." || name == ".." {
+            continue;
+        }
+        if fragment.is_empty() && name.starts_with('.') {
+            continue;
+        }
+        if !fragment.is_empty() && !name.to_lowercase().starts_with(&fragment_lower) {
+            continue;
+        }
+
+        let rel = if browse_dir == workspace {
+            name.clone()
+        } else {
+            let parent = browse_dir
+                .strip_prefix(&workspace)
+                .unwrap_or(&browse_dir)
+                .to_string_lossy()
+                .replace('\\', "/");
+            if parent.is_empty() {
+                name.clone()
+            } else {
+                format!("{}/{}", parent.trim_end_matches('/'), name)
+            }
+        };
+
+        let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+        let mut out = rel.replace('\\', "/");
+        if is_dir {
+            out.push('/');
+        }
+        matches.push(out);
+    }
+
+    matches.sort();
+    matches.dedup();
+    matches.truncate(limit);
+    Ok(matches)
+}
+
 #[tauri::command]
 async fn pick_workspace_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
     let folder = app
@@ -360,6 +804,24 @@ async fn pick_workspace_folder(app: tauri::AppHandle) -> Result<Option<String>, 
         .set_title("Choose project to work on")
         .blocking_pick_folder();
     Ok(folder.map(|p| p.to_string()))
+}
+
+/// Pick a folder under the workspace to add to the active session via `/add`-style context.
+#[tauri::command]
+async fn pick_context_directory(
+    app: tauri::AppHandle,
+    working_dir: String,
+) -> Result<Option<String>, String> {
+    let workspace = normalize_project_workspace(&working_dir);
+    let mut dialog = app
+        .dialog()
+        .file()
+        .set_title("Add folder to chat context");
+    if workspace.is_dir() {
+        dialog = dialog.set_directory(workspace);
+    }
+    let picked = dialog.blocking_pick_folder();
+    Ok(picked.map(|p| p.to_string()))
 }
 
 fn main() {
@@ -374,12 +836,13 @@ fn main() {
             });
             
             // Ensure core API process is terminated when the app quits to prevent port conflicts
-            let state = app.state::<AppState>();
+            let app_handle = app.handle().clone();
             if let Some(window) = app.get_webview_window("main") {
                 window.on_window_event(move |event| {
                     if let WindowEvent::CloseRequested { .. } = event {
-                        let state = state.clone();
+                        let app_handle = app_handle.clone();
                         tauri::async_runtime::spawn(async move {
+                            let state = app_handle.state::<AppState>();
                             let mut guard = state.serve_child.lock().await;
                             if let Some(mut child) = guard.take() {
                                 let _ = child.kill().await;
@@ -399,7 +862,18 @@ fn main() {
             detect_workspace,
             engine_install_path,
             git_workspace_status,
+            git_file_diff,
+            git_recent_commits,
+            git_commit_graph,
+            git_commit_detail,
+            git_stage_paths,
             pick_workspace_folder,
+            pick_context_directory,
+            complete_workspace_path,
+            pick_and_stage_chat_images,
+            read_workspace_todos,
+            write_workspace_todos,
+            import_todo_spec_files,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

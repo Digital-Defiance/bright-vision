@@ -46,7 +46,9 @@ Todos live in `.aider-vision/todos.json` under the session workspace.
 ```http
 GET    /sessions/{session_id}/todos
 POST   /sessions/{session_id}/todos          {"title", "spec?", "template?"}
-PATCH  /sessions/{session_id}/todos/{id}     partial update (incl. checklist)
+PATCH  /sessions/{session_id}/todos/{id}     partial update: title, spec, requirements, design, tasks_md, depends_on, branch, pr_url, checklist, status, links
+POST   /sessions/{session_id}/todos/{id}/generate-spec   {"prompt", "mode", "apply", "background": true} → 202 {job_id} or 200 when complete
+GET    /workspaces/todos/generate-spec/{job_id}   poll job status
 DELETE /sessions/{session_id}/todos/{id}
 PUT    /sessions/{session_id}/todos/active   {"activeId": "…" | null}
 ```
@@ -63,6 +65,25 @@ POST /sessions/{session_id}/messages
 ```
 
 The `done` event may include `active_todo_id`; edited files and commits are appended to that task’s `links`.
+
+### Workspace tasks (no session)
+
+Same todo file; use when the core API is running but you have not opened a chat session:
+
+```http
+GET    /workspaces/todos?workspace=/abs/path/to/repo
+POST   /workspaces/todos?workspace=…
+PATCH  /workspaces/todos/{id}?workspace=…   → { item, auto_completed }
+DELETE /workspaces/todos/{id}?workspace=…
+PUT    /workspaces/todos/active?workspace=…
+GET    /workspaces/todos/export?workspace=…
+POST   /workspaces/todos/import   {"workspace", "markdown", "merge": false}
+POST   /workspaces/todos/{id}/generate-spec?workspace=…&session_id=…   same body as session route
+POST   /workspaces/todos/{id}/move?workspace=…   {"direction": "up"|"down"}
+POST   /workspaces/todos/{id}/sync-spec-files?workspace=…   import specs from `.aider-vision/specs/{id}/`
+```
+
+`auto_completed` is true when a PATCH checklist update completes every item (task marked done).
 
 Optional auth: set `AIDER_VISION_TOKEN` and send `Authorization: Bearer <token>`.
 

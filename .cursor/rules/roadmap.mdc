@@ -1,0 +1,42 @@
+---
+description: Follow and maintain docs/ROADMAP.md until backlog is complete
+alwaysApply: true
+---
+
+# Product roadmap (source of truth)
+
+The tactical backlog lives in **`docs/ROADMAP.md`**, not in the high-level bullets in `AGENTS.md`.
+
+## Before substantive work
+
+1. Read `docs/ROADMAP.md` (status tables + **Suggested fix order**).
+2. Unless the user gives a different priority, work the **next Open item** in **Suggested fix order** (`docs/ROADMAP.md`).
+3. If the user’s request maps to a roadmap `#`, treat that item as in scope for the session.
+
+## While working
+
+- Keep changes aligned with the active roadmap item; avoid drive-by refactors.
+- If you discover a new bug or requirement, add a row to `docs/ROADMAP.md` (next `#`) and note it in your reply.
+
+## After shipping (same session)
+
+Update `docs/ROADMAP.md` for every item you completed or materially advanced:
+
+| Change | Action |
+|--------|--------|
+| Shipped | Set **Status** to **Done**; add a short note (commit/PR or file) if helpful |
+| Partial | Leave **Open**; add a one-line note under **Known context** or the row |
+| Blocked | Leave **Open**; document blocker under **Known context** |
+| Deprioritized | Set **Longer-term** or move to a “Deferred” note |
+
+Do not mark **Done** without landing the behavior in the repo.
+
+## Until complete
+
+- Continue roadmap items across sessions until all non–longer-term rows are **Done**, or the user explicitly changes priority.
+- Item **#18** (spec-driven tasks) is **Done** for v1–v5; follow [RELEASE.md](../docs/RELEASE.md) for submodule tagging. Deeper Kiro parity is longer-term only.
+
+## Related
+
+- Charter & architecture: `AGENTS.md`, `docs/ARCHITECTURE.md`
+- Dev setup: `docs/DEVELOPMENT.md`

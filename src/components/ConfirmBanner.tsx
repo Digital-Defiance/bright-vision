@@ -1,33 +1,29 @@
-import CloseIcon from '@mui/icons-material/Close'
-import { Alert, AlertTitle, IconButton, Typography } from '@mui/material'
+import { Alert, AlertTitle, Button, Stack, Typography } from '@mui/material'
 import type { CoreConfirmEvent } from '../ipc/events'
 
 interface ConfirmBannerProps {
   confirm: CoreConfirmEvent
-  onDismiss: () => void
+  onAnswer: (accepted: boolean) => void
 }
 
-export function ConfirmBanner({ confirm, onDismiss }: ConfirmBannerProps) {
+export function ConfirmBanner({ confirm, onAnswer }: ConfirmBannerProps) {
   return (
-    <Alert
-      severity="warning"
-      sx={{ mb: 2 }}
-      action={
-        <IconButton color="inherit" size="small" onClick={onDismiss} aria-label="Dismiss">
-          <CloseIcon fontSize="small" />
-        </IconButton>
-      }
-    >
+    <Alert severity="warning" sx={{ mb: 2 }}>
       <AlertTitle>Confirmation required</AlertTitle>
       <Typography variant="body2">{confirm.question}</Typography>
       {confirm.subject && (
-        <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
-          Subject: {confirm.subject}
+        <Typography variant="caption" display="block" sx={{ mt: 0.5, fontFamily: 'monospace' }}>
+          {confirm.subject}
         </Typography>
       )}
-      <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-        Approvals are handled inside the engine; enable auto-approve in settings for unattended runs.
-      </Typography>
+      <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+        <Button size="small" variant="contained" onClick={() => onAnswer(true)}>
+          Yes
+        </Button>
+        <Button size="small" variant="outlined" onClick={() => onAnswer(false)}>
+          No
+        </Button>
+      </Stack>
     </Alert>
   )
 }

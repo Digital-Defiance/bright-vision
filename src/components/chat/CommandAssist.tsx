@@ -13,15 +13,21 @@ import { QUICK_COMMANDS, type VisionCommand } from '../../ipc/commands'
 interface CommandAssistProps {
   commands: VisionCommand[]
   inputValue: string
+  pathSuggestions: string[]
+  pathAssistActive: boolean
   disabled?: boolean
   onPickCommand: (command: string) => void
+  onPickPath: (path: string) => void
 }
 
 export function CommandAssist({
   commands,
   inputValue,
+  pathSuggestions,
+  pathAssistActive,
   disabled,
   onPickCommand,
+  onPickPath,
 }: CommandAssistProps) {
   const showPalette = inputValue.trim().startsWith('/')
   const suggestions = showPalette
@@ -57,12 +63,46 @@ export function CommandAssist({
           />
         ))}
         <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
-          type <Box component="code">/</Box> for all · <Box component="code">/drop</Box> removes files from
-          chat · shell <Box component="code">!cmd</Box>
+          type <Box component="code">/</Box> for all · <Box component="code">/add path</Box> Tab
+          completes paths (desktop)
         </Typography>
       </Stack>
 
-      {showPalette && suggestions.length > 0 && (
+      {pathAssistActive && pathSuggestions.length > 0 && (
+        <Paper
+          variant="outlined"
+          sx={{
+            maxHeight: 180,
+            overflow: 'auto',
+            borderColor: 'info.dark',
+            bgcolor: 'background.paper',
+          }}
+        >
+          <Typography variant="caption" color="text.secondary" sx={{ px: 1.5, pt: 1 }}>
+            Paths in project
+          </Typography>
+          <List dense disablePadding>
+            {pathSuggestions.map((p) => (
+              <ListItemButton
+                key={p}
+                disabled={disabled}
+                onClick={() => onPickPath(p)}
+                sx={{ py: 0.5 }}
+              >
+                <ListItemText
+                  primary={p}
+                  primaryTypographyProps={{
+                    fontFamily: 'monospace',
+                    fontSize: '0.75rem',
+                  }}
+                />
+              </ListItemButton>
+            ))}
+          </List>
+        </Paper>
+      )}
+
+      {showPalette && !pathAssistActive && suggestions.length > 0 && (
         <Paper
           variant="outlined"
           sx={{

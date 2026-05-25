@@ -14,12 +14,6 @@ export function useSessionActivity() {
   const [filesInChat, setFilesInChat] = useState<string[]>([])
 
   const ingestEvent = useCallback((ev: CoreEventBase) => {
-    if (ev.type === 'confirm') {
-      const c = ev as CoreConfirmEvent
-      if (!c.auto_answered) {
-        setPendingConfirm(c)
-      }
-    }
     if (ev.type === 'done') {
       const d = ev as CoreDoneEvent
       setPendingConfirm(null)
@@ -41,6 +35,7 @@ export function useSessionActivity() {
 
   return {
     pendingConfirm,
+    setPendingConfirm,
     dismissConfirm: () => setPendingConfirm(null),
     lastGit,
     filesInChat,

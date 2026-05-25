@@ -1,15 +1,35 @@
+import CloseIcon from '@mui/icons-material/Close'
 import SendIcon from '@mui/icons-material/Send'
-import { Box, Button, Container, Paper, Stack, TextField, Typography, Alert } from '@mui/material'
+import StopIcon from '@mui/icons-material/Stop'
+import FolderOpenIcon from '@mui/icons-material/FolderOpen'
+import TerminalIcon from '@mui/icons-material/Terminal'
+import {
+  Alert,
+  Box,
+  Button,
+  IconButton,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material'
+import { useEffect, useRef } from 'react'
 import { DISPLAY_CORE } from '../../brand'
 import type { VisionCommand } from '../../ipc/commands'
-import { ConfirmBanner } from '../ConfirmBanner'
-import { CommandAssist } from './CommandAssist'
 import type { CoreConfirmEvent } from '../../ipc/events'
+import { parseFileCommandInput, replaceFileCommandPath } from '../../utils/fileCommandComplete'
+import { ConfirmBanner } from '../ConfirmBanner'
+import { AssistantMessageBody } from './AssistantMessageBody'
+import { ChatImageAttach } from './ChatImageAttach'
+import { CommandAssist } from './CommandAssist'
+import { TokenStatsBar } from './TokenStatsBar'
 
 export interface ChatMessage {
   id: number
   role: 'user' | 'assistant' | 'system'
   content: string
+  /** Paths reported in the following `done` event for this turn. */
+  appliedFiles?: string[]
 }
 
 export interface ToolEvent {
@@ -26,13 +46,25 @@ interface ChatPanelProps {
   inputValue: string
   isRunning: boolean
   isBusy: boolean
+  queuedCount: number
   pendingConfirm: CoreConfirmEvent | null
+  pathSuggestions: string[]
+  pathAssistActive: boolean
+  tokenStats: string | null
   chatEndRef: React.RefObject<HTMLDivElement>
   onInputChange: (value: string) => void
   onSend: () => void
-  onDismissConfirm: () => void
+  onCancelSend: () => void
+  onConfirmAnswer: (accepted: boolean) => void
+  onDismissMessage: (id: number) => void
   commands: VisionCommand[]
   onPickCommand: (command: string) => void
+  useNativeImagePicker?: boolean
+  onNativeAttachImages?: () => void
+  onAttachFiles?: (files: FileList) => void
+  onAttachTerminalTail?: () => void
+  terminalTailAvailable?: boolean
+  onAttachContextDirectory?: () => void
 }
 
 export function ChatPanel({
@@ -41,28 +73,54 @@ export function ChatPanel({
   inputValue,
   isRunning,
   isBusy,
+  queuedCount,
   pendingConfirm,
+  pathSuggestions,
+  pathAssistActive,
+  tokenStats,
   chatEndRef,
   onInputChange,
   onSend,
-  onDismissConfirm,
+  onCancelSend,
+  onConfirmAnswer,
+  onDismissMessage,
   commands,
   onPickCommand,
+  useNativeImagePicker,
+  onNativeAttachImages,
+  onAttachFiles,
+  onAttachTerminalTail,
+  terminalTailAvailable = false,
+  onAttachContextDirectory,
 }: ChatPanelProps) {
-  // Filter out empty tool outputs and noise to prevent duplication/clutter
+  const pathTabIndex = useRef(0)
+  const pathPrefix = parseFileCommandInput(inputValue)?.pathPrefix ?? ''
+
+  useEffect(() => {
+    pathTabIndex.current = 0
+  }, [pathPrefix, pathSuggestions.length])
+
   const meaningfulToolEvents = toolEvents.filter(
-    (t) => t.output?.trim() || t.type === 'tool_call'
+    (t) => t.type === 'tool_warning' || t.output?.trim() || t.type === 'tool_call'
   )
 
   return (
-    <Container maxWidth="md" disableGutters sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {pendingConfirm && <ConfirmBanner confirm={pendingConfirm} onDismiss={onDismissConfirm} />}
-      {isBusy && (
-        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-          Agent is working — see the pulse bar above.
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', width: '100%' }}>
+      {pendingConfirm && (
+        <ConfirmBanner confirm={pendingConfirm} onAnswer={onConfirmAnswer} />
+      )}
+      {(isBusy || queuedCount > 0) && (
+        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, px: 1 }}>
+          {isBusy ? 'Agent is working — use Stop to cancel the current turn.' : ''}
+          {queuedCount > 0 && (
+            <>
+              {isBusy ? ' ' : ''}
+              {queuedCount} message{queuedCount === 1 ? '' : 's'} queued.
+            </>
+          )}
         </Typography>
       )}
-      <Box sx={{ flex: 1, overflow: 'auto', mb: 2, p: 1 }}>
+      <Box sx={{ flex: 1, overflow: 'auto', mb: 1, px: 1 }}>
         {messages.length === 0 && meaningfulToolEvents.length === 0 && (
           <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
             <Typography color="text.secondary">
@@ -81,9 +139,11 @@ export function ChatPanel({
             >
               <Paper
                 sx={{
+                  position: 'relative',
                   px: 2,
                   py: 1.5,
-                  maxWidth: '85%',
+                  maxWidth: msg.role === 'user' ? '85%' : '95%',
+                  width: msg.role === 'assistant' ? '100%' : undefined,
                   bgcolor:
                     msg.role === 'user'
                       ? 'primary.dark'
@@ -94,41 +154,62 @@ export function ChatPanel({
                   borderColor: 'divider',
                 }}
               >
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                  {msg.content}
-                </Typography>
+                <IconButton
+                  size="small"
+                  aria-label="Dismiss message"
+                  onClick={() => onDismissMessage(msg.id)}
+                  sx={{ position: 'absolute', top: 4, right: 4, opacity: 0.6 }}
+                >
+                  <CloseIcon fontSize="inherit" />
+                </IconButton>
+                {msg.role === 'assistant' ? (
+                  <AssistantMessageBody
+                    content={msg.content}
+                    appliedFiles={msg.appliedFiles}
+                  />
+                ) : (
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', pr: 3 }}>
+                    {msg.content}
+                  </Typography>
+                )}
               </Paper>
             </Box>
           ))}
-          
-          {/* Group tool events logically with distinct styling */}
+
           {meaningfulToolEvents.map((tool) => (
             <Box key={tool.id} sx={{ width: '100%' }}>
               {tool.type === 'tool_warning' ? (
                 <Alert severity="warning" sx={{ mb: 1 }}>
-                  <Typography variant="body2" component="span" fontWeight="bold">
-                    {tool.name || 'Warning'}: 
-                  </Typography>
-                  <Typography variant="body2" component="span" sx={{ ml: 1 }}>
+                  <Typography variant="body2" component="span">
                     {tool.output}
                   </Typography>
                 </Alert>
               ) : (
                 <Paper
                   variant="outlined"
-                  sx={{ 
-                    p: 2, 
-                    maxWidth: '90%', 
-                    fontFamily: 'monospace', 
+                  sx={{
+                    p: 2,
+                    maxWidth: '95%',
+                    fontFamily: 'monospace',
                     fontSize: '0.85rem',
-                    bgcolor: 'action.hover'
+                    bgcolor: 'action.hover',
                   }}
                 >
-                  <Typography variant="caption" color="primary.main" display="block" gutterBottom fontWeight="bold">
-                    {tool.type === 'tool_call' ? '🛠 Calling' : '✅ Result'}: {tool.name || 'tool'}
+                  <Typography
+                    variant="caption"
+                    color="primary.main"
+                    display="block"
+                    gutterBottom
+                    fontWeight="bold"
+                  >
+                    {tool.type === 'tool_call' ? 'Tool call' : 'Tool'}: {tool.name || 'tool'}
                   </Typography>
                   {(tool.input || tool.output) && (
-                    <Typography component="pre" variant="body2" sx={{ m: 0, whiteSpace: 'pre-wrap', overflowX: 'auto' }}>
+                    <Typography
+                      component="pre"
+                      variant="body2"
+                      sx={{ m: 0, whiteSpace: 'pre-wrap', overflowX: 'auto' }}
+                    >
                       {tool.input || tool.output}
                     </Typography>
                   )}
@@ -139,15 +220,50 @@ export function ChatPanel({
         </Stack>
         <div ref={chatEndRef} />
       </Box>
-      
+
+      <TokenStatsBar stats={tokenStats} />
+
       <CommandAssist
         commands={commands}
         inputValue={inputValue}
-        disabled={!isRunning || isBusy}
+        pathSuggestions={pathSuggestions}
+        pathAssistActive={pathAssistActive}
+        disabled={!isRunning}
         onPickCommand={onPickCommand}
+        onPickPath={(path) => onInputChange(replaceFileCommandPath(inputValue, path))}
       />
-      
-      <Stack direction="row" spacing={1} sx={{ p: 1 }}>
+
+      <Stack direction="row" spacing={1} sx={{ p: 1 }} alignItems="flex-end">
+        {onAttachFiles && (
+          <ChatImageAttach
+            disabled={!isRunning}
+            useNativePicker={useNativeImagePicker}
+            onNativePick={onNativeAttachImages}
+            onPickFiles={onAttachFiles}
+          />
+        )}
+        {onAttachTerminalTail && (
+          <IconButton
+            size="small"
+            aria-label="Attach last terminal output to message"
+            title="Attach terminal output"
+            disabled={!isRunning || !terminalTailAvailable}
+            onClick={onAttachTerminalTail}
+          >
+            <TerminalIcon fontSize="small" />
+          </IconButton>
+        )}
+        {onAttachContextDirectory && (
+          <IconButton
+            size="small"
+            aria-label="Add folder to session context"
+            title="Add folder to context"
+            disabled={!isRunning}
+            onClick={onAttachContextDirectory}
+          >
+            <FolderOpenIcon fontSize="small" />
+          </IconButton>
+        )}
         <TextField
           fullWidth
           size="small"
@@ -160,28 +276,68 @@ export function ChatPanel({
               e.preventDefault()
               onSend()
             }
-            if (e.key === 'Tab' && inputValue.trim().startsWith('/')) {
-              const token = inputValue.trim().split(/\s/)[0] ?? ''
-              const match = commands.find((c) => c.name.toLowerCase().startsWith(token.toLowerCase()))
-              if (match && match.name !== token) {
+            if (e.key === 'Tab') {
+              if (pathAssistActive && pathSuggestions.length > 0) {
                 e.preventDefault()
-                onPickCommand(match.name + (inputValue.includes(' ') ? inputValue.slice(token.length) : ' '))
+                const idx = pathTabIndex.current % pathSuggestions.length
+                pathTabIndex.current = idx + 1
+                onInputChange(replaceFileCommandPath(inputValue, pathSuggestions[idx]))
+                return
+              }
+              if (inputValue.trim().startsWith('/')) {
+                const token = inputValue.trim().split(/\s/)[0] ?? ''
+                const match = commands.find((c) =>
+                  c.name.toLowerCase().startsWith(token.toLowerCase())
+                )
+                if (match && match.name !== token) {
+                  e.preventDefault()
+                  onPickCommand(
+                    match.name + (inputValue.includes(' ') ? inputValue.slice(token.length) : ' ')
+                  )
+                }
               }
             }
           }}
-          placeholder={isRunning ? `Message ${DISPLAY_CORE}...` : `Start ${DISPLAY_CORE} to chat...`}
-          disabled={!isRunning || isBusy}
+          placeholder={
+            isRunning
+              ? isBusy
+                ? `Queue a follow-up for ${DISPLAY_CORE}...`
+                : `Message ${DISPLAY_CORE}...`
+              : `Start ${DISPLAY_CORE} to chat...`
+          }
+          disabled={!isRunning}
         />
-        <Button
-          variant="contained"
-          endIcon={<SendIcon />}
-          onClick={onSend}
-          disabled={!isRunning || isBusy || !inputValue.trim()}
-          sx={{ alignSelf: 'flex-end' }}
-        >
-          Send
-        </Button>
+        {isBusy ? (
+          <Stack direction="row" spacing={0.5} sx={{ alignSelf: 'flex-end' }}>
+            <Button
+              variant="contained"
+              endIcon={<SendIcon />}
+              onClick={onSend}
+              disabled={!isRunning || !inputValue.trim()}
+            >
+              Queue
+            </Button>
+            <Button
+              variant="outlined"
+              color="warning"
+              startIcon={<StopIcon />}
+              onClick={onCancelSend}
+            >
+              Stop
+            </Button>
+          </Stack>
+        ) : (
+          <Button
+            variant="contained"
+            endIcon={<SendIcon />}
+            onClick={onSend}
+            disabled={!isRunning || !inputValue.trim()}
+            sx={{ alignSelf: 'flex-end' }}
+          >
+            Send
+          </Button>
+        )}
       </Stack>
-    </Container>
+    </Box>
   )
 }

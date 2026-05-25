@@ -4,7 +4,12 @@ import { isTauriRuntime } from '../ipc/isTauri'
 
 const POLL_MS = 8_000
 
-export function useGitStatus(workingDir: string, refreshKey: number, pollWhileRunning: boolean) {
+export function useGitStatus(
+  workingDir: string,
+  refreshKey: number,
+  pollWhileRunning: boolean,
+  pollWhileGitTab = false
+) {
   const [status, setStatus] = useState<GitWorkspaceStatus | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -27,10 +32,10 @@ export function useGitStatus(workingDir: string, refreshKey: number, pollWhileRu
   }, [refresh, refreshKey])
 
   useEffect(() => {
-    if (!pollWhileRunning || !isTauriRuntime()) return
+    if ((!pollWhileRunning && !pollWhileGitTab) || !isTauriRuntime()) return
     const id = window.setInterval(() => void refresh(), POLL_MS)
     return () => window.clearInterval(id)
-  }, [pollWhileRunning, refresh])
+  }, [pollWhileRunning, pollWhileGitTab, refresh])
 
   return { status, loading, refresh }
 }

@@ -1,79 +1,74 @@
 # Spec-driven development & in-app TODOs (roadmap #18)
 
-**v1 shipped** in the desktop/web UI. This doc describes the model and future work.
-
 Goal: lightweight **Kiro-like** flow inside Aider Vision without cloning IDE patterns.
 
-## Problems to solve
+## Shipped (v1–v4a)
 
-1. Users lose track of multi-step agent work across chat turns.
-2. Ad-hoc prompts lack a durable “definition of done.”
-3. Submodule / multi-repo tasks need scoped checklists per repo.
+| Version | What |
+|---------|------|
+| v1 | Tasks tab, `.aider-vision/todos.json`, active task, spec inject, `/todo` command |
+| v2 | Session todos HTTP API, `active_todo_id`, templates, checklist |
+| v3 | Workspace todos HTTP, markdown import/export, checklist auto-complete |
+| **v4a** | **Three-layer specs** (requirements / design / implementation tasks), `depends_on`, spec files under `.aider-vision/specs/{id}/`, `spec-driven` template |
 
-## Proposed concepts
+### Three-layer model (v4a)
 
-### Work item (TODO)
+Each task can carry:
 
-| Field | Purpose |
-|-------|---------|
-| `id` | Stable UUID |
-| `title` | Short label |
-| `spec` | Markdown: requirements, constraints, acceptance criteria |
-| `status` | `open` \| `in_progress` \| `done` \| `cancelled` |
-| `links` | Optional paths, issues, commits |
-| `created_at` / `updated_at` | Audit |
+| Field | Role |
+|-------|------|
+| `requirements` | EARS-style requirements (WHEN / THE system SHALL) |
+| `design` | Architecture and component design |
+| `tasks_md` | Ordered implementation steps (markdown checklist, not the JSON checklist) |
+| `checklist` | Runtime acceptance items (auto-complete task when all checked) |
+| `depends_on` | Other task IDs that must be `done` before work is unblocked |
 
-Stored under **`.aider-vision/todos.json`** in the workspace (gitignored via `.aider*`).
+Legacy single `spec` is migrated into `requirements` on load when layers are empty.
 
-### Spec session
+**Injected chat context** includes all three layers plus checklist and blocker notes for incomplete dependencies.
 
-- User picks a TODO → chat session gets **system context** injected once: spec + acceptance criteria.
-- Agent turns reference the active TODO id in `done` metadata (future core field).
-- Completing a TODO is manual or via `/todo done` command (core), not auto-inferred.
+**On disk:** updates sync to `.aider-vision/specs/<task-id>/requirements.md`, `design.md`, `tasks.md` (JSON remains source of truth in the app).
 
-### UI (minimal v1)
+**Template:** choose `spec-driven` when creating a task for Kiro-style stubs.
 
-- Side panel or drawer: list TODOs, editor for spec markdown.
-- “Start work” sets active TODO and optionally pre-fills chat (“Implement TODO-3 per spec”).
-- No Gantt charts, no VS Code task integration in v1.
+## Task git links (shipped)
 
-### Core / API (future)
+- `branch` and `pr_url` on each task (markdown `branch:` / `pr:` on export).
+- Desktop: **Use current branch** fills from `git_workspace_status`.
+- Included in injected spec context when starting work.
 
-```
-GET  /sessions/{id}/todos
-POST /sessions/{id}/todos
-PATCH /sessions/{id}/todos/{todo_id}
-```
+## v4b (shipped)
 
-Optional: `POST /messages` field `active_todo_id` to attach turns.
+1. **Generate spec** / **Refine spec** — Tasks tab buttons; requires active session + core API.  
+   `POST /sessions/{id}/todos/{todo_id}/generate-spec` or workspace route with `session_id` query.  
+   Body: `{ "prompt", "mode": "generate"|"refine", "apply": true }`.
+2. **Steered implementation** — parsed numbered lines in `tasks_md`; **Implement** per step prefills chat.
+3. **Dependency order** — task list sorted topologically by `depends_on`.
 
-## Non-goals (v1)
+## v5 (shipped)
 
-- Full formal verification, test generation pipelines, or external Kiro import.
-- Cloud sync of TODOs (local workspace only).
+- **Background jobs** — `POST …/generate-spec` with `background: true` returns `202` + `job_id`.
+- **Ephemeral session** — `dry_run` headless session in a worker thread; chat session unchanged.
+- **Poll** — `GET /workspaces/todos/generate-spec/{job_id}` until `completed` or `error`.
 
-## v1 (shipped)
+## Spec file sync (shipped)
 
-1. `.aider-vision/todos.json` — Tauri `read_workspace_todos` / `write_workspace_todos`; browser uses `localStorage` keyed by workspace
-2. **Tasks** nav tab — `TodoPanel` editor, Start work / Mark done / Set active
-3. Chat — header chip for active task; spec prepended on first send after activation (`formatTodoContext`)
-4. Turn links — `done.edited_files` and `commit:…` appended to active task `links`
-5. Core — `/todo list|add|active|done` via `workspace_todos.py`
+- **To disk** — every todo update writes `.aider-vision/specs/{id}/requirements.md`, `design.md`, `tasks.md`.
+- **From disk** — **Reload from disk** (UI) or `POST …/sync-spec-files` / Tauri `import_todo_spec_files`.
 
-## v2 (shipped)
+## Gap vs Kiro (tracked in ROADMAP #20–22)
 
-1. **HTTP API** — `GET/POST/PATCH/DELETE` todos and `PUT …/todos/active` on the session API ([IPC.md](./IPC.md))
-2. **`active_todo_id` + `inject_todo_spec`** on `POST /messages`; `done.active_todo_id` and server-side link capture
-3. **Templates** — `feature`, `bugfix`, `refactor` on create (UI + API)
-4. **Checklist** — per-task items in JSON and in injected spec context
+| Kiro | Aider Vision today | Roadmap |
+|------|-------------------|---------|
+| Dedicated spec agent product surface | Ephemeral job + poll | **#20** Open |
+| EARS validation & formal spec analysis | Refine prompt only | **#21** Open |
+| Sync Files / repo-wide spec index | Per-task JSON + optional spec folder | **#22** Open |
 
-## Possible v3
+## API
 
-- HTTP sync without requiring an active session (workspace-scoped routes)
-- Auto-complete tasks from spec checklist when all items checked
-- Import/export tasks markdown
+See [IPC.md](./IPC.md) for workspace and session todo routes. Patch body accepts `requirements`, `design`, `tasks_md`, `depends_on`.
 
 ## Open questions
 
-- Should TODOs commit to git or stay local-only? **Default: local-only** (gitignored).
-- One active TODO per session or global per workspace? **Per workspace**, one active in UI.
+- TODOs stay **local-only** (gitignored) by default.
+- One **active** task per workspace in the UI.
