@@ -26,6 +26,9 @@ export interface ProcessSnapshot {
   detail?: string
   /** 0–1 finite progress, or null for indeterminate flow. */
   progress: number | null
+  /** Optional counts from core ``progress`` events (e.g. repo scan). */
+  current?: number
+  total?: number
   /** Shown on error phase; cleared when returning to idle. */
   error?: string
 }
@@ -35,6 +38,9 @@ export interface ProcessUpdate {
   label: string
   detail?: string
   progress?: number | null
+  /** Set to ``null`` to clear counts (e.g. when LLM tokens start). */
+  current?: number | null
+  total?: number | null
   error?: string
 }
 

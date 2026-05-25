@@ -1,7 +1,9 @@
-import { createTheme } from '@mui/material/styles'
+import { createTheme, type Theme } from '@mui/material/styles'
+import { FONT_PRESET_CSS } from './theme/appearance'
 
 /** Dark-first Vision theme — distinct from VS Code; tuned for long coding sessions. */
-export const visionTheme = createTheme({
+export function createVisionTheme(uiFontFamily = FONT_PRESET_CSS.inter): Theme {
+  return createTheme({
   palette: {
     mode: 'dark',
     primary: {
@@ -28,7 +30,7 @@ export const visionTheme = createTheme({
     divider: '#2d3a4f',
   },
   typography: {
-    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+    fontFamily: uiFontFamily,
   },
   shape: {
     borderRadius: 10,
@@ -47,4 +49,8 @@ export const visionTheme = createTheme({
       },
     },
   },
-})
+  })
+}
+
+/** @deprecated use createVisionTheme() — default Inter UI stack */
+export const visionTheme = createVisionTheme()

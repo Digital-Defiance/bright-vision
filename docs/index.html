@@ -553,6 +553,125 @@
         color: var(--white);
       }
 
+      .status-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 1.75rem;
+      }
+
+      .status-pill {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        font-weight: 500;
+        padding: 0.3rem 0.65rem;
+        border-radius: 999px;
+        border: 1px solid var(--border-bright);
+      }
+
+      .status-pill--done {
+        color: #86efac;
+        border-color: rgba(34, 197, 94, 0.4);
+        background: rgba(34, 197, 94, 0.08);
+      }
+
+      .status-pill--partial {
+        color: #fcd34d;
+        border-color: rgba(245, 158, 11, 0.4);
+        background: rgba(245, 158, 11, 0.08);
+      }
+
+      .status-pill--open {
+        color: #93c5fd;
+        border-color: rgba(59, 130, 246, 0.35);
+        background: rgba(59, 130, 246, 0.08);
+      }
+
+      .status-pill--later {
+        color: var(--muted);
+        border-color: var(--border-bright);
+        background: var(--surface-raised);
+      }
+
+      .roadmap-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 2rem;
+      }
+
+      .roadmap-card {
+        padding: 1.1rem 1.15rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+
+      .roadmap-card h3 {
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin: 0 0 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .roadmap-card ul {
+        margin: 0;
+        padding-left: 1.1rem;
+        font-size: 0.82rem;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .roadmap-card li {
+        margin-bottom: 0.35rem;
+      }
+
+      .roadmap-table-wrap {
+        overflow-x: auto;
+        margin-bottom: 2rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+
+      table.roadmap-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8125rem;
+      }
+
+      table.roadmap-table th,
+      table.roadmap-table td {
+        padding: 0.65rem 0.85rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+
+      table.roadmap-table th {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--green);
+        background: var(--surface-raised);
+      }
+
+      table.roadmap-table tr:last-child td {
+        border-bottom: none;
+      }
+
+      table.roadmap-table td:first-child {
+        font-family: var(--font-mono);
+        color: var(--muted-dim);
+        white-space: nowrap;
+        width: 2.5rem;
+      }
+
       .install-mac {
         padding: 1.35rem 1.25rem;
         margin-bottom: 2.5rem;
@@ -657,6 +776,7 @@
           <a class="nav-docs" href="#features">Features</a>
           <a class="nav-docs" href="#architecture">Architecture</a>
           <a class="nav-docs" href="#start">Get started</a>
+          <a class="nav-docs" href="#roadmap">Roadmap</a>
           <a class="nav-docs" href="#docs">Docs</a>
           <a
             class="btn btn-ghost"
@@ -755,35 +875,37 @@
             </article>
             <article class="feature">
               <div class="feature-icon">02</div>
-              <h3>Real-time chat &amp; terminal</h3>
+              <h3>Chat &amp; streaming</h3>
               <p>
-                Send prompts in a dedicated Chat tab and inspect raw engine
-                output in a Technical Terminal for debugging.
+                Thinking/Answer sections, proposed edits, confirm flow,
+                queue/stop, stream dedupe, and configurable fonts including
+                Glass TTY VT220 for chat.
               </p>
             </article>
             <article class="feature">
               <div class="feature-icon">03</div>
-              <h3>Process management</h3>
+              <h3>Tasks &amp; spec-driven work</h3>
               <p>
-                Desktop spawns a local
-                <code>aider-vision-core-serve</code> instance. Web mode uses the
-                same API via Vite proxy or direct URL.
+                Tasks tab with <code>.aider-vision/todos.json</code>, layered
+                specs, generate/refine, and steered Implement steps (v1–v5
+                shipped).
               </p>
             </article>
             <article class="feature">
               <div class="feature-icon">04</div>
-              <h3>Flexible configuration</h3>
+              <h3>Git &amp; process</h3>
               <p>
-                Adjust binary path, LLM model, extra CLI params, working
-                directory, auto-approve limits, and worker mode from Settings.
+                Git tab with diffs and commit graph; reliable core start/stop;
+                determinate progress during repo scan; Technical terminal for
+                engine output.
               </p>
             </article>
             <article class="feature">
               <div class="feature-icon">05</div>
-              <h3>Core repo integration</h3>
+              <h3>Submodule workspaces</h3>
               <p>
-                Link an <code>aider-vision-core</code> submodule or directory
-                for advanced JSONL worker support and multi-repo workspaces.
+                Superproject layout with <code>aider-vision-core</code> as a
+                submodule — built to dogfood Vision on itself.
               </p>
             </article>
             <article class="feature">
@@ -839,10 +961,162 @@
             <span class="pill"><strong>Packages</strong> Yarn (PnP)</span>
           </div>
           <p class="callout">
-            <strong>Self-evolving by design.</strong> Aider Vision is built to
-            help develop itself — dogfooding the same Vision API and chat
-            workflow you use for your own projects.
+            <strong>Self-evolving by design.</strong> Primary validation is
+            <a href="#roadmap">dogfooding</a> on real repos via
+            <code>yarn tauri dev</code> — same API and chat workflow you use for
+            your own projects. See the
+            <a
+              href="https://github.com/digitaldefiance/aider-vision/blob/main/docs/ROADMAP.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              >living roadmap</a
+            >.
           </p>
+        </div>
+      </section>
+
+      <section id="roadmap">
+        <div class="wrap">
+          <p class="section-label">Roadmap</p>
+          <h2 class="section-title">What’s shipped, what’s next</h2>
+          <p class="section-desc">
+            Summary aligned with
+            <a
+              href="https://github.com/digitaldefiance/aider-vision/blob/main/docs/ROADMAP.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              ><code>docs/ROADMAP.md</code></a
+            >
+            — update that file (and this page when publishing) when statuses
+            change.
+          </p>
+
+          <div class="status-legend" aria-label="Status legend">
+            <span class="status-pill status-pill--done">Done</span>
+            <span class="status-pill status-pill--partial">Partial</span>
+            <span class="status-pill status-pill--open">Open</span>
+            <span class="status-pill status-pill--later">Longer-term</span>
+          </div>
+
+          <p class="callout" style="margin-top: 0; margin-bottom: 2rem">
+            <strong>Current focus:</strong> Dogfooding — workspace =
+            superproject root (<code>aider-vision/</code>), not
+            <code>aider-vision-core/</code> alone. Quick test:
+            <code>yarn test:local</code>; before bigger changes:
+            <code>yarn test:full</code>.
+            <a
+              href="https://github.com/digitaldefiance/aider-vision/blob/main/docs/SUBMODULE_VERIFICATION.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Submodule verification</a
+            >
+            sections A–D gate “hack on Vision itself.”
+          </p>
+
+          <div class="roadmap-grid">
+            <article class="roadmap-card">
+              <h3>
+                <span class="status-pill status-pill--done">Done</span>
+                Chat &amp; session
+              </h3>
+              <ul>
+                <li>Stream dedupe + tool timeline order</li>
+                <li>Proposed edits, confirms, queue/stop</li>
+                <li>/add Tab completion (desktop)</li>
+                <li>Images/PDF attach, token stats</li>
+              </ul>
+            </article>
+            <article class="roadmap-card">
+              <h3>
+                <span class="status-pill status-pill--done">Done</span>
+                Spec-driven (#18)
+              </h3>
+              <ul>
+                <li>Tasks v1–v5: todos API, layered specs</li>
+                <li>Generate/refine spec, Implement steps</li>
+                <li>Background generate-spec jobs</li>
+              </ul>
+            </article>
+            <article class="roadmap-card">
+              <h3>
+                <span class="status-pill status-pill--done">Done</span>
+                Git &amp; engine
+              </h3>
+              <ul>
+                <li>Git tab (#27): diffs, graph, stage/undo</li>
+                <li>Core lifecycle, manual commit option</li>
+                <li>Activity-bar scan progress</li>
+              </ul>
+            </article>
+          </div>
+
+          <h3 class="start-divider-title" style="border-top: none; padding-top: 0">
+            In progress &amp; backlog
+          </h3>
+          <div class="roadmap-table-wrap">
+            <table class="roadmap-table">
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Item</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>19</td>
+                  <td><span class="status-pill status-pill--partial">Partial</span></td>
+                  <td>
+                    Submodule verify — automated green; manual dogfood sign-off
+                    (SUBMODULE_VERIFICATION A–D)
+                  </td>
+                </tr>
+                <tr>
+                  <td>26</td>
+                  <td><span class="status-pill status-pill--partial">Partial</span></td>
+                  <td>Git status poll (8s); native file watcher open</td>
+                </tr>
+                <tr>
+                  <td>28</td>
+                  <td><span class="status-pill status-pill--partial">Partial</span></td>
+                  <td>Context attach done; file-tree picker open</td>
+                </tr>
+                <tr>
+                  <td>30</td>
+                  <td><span class="status-pill status-pill--partial">Partial</span></td>
+                  <td>Web dev via proxy; desktop-first generate-spec parity</td>
+                </tr>
+                <tr>
+                  <td>31</td>
+                  <td><span class="status-pill status-pill--open">Open</span></td>
+                  <td>Release hygiene — tag core, bump submodule pointer</td>
+                </tr>
+                <tr>
+                  <td>20–22</td>
+                  <td><span class="status-pill status-pill--open">Open</span></td>
+                  <td>Kiro-depth spec: dedicated agent UX, EARS linter, repo spec index</td>
+                </tr>
+                <tr>
+                  <td>29</td>
+                  <td><span class="status-pill status-pill--later">Longer-term</span></td>
+                  <td>Plugin / extension system</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p class="section-desc" style="margin-bottom: 1rem">
+            <strong>Suggested order while dogfooding:</strong> #19 manual pass →
+            friction from real use → #28 if context hurts → #31 when sharing
+            builds → #20–22 spec depth → plugins / web parity.
+          </p>
+          <a
+            class="btn btn-primary"
+            href="https://github.com/digitaldefiance/aider-vision/blob/main/docs/ROADMAP.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Full roadmap on GitHub →</a
+          >
         </div>
       </section>
 
@@ -885,10 +1159,12 @@ brew install aider-vision</code></pre>
           <ol class="steps">
             <li>
               <div>
-                <h3>Clone the repository</h3>
-                <p>Fetch the superproject and enter the workspace.</p>
+                <h3>Clone and init submodules</h3>
+                <p>Fetch the superproject, init <code>aider-vision-core</code>, activate the venv.</p>
                 <pre><code>git clone https://github.com/digitaldefiance/aider-vision.git
-cd aider-vision</code></pre>
+cd aider-vision
+git submodule update --init --recursive
+source activate.sh</code></pre>
               </div>
             </li>
             <li>
@@ -992,7 +1268,25 @@ cd aider-vision</code></pre>
               rel="noopener noreferrer"
             >
               <strong>Roadmap</strong>
-              <span>Active backlog and fix order</span>
+              <span>Living backlog — dogfooding focus, statuses, fix order</span>
+            </a>
+            <a
+              class="doc-link"
+              href="https://github.com/digitaldefiance/aider-vision/blob/main/docs/TESTING.md"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <strong>Testing</strong>
+              <span>Local-first: test:local, test:full, e2e matrix</span>
+            </a>
+            <a
+              class="doc-link"
+              href="https://github.com/digitaldefiance/aider-vision/blob/main/docs/SPEC_DRIVEN_DEV.md"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <strong>Spec-driven dev</strong>
+              <span>Tasks workflow vs Kiro parity gaps</span>
             </a>
             <a
               class="doc-link"

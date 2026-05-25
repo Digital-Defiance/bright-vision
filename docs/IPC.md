@@ -115,6 +115,7 @@ Each `data:` line in the message stream is a JSON object:
 ```json
 {"type": "user_message", "text": "..."}
 {"type": "token", "text": "partial"}
+{"type": "progress", "label": "Scanning repo", "current": 40, "total": 100, "fraction": 0.4, "message": "40/100"}
 {"type": "tool_output", "text": "..."}
 {"type": "confirm", "confirm_id": "…", "question": "…", "auto_answered": false}
 {"type": "done", "assistant_text": "...", "edited_files": ["src/foo.ts"], "commit_hash": "abc123"}

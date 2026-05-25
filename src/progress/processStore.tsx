@@ -6,7 +6,8 @@ import {
   useReducer,
   type ReactNode,
 } from 'react'
-import type { CoreEventBase } from '../ipc/events'
+import type { CoreEventBase, CoreProgressEvent } from '../ipc/events'
+import { progressEventToUpdate } from './ingestProgress'
 import {
   IDLE_SNAPSHOT,
   PHASE_LABELS,
@@ -41,8 +42,12 @@ function reducer(state: ProcessSnapshot, action: Action): ProcessSnapshot {
         active: true,
         phase,
         label: update.label || PHASE_LABELS[phase],
-        detail: update.detail,
-        progress: update.progress === undefined ? null : update.progress,
+        detail: update.detail === undefined ? state.detail : update.detail,
+        progress:
+          update.progress === undefined ? state.progress : update.progress,
+        current:
+          update.current !== undefined ? (update.current ?? undefined) : state.current,
+        total: update.total !== undefined ? (update.total ?? undefined) : state.total,
         error: update.error,
       }
     }
@@ -70,7 +75,12 @@ export function ProcessProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const begin = useCallback(
-    (phase: ProcessPhase, label?: string, detail?: string, progress: number | null = null) => {
+    (
+      phase: ProcessPhase,
+      label?: string,
+      detail?: string,
+      progress?: number | null
+    ) => {
       dispatch({
         type: 'apply',
         update: {
@@ -89,28 +99,22 @@ export function ProcessProvider({ children }: { children: ReactNode }) {
 
   const ingestCoreEvent = useCallback((ev: CoreEventBase) => {
     switch (ev.type) {
-      case 'progress': {
-        const fraction =
-          typeof ev.fraction === 'number'
-            ? ev.fraction
-            : typeof ev.current === 'number' && typeof ev.total === 'number' && ev.total > 0
-              ? ev.current / ev.total
-              : null
+      case 'progress':
         dispatch({
           type: 'apply',
-          update: {
-            phase: 'scan',
-            label: String(ev.label ?? PHASE_LABELS.scan),
-            detail: String(ev.message ?? '').slice(0, 120) || undefined,
-            progress: fraction,
-          },
+          update: progressEventToUpdate(ev as CoreProgressEvent),
         })
         break
-      }
       case 'token':
         dispatch({
           type: 'apply',
-          update: { phase: 'reasoning', label: PHASE_LABELS.reasoning, progress: null },
+          update: {
+            phase: 'reasoning',
+            label: PHASE_LABELS.reasoning,
+            progress: null,
+            current: null,
+            total: null,
+          },
         })
         break
       case 'tool_output':

@@ -103,6 +103,49 @@ export function capList<T>(items: T[], max: number): T[] {
   return items.slice(items.length - max)
 }
 
+/** Longest suffix of `a` that matches a prefix of `b`. */
+export function suffixPrefixOverlap(a: string, b: string): number {
+  const max = Math.min(a.length, b.length)
+  for (let len = max; len > 0; len--) {
+    if (a.endsWith(b.slice(0, len))) return len
+  }
+  return 0
+}
+
+/**
+ * Append one streamed token chunk without duplicating text when the provider
+ * resends cumulative snapshots or overlapping segments.
+ */
+export function appendStreamingToken(existing: string, chunk: string): string {
+  if (!chunk) return existing
+  if (!existing) return chunk
+  if (chunk === existing) return existing
+  if (chunk.startsWith(existing)) return chunk
+  if (existing.endsWith(chunk)) return existing
+  const overlap = suffixPrefixOverlap(existing, chunk)
+  if (overlap > 0) return existing + chunk.slice(overlap)
+  return existing + chunk
+}
+
+export type TimelineSortable = { id: number }
+
+/** Merge chat messages and tool events in SSE arrival order (by monotonic id). */
+export function mergeChatTimeline<T extends TimelineSortable, U extends TimelineSortable>(
+  messages: readonly T[],
+  tools: readonly U[]
+): Array<{ kind: 'message'; item: T } | { kind: 'tool'; item: U }> {
+  const merged: Array<
+    { kind: 'message'; id: number; item: T } | { kind: 'tool'; id: number; item: U }
+  > = [
+    ...messages.map((item) => ({ kind: 'message' as const, id: item.id, item })),
+    ...tools.map((item) => ({ kind: 'tool' as const, id: item.id, item })),
+  ]
+  merged.sort((a, b) => a.id - b.id)
+  return merged.map(({ kind, item }) =>
+    kind === 'message' ? { kind: 'message' as const, item } : { kind: 'tool' as const, item }
+  )
+}
+
 /** Shift the oldest optimistic user-message id (FIFO, matches send / SSE order). */
 export function shiftPendingUserMessageId(pendingIds: number[]): number | undefined {
   return pendingIds.shift()

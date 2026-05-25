@@ -18,6 +18,8 @@ export interface MockCoreOptions {
   messageTurns?: Record<string, unknown>[][]
   /** Delay before fulfilling POST .../messages (keeps turn busy for queue/stop tests). */
   messageDelayMs?: number
+  /** Delay between each SSE event (staggered stream for progress UI). */
+  messageEventDelayMs?: number
   filesInChat?: string[]
   onSessionCreate?: (body: Record<string, unknown>) => void
 }
@@ -139,14 +141,31 @@ export async function installMockCoreApi(page: Page, opts: MockCoreOptions = {})
     } catch {
       /* ignore */
     }
-    await route.fulfill({
-      status: 200,
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-      },
-      body: formatSse(events),
-    })
+    const headers = {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+    }
+
+    if (opts.messageEventDelayMs && opts.messageEventDelayMs > 0) {
+      const delayMs = opts.messageEventDelayMs
+      const encoder = new TextEncoder()
+      const stream = new ReadableStream({
+        async start(controller) {
+          for (const ev of events) {
+            await new Promise((r) => setTimeout(r, delayMs))
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(ev)}\n\n`))
+          }
+          controller.close()
+        },
+      })
+      await route.fulfill({ status: 200, headers, body: stream as unknown as string })
+    } else {
+      await route.fulfill({
+        status: 200,
+        headers,
+        body: formatSse(events),
+      })
+    }
   })
 
   await page.route(`**/api/core/sessions/${sessionId}/confirm`, async (route) => {

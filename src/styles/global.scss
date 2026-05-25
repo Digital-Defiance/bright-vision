@@ -22,6 +22,12 @@ $brand-font-url: '../assets/fonts/Glass_TTY_VT220.woff2';
 
 // Global layout & polish — component styling stays on MUI (theme + sx).
 
+:root {
+  --vision-font-ui: #{$vision-font-sans};
+  --vision-font-chat: 'Glass TTY VT220', 'Glass_TTY_VT220', monospace;
+  --vision-font-terminal: #{$vision-font-mono};
+}
+
 html,
 body,
 #root {
@@ -29,15 +35,38 @@ body,
 }
 
 body {
-  font-family: $vision-font-sans;
+  font-family: var(--vision-font-ui, #{$vision-font-sans});
   background-color: $vision-bg-default;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-// Monospace regions outside MUI TextField slotProps
+// Chat tab — plain Glass TTY (or user choice); no VT scanline striping
+.vision-chat {
+  font-family: var(--vision-font-chat, #{$vision-font-mono});
+  font-size: 0.9rem;
+  line-height: 1.5;
+  font-variant-ligatures: none;
+
+  .MuiTypography-root,
+  .MuiInputBase-input,
+  .MuiButton-root,
+  pre,
+  code {
+    font-family: inherit;
+  }
+}
+
+.vision-terminal {
+  font-family: var(--vision-font-terminal, #{$vision-font-mono});
+  font-size: 0.8rem;
+  line-height: 1.45;
+  font-variant-ligatures: none;
+}
+
+// Monospace regions outside chat/terminal shells
 .vision-mono {
-  font-family: $vision-font-mono;
+  font-family: var(--vision-font-terminal, #{$vision-font-mono});
 }
 
 // Subtle scrollbars (dark shell)

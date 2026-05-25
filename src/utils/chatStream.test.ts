@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  appendStreamingToken,
+  mergeChatTimeline,
   popPendingUserMessageId,
   reconcileUserMessageInChat,
   removeChatMessageById,
   shiftPendingUserMessageId,
   splitAssistantSections,
+  suffixPrefixOverlap,
 } from './chatStream'
 
 describe('splitAssistantSections', () => {
@@ -69,5 +72,55 @@ describe('optimistic user messages', () => {
   it('removeChatMessageById drops optimistic bubble', () => {
     const msgs = [make(10, 'oops'), make(11, 'keep')]
     expect(removeChatMessageById(msgs, 10)).toEqual([make(11, 'keep')])
+  })
+})
+
+describe('appendStreamingToken', () => {
+  it('appends deltas', () => {
+    expect(appendStreamingToken('In ', 'Progress')).toBe('In Progress')
+  })
+
+  it('replaces with cumulative snapshot', () => {
+    expect(appendStreamingToken('In ', 'In Progress')).toBe('In Progress')
+  })
+
+  it('avoids duplicated cumulative words', () => {
+    let text = ''
+    for (const snap of ['In ', 'In Progress', 'In Progress Progress']) {
+      text = appendStreamingToken(text, snap)
+    }
+    expect(text).toBe('In Progress Progress')
+    expect(text).not.toContain('In In')
+    expect(text).not.toContain('Progress Progress Progress')
+  })
+
+  it('skips identical chunk', () => {
+    expect(appendStreamingToken('hello', 'hello')).toBe('hello')
+  })
+
+  it('merges overlapping chunks', () => {
+    expect(suffixPrefixOverlap('In Progress', 'Progress more')).toBe(8)
+    expect(appendStreamingToken('In Progress', 'Progress more')).toBe('In Progress more')
+  })
+})
+
+describe('mergeChatTimeline', () => {
+  it('orders messages and tools by monotonic id', () => {
+    const merged = mergeChatTimeline(
+      [
+        { id: 1, role: 'user' as const, content: 'hi' },
+        { id: 4, role: 'assistant' as const, content: 'reply tail' },
+      ],
+      [
+        { id: 2, type: 'tool_result' as const, name: 'output', output: 'Added a.md' },
+        { id: 3, type: 'tool_result' as const, name: 'output', output: 'Added b.md' },
+      ]
+    )
+    expect(merged.map((e) => (e.kind === 'message' ? `m${e.item.id}` : `t${e.item.id}`))).toEqual([
+      'm1',
+      't2',
+      't3',
+      'm4',
+    ])
   })
 })

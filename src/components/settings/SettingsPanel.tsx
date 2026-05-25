@@ -11,21 +11,27 @@ import {
 } from '../../ipc/config'
 import { isTauriRuntime } from '../../ipc/isTauri'
 import { WorkspaceBar } from '../WorkspaceBar'
+import type { AppearanceConfig } from '../../theme/appearance'
+import { AppearanceSection } from './AppearanceSection'
 
 interface SettingsPanelProps {
   config: AiderConfig
+  appearance: AppearanceConfig
   apiPreview: string
   sessionFiles?: string[]
   onChange: (config: AiderConfig) => void
+  onAppearanceChange: (appearance: AppearanceConfig) => void
   onSave: () => void
   onReset: () => void
 }
 
 export function SettingsPanel({
   config,
+  appearance,
   apiPreview,
   sessionFiles,
   onChange,
+  onAppearanceChange,
   onSave,
   onReset,
 }: SettingsPanelProps) {
@@ -188,6 +194,8 @@ export function SettingsPanel({
           </TextField>
         </Stack>
       </Paper>
+
+      <AppearanceSection appearance={appearance} onChange={onAppearanceChange} />
 
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Typography variant="subtitle2" color="text.secondary" gutterBottom>

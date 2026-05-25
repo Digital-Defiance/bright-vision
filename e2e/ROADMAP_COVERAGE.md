@@ -7,7 +7,7 @@ Run: `yarn test:full` or `sh scripts/test-local.sh full`. CI is optional.
 | Roadmap | Status in product | E2E / tests |
 |---------|-------------------|-------------|
 | **Core lifecycle** | Done | `session-lifecycle.spec.ts` |
-| **#1–2, #8–11, #13, #25** Chat UX | Done | `chat-ux.spec.ts` (`chat-message-user` test ids) |
+| **#1–2, #8–11, #13, #25** Chat UX | Done | `chat-ux.spec.ts`, `stream-chat.spec.ts` (timeline order, stream dedupe) |
 | **#3–5** Queue / stop / multiline | Done | `chat-input.spec.ts` (optimistic send: `helpers/chatSend.ts`, `chatStream.test.ts`) |
 | **#7** Confirm | Done | `confirm-flow.spec.ts` |
 | **#12** `/add` Tab paths | Done (Tauri) | `path-completion.spec.ts` (mock Tauri) |

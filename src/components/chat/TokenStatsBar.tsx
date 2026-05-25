@@ -14,7 +14,6 @@ export function TokenStatsBar({ stats }: TokenStatsBarProps) {
       sx={{
         px: 1,
         py: 0.5,
-        fontFamily: 'monospace',
         fontSize: '0.7rem',
         borderTop: 1,
         borderColor: 'divider',

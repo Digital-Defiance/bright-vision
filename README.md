@@ -11,11 +11,49 @@ A lightweight, cross-platform desktop application built with **Tauri** and **Rea
 ## 🚀 Features
 
 - **Vision API**: All prompting goes through the HTTP API (React is the head; core is headless under `aider-vision-core/`).
-- **Process Management**: Desktop spawns local `aider-vision-core-serve`; web uses the same API via Vite proxy or direct URL.
-- **Real-time Interaction**: Send prompts and view responses in a dedicated Chat tab, alongside a Technical Terminal for debugging.
-- **Customizable Configuration**: Easily adjust the binary path, LLM model, extra CLI parameters, working directory, and auto-approve limits.
-- **Core Repository Integration**: Seamlessly link to an `aider-vision-core` submodule or directory for advanced JSONL worker support.
-- **Native Performance**: Built with Rust and Tauri v2 for a fast, low-footprint experience on Windows, macOS, and Linux.
+- **Chat UX**: Streaming replies with Thinking/Answer sections, proposed-edit accordions, confirm flow, queue/stop, `/add` path completion (desktop), image/PDF attach, Glass TTY–style chat font (configurable).
+- **Tasks & specs**: Spec-driven workflow (`.aider-vision/todos.json`, generate/refine spec, steered **Implement** steps) — see [docs/SPEC_DRIVEN_DEV.md](docs/SPEC_DRIVEN_DEV.md).
+- **Git tab**: Working tree, diffs, commit graph, stage/undo, auto-stage after turns (desktop).
+- **Process management**: Reliable core start/stop, activity-bar progress for repo scan, Technical terminal for engine output.
+- **Superproject + submodule**: Hack on Aider Vision itself with `aider-vision-core` as a submodule ([SUBMODULE_VERIFICATION.md](docs/SUBMODULE_VERIFICATION.md)).
+- **Native performance**: Rust + Tauri v2 on macOS, Linux, and Windows.
+
+## 🗺 Roadmap status
+
+Living backlog: **[docs/ROADMAP.md](docs/ROADMAP.md)** (also on the [project site](https://aider-vision.digitaldefiance.org/#roadmap)). Summary as of the current tree:
+
+| Status | Meaning |
+|--------|---------|
+| **Done** | Shipped in the app and/or `aider-vision-core` |
+| **Partial** | Works in part; gaps documented in the roadmap |
+| **Open** | Not started or in progress |
+| **Longer-term** | Strategic; design before build |
+
+**Current focus:** [dogfooding](docs/ROADMAP.md#current-focus--dogfooding) — daily use on real repos (`yarn tauri dev`), especially the superproject root, not expanding CI/e2e alone. Quick checks: `yarn test:local`; before larger changes: `yarn test:full`.
+
+### Shipped (high level)
+
+| Area | Highlights |
+|------|------------|
+| **Chat & session** | Stream dedupe, optimistic send + timeline tool order, multiline input, queue, stop, token stats, dismiss bubbles |
+| **Engine** | Core API lifecycle, confirm API, optional manual commit, terminate `:8741` on quit |
+| **Spec-driven (#18)** | Tasks tab v1–v5: workspace todos, three-layer specs, generate-spec jobs, Implement steps |
+| **Charter §3 Git** | Git visualization tab (#27) |
+| **Charter §23–24** | Process integration + LLM chat interface |
+
+### In progress & next
+
+| # | Status | Item |
+|---|--------|------|
+| **19** | Partial | Submodule/multi-repo — automated verify green; manual A–D dogfood sign-off pending |
+| **26** | Partial | File awareness via git poll (8s); native FS watcher still open |
+| **28** | Partial | Context: images, `/add`, folder attach; file-tree picker open |
+| **30** | Partial | Web dev via Vite proxy; full desktop parity for `/add` Tab + generate-spec |
+| **31** | Open | Release hygiene (tag core, bump submodule) — when sharing builds |
+| **20–22** | Open | Kiro-depth spec UX (dedicated spec agent, EARS linter, repo-wide spec index) |
+| **29** | Longer-term | Plugin / extension system |
+
+**Suggested order while dogfooding:** submodule verification → friction from real use → context picker if needed → release tagging → spec-depth features. Details in [ROADMAP.md § Suggested fix order](docs/ROADMAP.md#suggested-fix-order).
 
 ## 🛠 Tech Stack
 
@@ -77,18 +115,24 @@ Tap repository: [digital-defiance/homebrew-tap](https://github.com/digital-defia
 
 ## ⚙️ Configuration
 
-The application exposes the following configuration options in the **Settings** tab:
+**Settings → Model & system:** LLM model, LiteLLM extra params (JSON), project workspace, context files, auto-approve limit, prompt-before-commit, auto-stage on done, engine path (desktop).
 
-| Option             | Description                                                                 | Default                  |
-|--------------------|-----------------------------------------------------------------------------|--------------------------|
-| `binaryPath`       | Path to the `aider` executable or script.                                   | `aider-vision-core`      |
-| `model`            | The LLM model to use (e.g., `gpt-4`, `claude-3`, `ollama/codellama`).       | `ollama_chat/qwen3.6...` |
-| `extraParams`      | JSON string of additional parameters passed as `LITELLM_EXTRA_PARAMS`.      | `{"think": false}`       |
-| `workingDir`       | The directory where Aider will operate and manage files.                    | `.`                      |
-| `autoApproveLimit` | Threshold for automatic approval of file changes (set to `>0` to enable).   | `0`                      |
-| `workerMode`       | Execution mode: `auto`, `jsonl`, or `cli`.                                  | `auto`                   |
-| `coreRepoPath`     | Relative path to `aider-vision-core` for JSONL worker script resolution.    | `aider-vision-core`      |
-| `pythonPath`       | Path to the Python interpreter for the JSONL worker.                        | *(empty)*                |
+**Settings → Appearance:** UI font, chat font (default [Glass TTY VT220](src/assets/fonts/Glass_TTY_VT220.woff2)), terminal font.
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and [docs/USER_WORKFLOW.md](docs/USER_WORKFLOW.md) for defaults and day-to-day use.
+
+## 📚 Documentation
+
+| Doc | Topic |
+|-----|--------|
+| [ROADMAP.md](docs/ROADMAP.md) | Status, dogfooding focus, fix order |
+| [TESTING.md](docs/TESTING.md) | Local-first tests (`yarn test:local` / `test:full`) |
+| [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Setup and conventions |
+| [IPC.md](docs/IPC.md) | HTTP API and SSE events |
+| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Connecting, orphaned `:8741`, common failures |
+| [SUBMODULE_VERIFICATION.md](docs/SUBMODULE_VERIFICATION.md) | Superproject + `aider-vision-core` |
+| [SPEC_DRIVEN_DEV.md](docs/SPEC_DRIVEN_DEV.md) | Tasks / spec-driven workflow |
+| [RELEASE.md](docs/RELEASE.md) | Tag core and bump submodule |
 
 ## 📜 License
 
@@ -98,4 +142,4 @@ Copyright (c) 2026 Digital Defiance, Jessica Mulein
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request or open an Issue for bug reports and feature requests.
+Contributions are welcome! Check **[docs/ROADMAP.md](docs/ROADMAP.md)** before substantive work; update roadmap statuses in the same PR when you ship or learn something new. Open an issue for dogfooding friction with repro (workspace path, file path, expected vs actual commit repo).

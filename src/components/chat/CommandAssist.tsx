@@ -55,7 +55,6 @@ export function CommandAssist({
             disabled={disabled}
             onClick={() => onPickCommand(cmd + ' ')}
             sx={{
-              fontFamily: 'monospace',
               fontSize: '0.7rem',
               borderColor: 'divider',
               '&:hover': { borderColor: 'primary.main', color: 'primary.light' },
@@ -93,7 +92,6 @@ export function CommandAssist({
                 <ListItemText
                   primary={p}
                   primaryTypographyProps={{
-                    fontFamily: 'monospace',
                     fontSize: '0.75rem',
                   }}
                 />
@@ -125,7 +123,6 @@ export function CommandAssist({
                   primary={cmd.name}
                   secondary={cmd.summary || undefined}
                   primaryTypographyProps={{
-                    fontFamily: 'monospace',
                     fontSize: '0.8rem',
                     color: 'primary.light',
                   }}

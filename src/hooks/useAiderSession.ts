@@ -128,7 +128,7 @@ export function useAiderSession(onCoreEvent: (event: CoreEventBase) => void) {
       if (!sessionRef.current) throw new Error('Session not started')
       busyRef.current = true
       setIsBusy(true)
-      process.begin('reasoning', 'Sending', undefined, null)
+      process.begin('reasoning', 'Sending')
       try {
         await sessionRef.current.send(content, todoOptions)
       } catch (err) {

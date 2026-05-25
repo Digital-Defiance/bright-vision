@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from 'react'
+import { CssBaseline, ThemeProvider } from '@mui/material'
 import ChatIcon from '@mui/icons-material/Chat'
 import ChecklistRtlIcon from '@mui/icons-material/ChecklistRtl'
 import GitHubIcon from '@mui/icons-material/GitHub'
@@ -14,6 +15,7 @@ import { AppChrome } from './components/layout/AppChrome'
 import { DEFAULT_CONFIG, defaultCoreApiUrl, type AiderConfig } from './ipc/config'
 import { type CoreConfirmEvent, type CoreEventBase } from './ipc/events'
 import {
+  appendStreamingToken,
   capList,
   MAX_CHAT_MESSAGES,
   MAX_TERMINAL_LINES,
@@ -42,8 +44,18 @@ import { GitPanel } from './components/GitPanel'
 import { useWorkspaceTodos } from './hooks/useWorkspaceTodos'
 import { WelcomePanel } from './components/onboarding/WelcomePanel'
 import { SettingsPanel } from './components/settings/SettingsPanel'
+import { ProcessProvider } from './progress/processStore'
 import { useProcess } from './progress/processStore'
 import { isSessionLifecycleActive } from './utils/sessionLifecycle'
+import {
+  applyAppearanceCssVars,
+  DEFAULT_APPEARANCE,
+  loadAppearance,
+  resolveAppearanceFonts,
+  saveAppearance,
+  type AppearanceConfig,
+} from './theme/appearance'
+import { createVisionTheme } from './theme'
 
 const WELCOME_DISMISSED_KEY = 'vision-welcome-dismissed'
 
@@ -93,6 +105,9 @@ function App() {
   const [activeTab, setActiveTab] = useState<TabId>('chat')
   const [config, setConfig] = useState<AiderConfig>(DEFAULT_CONFIG)
   const [savedConfig, setSavedConfig] = useState<AiderConfig>(DEFAULT_CONFIG)
+  const [appearance, setAppearance] = useState<AppearanceConfig>(() => loadAppearance())
+  const fonts = useMemo(() => resolveAppearanceFonts(appearance), [appearance])
+  const theme = useMemo(() => createVisionTheme(fonts.ui), [fonts.ui])
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [toolEvents, setToolEvents] = useState<ToolEvent[]>([])
   const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([])
@@ -127,6 +142,10 @@ function App() {
   const savedConfigRef = useRef(savedConfig)
   savedConfigRef.current = savedConfig
   const unlistenersRef = useRef<UnlistenFn[]>([])
+
+  useEffect(() => {
+    applyAppearanceCssVars(appearance)
+  }, [appearance])
 
   useEffect(() => {
     const stored = localStorage.getItem('aider-vision-config')
@@ -274,7 +293,7 @@ function App() {
   const handleCoreEvent = useCallback((ev: CoreEventBase) => {
     process.ingestCoreEvent(ev)
     if (ev.type === 'done') bumpGitRefresh()
-    const id = Date.now()
+    const orderId = nextChatMessageId()
 
     switch (ev.type) {
       case 'user_message': {
@@ -298,16 +317,22 @@ function App() {
       case 'token': {
         const chunk = String(ev.text ?? '')
         if (!chunk) break
-        if (streamingAssistantId.current === null) {
-          streamingAssistantId.current = id
+        let sid = streamingAssistantId.current
+        if (sid === null) {
+          sid = orderId
+          streamingAssistantId.current = sid
           setChatMessages((prev) =>
-            capList([...prev, { id, role: 'assistant' as const, content: chunk }], MAX_CHAT_MESSAGES)
+            capList([...prev, { id: sid!, role: 'assistant' as const, content: chunk }], MAX_CHAT_MESSAGES)
           )
         } else {
-          const sid = streamingAssistantId.current
+          const captureSid = sid
           setChatMessages((prev) =>
             capList(
-              prev.map((m) => (m.id === sid ? { ...m, content: m.content + chunk } : m)),
+              prev.map((m) =>
+                m.id === captureSid
+                  ? { ...m, content: appendStreamingToken(m.content, chunk) }
+                  : m
+              ),
               MAX_CHAT_MESSAGES
             )
           )
@@ -324,12 +349,13 @@ function App() {
           break
         }
         if (!text.trim()) break
+        streamingAssistantId.current = null
         setToolEvents((prev) =>
           capList(
             [
               ...prev,
               {
-                id,
+                id: orderId,
                 type: 'tool_result' as const,
                 name: 'output',
                 output: text,
@@ -339,16 +365,17 @@ function App() {
           )
         )
         setTerminalLines((prev) =>
-          capList([...prev, { id, text, type: 'stdout' as const }], MAX_TERMINAL_LINES)
+          capList([...prev, { id: orderId, text, type: 'stdout' as const }], MAX_TERMINAL_LINES)
         )
         break
       }
       case 'tool_error': {
         const text = String(ev.text ?? '')
         if (!text.trim()) break
+        streamingAssistantId.current = null
         setToolEvents((prev) =>
           capList(
-            [...prev, { id, type: 'tool_result' as const, name: 'error', output: text }],
+            [...prev, { id: orderId, type: 'tool_result' as const, name: 'error', output: text }],
             MAX_TOOL_EVENTS
           )
         )
@@ -357,9 +384,13 @@ function App() {
       case 'tool_warning': {
         const text = String(ev.text ?? '')
         if (!text.trim()) break
+        streamingAssistantId.current = null
         setToolEvents((prev) =>
           capList(
-            [...prev, { id, type: 'tool_warning' as const, name: 'warning', output: text }],
+            [
+              ...prev,
+              { id: orderId, type: 'tool_warning' as const, name: 'warning', output: text },
+            ],
             MAX_TOOL_EVENTS
           )
         )
@@ -372,7 +403,7 @@ function App() {
             [
               ...prev,
               {
-                id,
+                id: orderId,
                 text: `[confirm] ${c.question ?? ''}${c.auto_answered ? ' (auto)' : ''}`,
                 type: 'stdout' as const,
               },
@@ -397,24 +428,31 @@ function App() {
           ev.edited_files && Array.isArray(ev.edited_files)
             ? (ev.edited_files as string[])
             : []
-        const assistantId = streamingAssistantId.current
         streamingAssistantId.current = null
         setStatusMessage('Ready')
-        if (assistantId && applied.length > 0) {
-          setChatMessages((prev) =>
-            capList(
+        if (applied.length > 0) {
+          setChatMessages((prev) => {
+            let lastAssistantId: number | null = null
+            for (let i = prev.length - 1; i >= 0; i--) {
+              if (prev[i].role === 'assistant') {
+                lastAssistantId = prev[i].id
+                break
+              }
+            }
+            if (lastAssistantId === null) return prev
+            return capList(
               prev.map((m) =>
-                m.id === assistantId ? { ...m, appliedFiles: applied } : m
+                m.id === lastAssistantId ? { ...m, appliedFiles: applied } : m
               ),
               MAX_CHAT_MESSAGES
             )
-          )
+          })
         }
         if (applied.length > 0) {
           setTerminalLines((prev) => [
             ...prev,
             {
-              id,
+              id: orderId,
               text: `Edited: ${applied.join(', ')}`,
               type: 'stdout',
             },
@@ -424,7 +462,7 @@ function App() {
           setTerminalLines((prev) => [
             ...prev,
             {
-              id: id + 1,
+              id: orderId + 1,
               text: `Commit ${ev.commit_hash}: ${ev.commit_message ?? ''}`,
               type: 'stdout',
             },
@@ -467,7 +505,7 @@ function App() {
         setTerminalLines((prev) => [
           ...prev,
           {
-            id,
+            id: orderId,
             text: `${prefixForUserFacing('core')} ${ev.text ?? 'Unknown error'}`,
             type: 'stderr',
             source: 'core',
@@ -477,7 +515,7 @@ function App() {
         setChatMessages((prev) => [
           ...prev,
           {
-            id,
+            id: orderId,
             role: 'system',
             content: `${prefixForUserFacing('core')} ${ev.text ?? 'Unknown error'}`,
           },
@@ -486,7 +524,7 @@ function App() {
       default:
         setTerminalLines((prev) => [
           ...prev,
-          { id, text: JSON.stringify(ev), type: 'stdout' },
+          { id: orderId, text: JSON.stringify(ev), type: 'stdout' },
         ])
     }
   }, [process, bumpGitRefresh, nextChatMessageId])
@@ -608,6 +646,7 @@ function App() {
   const handleSave = () => {
     setSavedConfig(config)
     localStorage.setItem('aider-vision-config', JSON.stringify(config))
+    saveAppearance(appearance)
     setSnackbar({ message: 'Settings saved', severity: 'info' })
   }
 
@@ -615,6 +654,9 @@ function App() {
     setConfig(DEFAULT_CONFIG)
     setSavedConfig(DEFAULT_CONFIG)
     localStorage.removeItem('aider-vision-config')
+    setAppearance({ ...DEFAULT_APPEARANCE })
+    localStorage.removeItem('aider-vision-appearance')
+    applyAppearanceCssVars(DEFAULT_APPEARANCE)
   }
 
   const handleStart = async () => {
@@ -1000,7 +1042,9 @@ function App() {
   )
 
   return (
-    <>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <ProcessProvider>
       <AppChrome
         nav={NAV}
         activeTab={activeTab}
@@ -1129,7 +1173,7 @@ function App() {
               >
                 Technical log — includes {DISPLAY_CORE} details for debugging
               </Typography>
-              <Box sx={{ flex: 1, overflow: 'auto', p: 2, fontFamily: 'monospace', fontSize: '0.8rem' }}>
+              <Box className="vision-terminal" sx={{ flex: 1, overflow: 'auto', p: 2 }}>
                 {terminalLines
                   .filter((line) => line.channel !== 'user')
                   .map((line) => (
@@ -1187,9 +1231,11 @@ function App() {
             <Container maxWidth="sm" disableGutters>
               <SettingsPanel
                 config={config}
+                appearance={appearance}
                 apiPreview={apiPreview}
                 sessionFiles={sessionFiles}
                 onChange={setConfig}
+                onAppearanceChange={setAppearance}
                 onSave={handleSave}
                 onReset={handleReset}
               />
@@ -1209,7 +1255,8 @@ function App() {
           </Alert>
         ) : undefined}
       </Snackbar>
-    </>
+      </ProcessProvider>
+    </ThemeProvider>
   )
 }
 

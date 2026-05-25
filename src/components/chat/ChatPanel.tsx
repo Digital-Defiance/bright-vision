@@ -12,7 +12,8 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
+import { mergeChatTimeline } from '../../utils/chatStream'
 import { DISPLAY_CORE } from '../../brand'
 import type { VisionCommand } from '../../ipc/commands'
 import type { CoreConfirmEvent } from '../../ipc/events'
@@ -106,8 +107,16 @@ export function ChatPanel({
     (t) => t.type === 'tool_warning' || t.output?.trim() || t.type === 'tool_call'
   )
 
+  const timeline = useMemo(
+    () => mergeChatTimeline(messages, meaningfulToolEvents),
+    [messages, meaningfulToolEvents]
+  )
+
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', width: '100%' }}>
+    <Box
+      className="vision-chat"
+      sx={{ height: '100%', display: 'flex', flexDirection: 'column', width: '100%' }}
+    >
       {pendingConfirm && (
         <ConfirmBanner confirm={pendingConfirm} onAnswer={onConfirmAnswer} />
       )}
@@ -131,101 +140,101 @@ export function ChatPanel({
           </Paper>
         )}
         <Stack spacing={2}>
-          {messages.map((msg) => (
-            <Box
-              key={msg.id}
-              sx={{
-                display: 'flex',
-                justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-              }}
-            >
-              <Paper
-                data-testid={
-                  msg.role === 'user'
-                    ? 'chat-message-user'
-                    : msg.role === 'assistant'
-                      ? 'chat-message-assistant'
-                      : 'chat-message-system'
-                }
+          {timeline.map((entry) =>
+            entry.kind === 'message' ? (
+              <Box
+                key={`msg-${entry.item.id}`}
                 sx={{
-                  position: 'relative',
-                  px: 2,
-                  py: 1.5,
-                  maxWidth: msg.role === 'user' ? '85%' : '95%',
-                  width: msg.role === 'assistant' ? '100%' : undefined,
-                  bgcolor:
-                    msg.role === 'user'
-                      ? 'primary.dark'
-                      : msg.role === 'system'
-                        ? 'warning.dark'
-                        : 'background.paper',
-                  border: msg.role === 'assistant' ? 1 : 0,
-                  borderColor: 'divider',
+                  display: 'flex',
+                  justifyContent: entry.item.role === 'user' ? 'flex-end' : 'flex-start',
                 }}
               >
-                <IconButton
-                  size="small"
-                  aria-label="Dismiss message"
-                  onClick={() => onDismissMessage(msg.id)}
-                  sx={{ position: 'absolute', top: 4, right: 4, opacity: 0.6 }}
-                >
-                  <CloseIcon fontSize="inherit" />
-                </IconButton>
-                {msg.role === 'assistant' ? (
-                  <AssistantMessageBody
-                    content={msg.content}
-                    appliedFiles={msg.appliedFiles}
-                  />
-                ) : (
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', pr: 3 }}>
-                    {msg.content}
-                  </Typography>
-                )}
-              </Paper>
-            </Box>
-          ))}
-
-          {meaningfulToolEvents.map((tool) => (
-            <Box key={tool.id} sx={{ width: '100%' }}>
-              {tool.type === 'tool_warning' ? (
-                <Alert severity="warning" sx={{ mb: 1 }}>
-                  <Typography variant="body2" component="span">
-                    {tool.output}
-                  </Typography>
-                </Alert>
-              ) : (
                 <Paper
+                  data-testid={
+                    entry.item.role === 'user'
+                      ? 'chat-message-user'
+                      : entry.item.role === 'assistant'
+                        ? 'chat-message-assistant'
+                        : 'chat-message-system'
+                  }
+                  sx={{
+                    position: 'relative',
+                    px: 2,
+                    py: 1.5,
+                    maxWidth: entry.item.role === 'user' ? '85%' : '95%',
+                    width: entry.item.role === 'assistant' ? '100%' : undefined,
+                    bgcolor:
+                      entry.item.role === 'user'
+                        ? 'primary.dark'
+                        : entry.item.role === 'system'
+                          ? 'warning.dark'
+                          : 'background.paper',
+                    border: entry.item.role === 'assistant' ? 1 : 0,
+                    borderColor: 'divider',
+                  }}
+                >
+                  <IconButton
+                    size="small"
+                    aria-label="Dismiss message"
+                    onClick={() => onDismissMessage(entry.item.id)}
+                    sx={{ position: 'absolute', top: 4, right: 4, opacity: 0.6 }}
+                  >
+                    <CloseIcon fontSize="inherit" />
+                  </IconButton>
+                  {entry.item.role === 'assistant' ? (
+                    <AssistantMessageBody
+                      content={entry.item.content}
+                      appliedFiles={entry.item.appliedFiles}
+                    />
+                  ) : (
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', pr: 3 }}>
+                      {entry.item.content}
+                    </Typography>
+                  )}
+                </Paper>
+              </Box>
+            ) : (
+              <Box key={`tool-${entry.item.id}`} sx={{ width: '100%' }}>
+                {entry.item.type === 'tool_warning' ? (
+                  <Alert severity="warning" sx={{ mb: 1 }} data-testid="chat-tool-warning">
+                    <Typography variant="body2" component="span">
+                      {entry.item.output}
+                    </Typography>
+                  </Alert>
+                ) : (
+                <Paper
+                  data-testid="chat-tool-output"
                   variant="outlined"
                   sx={{
                     p: 2,
                     maxWidth: '95%',
-                    fontFamily: 'monospace',
-                    fontSize: '0.85rem',
                     bgcolor: 'action.hover',
                   }}
                 >
-                  <Typography
-                    variant="caption"
-                    color="primary.main"
-                    display="block"
-                    gutterBottom
-                    fontWeight="bold"
-                  >
-                    {tool.type === 'tool_call' ? 'Tool call' : 'Tool'}: {tool.name || 'tool'}
-                  </Typography>
-                  {(tool.input || tool.output) && (
                     <Typography
-                      component="pre"
-                      variant="body2"
-                      sx={{ m: 0, whiteSpace: 'pre-wrap', overflowX: 'auto' }}
+                      variant="caption"
+                      color="primary.main"
+                      display="block"
+                      gutterBottom
+                      fontWeight="bold"
                     >
-                      {tool.input || tool.output}
+                      {entry.item.type === 'tool_call' ? 'Tool call' : 'Tool'}:{' '}
+                      {entry.item.name || 'tool'}
                     </Typography>
-                  )}
-                </Paper>
-              )}
-            </Box>
-          ))}
+                    {(entry.item.input || entry.item.output) && (
+                      <Typography
+                        component="pre"
+                        variant="body2"
+                        sx={{ m: 0, whiteSpace: 'pre-wrap', overflowX: 'auto' }}
+                      >
+                        {entry.item.input || entry.item.output}
+                      </Typography>
+                    )}
+                  </Paper>
+                )}
+              </Box>
+            )
+          )}
         </Stack>
         <div ref={chatEndRef} />
       </Box>

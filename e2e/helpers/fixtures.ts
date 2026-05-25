@@ -83,3 +83,59 @@ export function slowTurnEvents() {
 export function hangingTurnEvents() {
   return [{ type: 'token', text: '► **REASONING**\nWorking…\n' }]
 }
+
+/**
+ * Simulates providers that emit cumulative text snapshots per chunk (causes doubled words if appended naively).
+ */
+export function cumulativeStreamTurnEvents() {
+  const deltas = [
+    '► **THINKING**\n',
+    'In ',
+    'Progress',
+    '\n► **ANSWER**\n',
+    'Workspace',
+    ' roadmap',
+    '.',
+  ]
+  let full = ''
+  const events: { type: string; text: string }[] = []
+  for (const part of deltas) {
+    full += part
+    events.push({ type: 'token', text: full })
+  }
+  events.push({ type: 'done', edited_files: [] })
+  return events
+}
+
+/** Tool output mid-stream (e.g. /add files) before assistant finishes. */
+export function interleavedToolTurnEvents() {
+  return [
+    { type: 'token', text: '► **ANSWER**\nReading roadmap.\n' },
+    { type: 'tool_output', text: 'Added docs/ROADMAP.md to the chat' },
+    { type: 'tool_output', text: 'Added docs/index.html to the chat' },
+    { type: 'token', text: '\n\n**In Progress**\n' },
+    { type: 'done', edited_files: [] },
+  ]
+}
+
+/** Repo scan style determinate progress before assistant tokens (Vision activity bar). */
+export function scanProgressTurnEvents() {
+  return [
+    {
+      type: 'progress',
+      label: 'Scanning repo',
+      current: 40,
+      total: 100,
+      message: '40/100',
+    },
+    {
+      type: 'progress',
+      label: 'Scanning repo',
+      current: 100,
+      total: 100,
+      message: '100/100',
+    },
+    { type: 'token', text: '► **ANSWER**\nDone scanning.\n' },
+    { type: 'done', edited_files: [] },
+  ]
+}

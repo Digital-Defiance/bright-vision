@@ -2,6 +2,8 @@
 
 Living backlog for chat UX, engine behavior, spec-driven work, and charter-level evolution ([AGENTS.md](../AGENTS.md) § Evolution).
 
+**Public summary:** [README.md](../README.md#-roadmap-status) · [docs site](https://aider-vision.digitaldefiance.org/#roadmap) (`docs/index.html`). Update those summaries when statuses change here.
+
 **Agents:** Read this file before substantive work; follow **Suggested fix order** until open items are **Done**; update statuses in the same session when you ship or learn something new. Instructions: `AGENTS.md` (Product roadmap) and `.cursor/rules/roadmap.mdc`.
 
 ## Current focus — dogfooding
@@ -42,7 +44,7 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 
 | # | Status | Item |
 |---|--------|------|
-| 1 | **Done** | Fix stream doubling — headless mode skips `stdout` writes when `yield_stream` (`base_coder.py`) |
+| 1 | **Done** | Stream dedupe — core skips stdout when `yield_stream`; UI `appendStreamingToken` for cumulative chunks; timeline interleaves tools (`stream-chat.spec.ts`) |
 | 2 | **Done** | Proposed edits in fenced blocks → collapsed accordions; **Applied** vs **Proposed only** from `done.edited_files` |
 | 8 | **Done** | Duplicate assistant text (same stdout fix as #1) |
 | 9 | **Done** | Basic section chips for `► **THINKING**` / `► **ANSWER**` (`splitAssistantSections`) |

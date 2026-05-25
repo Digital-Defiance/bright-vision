@@ -33,7 +33,7 @@ export function ProposedEditBlock({ segment, applied, defaultExpanded = false }:
       }}
     >
       <AccordionSummary expandIcon={<ExpandMoreIcon fontSize="small" />}>
-        <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.8rem', flex: 1, mr: 1 }}>
+        <Typography variant="body2" sx={{ fontSize: '0.8rem', flex: 1, mr: 1 }}>
           {segment.title}
         </Typography>
         <Chip

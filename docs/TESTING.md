@@ -66,6 +66,8 @@ yarn test:e2e
 | `session-lifecycle.spec.ts` | Start/stop, connecting, health recovery |
 | `navigation.spec.ts` | Main tabs |
 | `chat-ux.spec.ts` | Sections, proposed edits, token stats; optimistic user bubble on send |
+| `stream-chat.spec.ts` | Tool output order in timeline; cumulative stream dedupe (#1, #8) |
+| `progress-activity.spec.ts` | Determinate activity bar from core `progress` SSE (repo scan) |
 | `chat-input.spec.ts` | Send clears input + user bubble; queue, stop turn, multiline |
 | `confirm-flow.spec.ts` | Confirm banner |
 | `chat-context.spec.ts` | Folder attach |
