@@ -1,21 +1,21 @@
-# Developing Aider Vision
+# Developing Bright Vision
 
 Product backlog and priorities: [ROADMAP.md](./ROADMAP.md) — agents maintain and follow it until the open backlog is complete.
 
-**Project site:** [aider-vision.digitaldefiance.org](https://aider-vision.digitaldefiance.org) — static landing page in `docs/index.html`, deployed via [GitHub Pages](../.github/workflows/pages.yml) on pushes to `main` under `docs/`.
+**Project site:** [bright-vision.digitaldefiance.org](https://bright-vision.digitaldefiance.org) — static landing page in `docs/index.html`, deployed via [GitHub Pages](../.github/workflows/pages.yml) on pushes to `main` under `docs/`.
 
 ## Prerequisites
 
 - Node 18+ and Yarn
 - Rust toolchain (for Tauri)
-- Python 3.10+ with `aider-vision-core` installed editable
+- Python 3.10+ with `bright-vision-core` installed editable (`source activate.sh`)
 - **LLM:** local [Ollama](https://ollama.com/) recommended — see [LOCAL_LLM.md](./LOCAL_LLM.md)
 
 ## First-time setup
 
 ```bash
-git submodule update --init --recursive
-source activate.sh   # venv + pip install -e aider-vision-core + uvicorn
+git submodule update --init --recursive bright-vision-core
+source activate.sh   # venv + pip install -e bright-vision-core + uvicorn
 yarn install
 ```
 
@@ -75,7 +75,7 @@ Set Vision API URL to `/api/core` in Settings.
 Long-running work is surfaced via `ProcessProvider` and `VisionActivityBar` (violet/cyan pulse under the header). Phases are driven from:
 
 - `visionApi` `onPhase` during API boot / session create
-- `useAiderSession` for send/stop
+- `useVisionSession` for send/stop
 - `process.ingestCoreEvent()` for SSE (`token`, `tool_*`, `confirm`, `done`, `error`)
 
 Import from `src/progress` or use `useProcess()` in components.

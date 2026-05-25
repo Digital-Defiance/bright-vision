@@ -1,24 +1,24 @@
 # Submodule & multi-repo verification (#19)
 
-Confirm that Aider Vision can treat **aider-vision** (superproject) as the workspace and correctly edit files inside the **`aider-vision-core`** submodule — not only the parent app tree.
+Confirm that Bright Vision can treat the **superproject root** as the workspace and correctly edit files inside the **`bright-vision-core`** submodule — not only the parent app tree.
 
 ## Prerequisites
 
 ```bash
-cd /path/to/aider-vision
-git submodule update --init --recursive
+cd /path/to/bright-vision   # repo folder may still be named aider-vision on disk
+git submodule update --init --recursive bright-vision-core
 source activate.sh
 ```
 
-- Workspace in Settings / welcome must be the **repo root** (`aider-vision/`), not `aider-vision-core/` alone.
-- Submodule must be on a real commit (not empty): `git -C aider-vision-core status`.
+- Workspace in Settings / welcome must be the **repo root** (`bright-vision/`), not `bright-vision-core/` alone.
+- Submodule must be on a real commit (not empty): `git -C bright-vision-core status`.
 
 ## Automated
 
-From **aider-vision** root (after `source activate.sh`):
+From **superproject** root (after `source activate.sh`):
 
 ```bash
-source activate.sh   # creates .venv and installs editable core
+source activate.sh   # creates .venv and installs editable bright-vision-core
 yarn verify:submodule
 # uses .venv/bin/python when present (see scripts/verify_submodule.sh)
 ```
@@ -27,25 +27,26 @@ Core unit + integration tests:
 
 ```bash
 yarn test:git-workspace
-cd aider-vision-core && python -m pytest tests/basic/test_superproject_integration.py -q
+yarn test:bright-core
+# includes tests/basic/test_superproject_integration.py when parent checkout exists
 ```
 
-Synthetic `test_git_workspace.py` covers `RepoSet` mechanics; `test_superproject_integration.py` and `verify_submodule_workspace.py` use the real `aider-vision` → `aider-vision-core` layout.
+Synthetic `test_git_workspace.py` covers `RepoSet` mechanics; `test_superproject_integration.py` and `verify_submodule_workspace.py` use the real parent → `bright-vision-core` layout.
 
 ## Manual checklist
 
 ### A. Submodule discovery
 
-- [ ] Start session with workspace = aider-vision root.
-- [ ] `/add aider-vision-core/aider_vision_core/session.py` (or picker) — file enters context without “not a normal file” on the repo root.
+- [ ] Start session with workspace = superproject root.
+- [ ] `/add bright-vision-core/bright_vision_core/session.py` (or picker) — file enters context without “not a normal file” on the repo root.
 - [ ] Repo map / scan completes without fatal errors (progress bar may run).
 
 ### B. Edit inside submodule
 
-- [ ] Ask for a trivial change in core, e.g. a comment in `aider-vision-core/aider_vision_core/session.py` (must be a **tracked** file in the submodule).
+- [ ] Ask for a trivial change in core, e.g. a comment in `bright-vision-core/bright_vision_core/session.py` (must be a **tracked** file in the submodule).
 - [ ] Model emits SEARCH/REPLACE (or applies via engine); chat shows **Proposed** vs **Applied** correctly.
-- [ ] `git -C aider-vision-core diff` shows the change on disk when **Applied**.
-- [ ] Git tab / `done.edited_files` lists a path under `aider-vision-core/`.
+- [ ] `git -C bright-vision-core diff` shows the change on disk when **Applied**.
+- [ ] Git tab / `done.edited_files` lists a path under `bright-vision-core/`.
 
 ### C. Commit scope
 
@@ -54,14 +55,14 @@ Synthetic `test_git_workspace.py` covers `RepoSet` mechanics; `test_superproject
 
 ### D. Parent + submodule in one session
 
-- [ ] `/add` both `src/App.tsx` and `aider-vision-core/aider_vision_core/http_api.py`.
+- [ ] `/add` both `src/App.tsx` and `bright-vision-core/bright_vision_core/http_api.py`.
 - [ ] Single turn that touches both trees (or two turns) — both paths editable, no wrong-repo writes.
 
 ### E. Regression guards
 
 ```bash
-yarn audit:core
-python aider-vision-core/tests/basic/test_vision_runtime.py -q   # if present
+yarn test:bright-core
+yarn audit:core   # legacy rename audit on aider-vision-core if still present
 ```
 
 ## Failure modes to watch
@@ -75,7 +76,7 @@ python aider-vision-core/tests/basic/test_vision_runtime.py -q   # if present
 
 ## Done criteria
 
-- `yarn verify:submodule` and `test_superproject_integration.py` pass (automated baseline — **done** May 2026).
+- `yarn verify:submodule` and `test_superproject_integration.py` pass (automated baseline).
 - All sections **A–D** pass on macOS via Vision UI (manual regression before releases).
 - Any failures filed as bugs with repro steps.
 
@@ -83,4 +84,5 @@ python aider-vision-core/tests/basic/test_vision_runtime.py -q   # if present
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — superproject + `RepoSet`
 - [IPC.md](./IPC.md) — workspace on `POST /sessions`
-- [USER_WORKFLOW.md](./USER_WORKFLOW.md) — “Hack on Aider Vision itself”
+- [USER_WORKFLOW.md](./USER_WORKFLOW.md) — “Hack on Bright Vision itself”
+- [CECLI_MIGRATION_ROADMAP.md](./CECLI_MIGRATION_ROADMAP.md) — engine migration gates

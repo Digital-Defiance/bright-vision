@@ -89,7 +89,7 @@ Optional auth: set `AIDER_VISION_TOKEN` and send `Authorization: Bearer <token>`
 
 ## Multi-repo workspaces (including nested submodules)
 
-Point `workspace` at the **git superproject root** (e.g. this repo, which contains the `aider-vision-core` submodule).
+Point `workspace` at the **git superproject root** (e.g. this repo, which contains the `bright-vision-core` submodule).
 
 Core uses `create_git_workspace()` / `RepoSet`:
 
@@ -98,7 +98,7 @@ Core uses `create_git_workspace()` / `RepoSet`:
 - Excludes submodule **gitlink** paths (mode `160000`) from repo-map file lists — only real files are indexed.
 - Commits run innermost repos first, then update parent gitlinks.
 
-For self-dev on aider-vision: set working directory to the parent repo, not `aider-vision-core/` alone.
+For self-dev on Bright Vision: set working directory to the parent repo, not `bright-vision-core/` alone.
 
 ## Web dev proxy
 

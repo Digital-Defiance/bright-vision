@@ -24,8 +24,8 @@ Primary validation mode: **use the desktop app on real repos** (especially hacki
 
 | Doc | Use when |
 |-----|----------|
-| [USER_WORKFLOW.md](./USER_WORKFLOW.md) | Workspace = **superproject root** (`aider-vision/`), not `aider-vision-core/` alone |
-| [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) | Editing files under `aider-vision-core/` + parent tree in one session |
+| [USER_WORKFLOW.md](./USER_WORKFLOW.md) | Workspace = **superproject root** (repo root), not `bright-vision-core/` alone |
+| [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) | Editing files under `bright-vision-core/` + parent tree in one session |
 | [TESTING.md](./TESTING.md) | Before/after sessions: `yarn test:local` (quick), `yarn test:full` before larger changes |
 | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | Stuck Connecting, orphaned `:8741`, Stop vs Start |
 
@@ -35,7 +35,7 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 
 | Status | Meaning |
 |--------|---------|
-| Done | Shipped in repo (parent UI and/or `aider-vision-core` submodule) |
+| Done | Shipped in repo (parent UI and/or `bright-vision-core` submodule) |
 | Open | Not started or in progress |
 | Partial | Some behavior exists; gaps documented |
 | Longer-term | Strategic; design before build |
@@ -48,7 +48,7 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 | # | Status | Item |
 |---|--------|------|
 | **19** | **Partial** | **Automated:** `yarn verify:submodule`, `test_git_workspace.py`, `test_superproject_integration.py` (RepoSet, `/add` paths, Session). **Dogfooding sign-off:** manual A–D in [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) via `yarn tauri dev` — not yet a roadmap **Done**. |
-| **31** | **Open** | **Release hygiene** — commit/tag `aider-vision-core`, bump submodule pointer ([RELEASE.md](./RELEASE.md)). Defer until dogfooding is stable; operator/git, not blocking daily use. |
+| **31** | **Partial** | **Release hygiene** — e2e + `yarn verify:submodule` on `bright-vision-core`; commit/tag core, bump submodule pointer ([RELEASE.md](./RELEASE.md)). |
 
 ---
 
@@ -73,7 +73,7 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 |---|--------|------|
 | 5 | **Done** | Multiline input: Shift+Return newline, Enter to send |
 | 3 | **Done** | Stop in-flight turn (`cancelSend` + AbortSignal on fetch) |
-| 4 | **Done** | Queue messages while busy (`useAiderSession` queue + Queue button in `ChatPanel`) |
+| 4 | **Done** | Queue messages while busy (`useVisionSession` queue + Queue button in `ChatPanel`) |
 | 12 | **Done** | `/add` / `/drop` path completion via Tauri `complete_workspace_path` + Tab in chat |
 | **32** | **Partial** | **Suggested files tray** — parse assistant **Answer** for repo-relative paths; tray above chat input with **Add all**, **Queue `/add`**, dismiss; uses `addFiles` + message queue (#4). **Open:** e2e polish, tree picker tie-in (#28). See [§ #32 design](#32-suggested-files--queued-add) |
 
@@ -130,7 +130,7 @@ Maps the high-level product charter to tracked work. Items **23–24** are large
 
 | # | Status | Charter theme | Tactical mapping / gap |
 |---|--------|---------------|-------------------------|
-| **23** | **Done** | Process & terminal integration | Vision HTTP/SSE, `useAiderSession`, stop/queue, Tauri core spawn, terminal stream, reliable start/stop lifecycle |
+| **23** | **Done** | Process & terminal integration | Vision HTTP/SSE, `useVisionSession`, stop/queue, Tauri core spawn, terminal stream, reliable start/stop lifecycle |
 | **24** | **Done** | LLM chat interface | Chat panel, markdown, proposed edits, confirms, token stats |
 | **25** | **Done** | (overlap) Richer chat sections | Same as chat **#25** |
 | **26** | **Partial** | File system watcher | Git status polls on **Git** tab + while session runs (8s); native FS notify still open |
@@ -152,7 +152,7 @@ Maps the high-level product charter to tracked work. Items **23–24** are large
 1. **Detect** — After an assistant turn, parse the **Answer** section (► **ANSWER**, `**ANSWER**`, or `Answer` heading) for workspace-relative paths: backtick paths in bullet lists, e.g. `` `src/todos/types.ts` ``.
 2. **Accumulate** — Merge into a session-scoped **Suggested** list (dedupe, drop paths already in `files_in_chat`).
 3. **Tray UI** — Chips or list near chat input: path, remove, “Add”, “Add all”, “Queue `/add`s”.
-4. **Queue `/add`s** — Enqueue one user message per file (`/add aider-vision-core/.../session.py`, …) via existing `useAiderSession` queue (#4) so core handles each add like typed input.
+4. **Queue `/add`s** — Enqueue one user message per file (`/add bright-vision-core/.../session.py`, …) via existing `useVisionSession` message queue (#4) so core handles each add like typed input.
 5. **Add all (fast path)** — Optional single `addFiles(paths)` API call when batch attach is enough (no per-file `/add` narration).
 
 ### Parser spike (in repo)
@@ -160,8 +160,8 @@ Maps the high-level product charter to tracked work. Items **23–24** are large
 `src/utils/suggestedFiles.ts` + tests — extracts the Kiro/spec example list into seven paths and builds:
 
 ```text
-/add aider-vision-core/aider_vision_core/todo_spec_generate.py
-/add aider-vision-core/aider_vision_core/workspace_todos.py
+/add bright-vision-core/bright_vision_core/todo_spec_generate.py
+/add bright-vision-core/bright_vision_core/workspace_todos.py
 … (one queued message per path)
 ```
 

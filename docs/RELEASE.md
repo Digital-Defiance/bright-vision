@@ -1,21 +1,21 @@
-# Release checklist (aider-vision + core submodule)
+# Release checklist (Bright Vision + core submodule)
 
 Use this when cutting a release that includes Tasks / spec-driven work (roadmap #18) and Vision HTTP API changes.
 
-## 1. Core submodule (`aider-vision-core`)
+## 1. Core submodule (`bright-vision-core`)
 
 ```bash
-cd aider-vision-core
-git status   # ensure todo_spec_*, workspace_todos, http_api, session, tests are included
+cd bright-vision-core
+git status   # ensure workspace_todos, http_api, session, tests are included
 git add -A
 git commit -m "$(cat <<'EOF'
-feat(vision): todos API, spec layers, background generate jobs
+feat(vision): todos API, spec layers, cecli session bridge
 
-Three-layer specs, workspace/session todo routes, ephemeral spec
-generation jobs, move/reorder, branch/PR fields, and spec file sync.
+Three-layer specs, workspace/session todo routes, RepoSet superproject
+support, and headless HTTP API on cecli.
 EOF
 )"
-git tag -a v0.91.0-vision -m "Vision headless API: todos, specs, background jobs"
+git tag -a v0.1.0-bright -m "Bright Vision Core: cecli + headless API"
 git push origin main --tags   # when ready
 ```
 
@@ -23,15 +23,14 @@ git push origin main --tags   # when ready
 
 ```bash
 cd ..
-git add aider-vision-core   # submodule pointer at tag
-# commit parent app UI + docs + Tauri todo fields
+git add bright-vision-core   # submodule pointer at tag
+# commit parent app UI + docs + Tauri
 ```
 
-Or use the existing sync script after publishing to PyPI:
+Legacy `aider-vision-core` sync script (pre-cecli) remains only if you still ship the old engine:
 
 ```bash
 cd aider-vision-core && ./scripts/sync_aider_vision.sh <version> --commit
-cd .. && yarn sync:core <version>
 ```
 
 ## 3. Verify
@@ -41,12 +40,12 @@ source activate.sh
 yarn verify:submodule
 yarn test:full         # local: tsc + vitest + rust + e2e (see TESTING.md)
 # or: sh scripts/test-local.sh release   # adds verify:submodule when .venv exists
-cd aider-vision-core && python -m pytest tests/basic/test_workspace_todos.py \
-  tests/basic/test_todo_spec_generate.py tests/basic/test_todo_spec_jobs.py -q
-yarn tauri dev   # smoke: Terminal Start/Stop, Tasks tab, Generate spec (background), Git tab
+yarn test:bright-core
+yarn tauri dev   # smoke: Terminal Start/Stop, Tasks tab, Generate spec, Git tab
 ```
 
 ## 4. Optional
 
 - `yarn build:mac` — see [BUILD_MACOS.md](./BUILD_MACOS.md)
 - Bump `package.json` / `tauri.conf.json` version if shipping a desktop build
+- `BRIGHT_VISION_ENGINE=aider-vision-core` — legacy fallback until submodule deinit
