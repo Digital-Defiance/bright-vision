@@ -67,6 +67,11 @@ import {
   type SuggestedFilesPrefs,
 } from './theme/suggestedFilesPrefs'
 import { SessionContextChip } from './components/session/SessionContextChip'
+import {
+  buildEmptyLlmRetryMessage,
+  isEmptyLlmWarning,
+  rewriteEmptyLlmWarningIfNeeded,
+} from './utils/emptyLlmResponse'
 import { ChatPanel, type ChatMessage, type ToolEvent } from './components/chat/ChatPanel'
 import { TodoPanel } from './components/todos/TodoPanel'
 import { GitPanel } from './components/GitPanel'
@@ -309,6 +314,9 @@ function AppShell({
   const [suggestedPaths, setSuggestedPaths] = useState<string[]>([])
   const [suggestedAwaitingProceed, setSuggestedAwaitingProceed] = useState(false)
   const [trackTurnResources, setTrackTurnResources] = useState(false)
+  const [lastUserMessageForRetry, setLastUserMessageForRetry] = useState<string | null>(null)
+  const lastUserMessageForRetryRef = useRef<string | null>(null)
+  const isLocalLlmModel = isOllamaVisionModel(savedConfig.model)
   const [contextUsage, setContextUsage] = useState<SessionContextUsage>(EMPTY_CONTEXT_USAGE)
 
   useEffect(() => {
@@ -627,14 +635,22 @@ function AppShell({
         break
       }
       case 'tool_warning': {
-        const text = String(ev.text ?? '')
-        if (!text.trim()) break
+        const raw = String(ev.text ?? '')
+        if (!raw.trim()) break
+        const emptyLlm = isEmptyLlmWarning(raw)
+        const text = rewriteEmptyLlmWarningIfNeeded(raw, isLocalLlmModel)
         streamingAssistantId.current = null
         setToolEvents((prev) =>
           capList(
             [
               ...prev,
-              { id: orderId, type: 'tool_warning' as const, name: 'warning', output: text },
+              {
+                id: orderId,
+                type: 'tool_warning' as const,
+                name: 'warning',
+                output: text,
+                ...(emptyLlm ? { emptyLlm: true as const } : {}),
+              },
             ],
             MAX_TOOL_EVENTS
           )
@@ -854,7 +870,7 @@ function AppShell({
           { id: orderId, text: JSON.stringify(ev), type: 'stdout' },
         ])
     }
-  }, [process, bumpGitRefresh, nextChatMessageId])
+  }, [process, bumpGitRefresh, nextChatMessageId, isLocalLlmModel])
 
   const { pendingConfirm, setPendingConfirm, dismissConfirm, lastGit, filesInChat, setFilesInChat, wrapHandler } =
     useSessionActivity()
@@ -1391,9 +1407,90 @@ function AppShell({
     }
   }, [isRunning, isBusy, suggestedPaths, addFiles, applyFilesAdded])
 
+  const rememberUserMessageForRetry = useCallback((text: string) => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+    lastUserMessageForRetryRef.current = trimmed
+    setLastUserMessageForRetry(trimmed)
+  }, [])
+
+  const deliverUserMessage = useCallback(
+    async (text: string, todoOptions?: { activeTodoId: string; injectTodoSpec: boolean }) => {
+      lastUserPromptCharsRef.current = text.length
+      lastAssistantStreamRef.current = ''
+      stallWatch.touchEvent('user_send')
+      appendUserMessageToChat(text, true)
+      const turnStartMs = Date.now()
+      if (isBusy) {
+        pendingTurnTimingQueueRef.current.push({ promptChars: text.length, turnStartMs })
+      } else {
+        startTurnTimingRef.current(text.length, turnStartMs)
+      }
+      const result = await send(text, todoOptions)
+      return result
+    },
+    [isBusy, send, appendUserMessageToChat, stallWatch]
+  )
+
+  const handleRetryEmptyLlm = useCallback(
+    async (mode: 'exact' | 'nudge') => {
+      if (!isRunning) return
+      const original = lastUserMessageForRetryRef.current
+      if (!original) {
+        setSnackbar({ message: 'No previous message to retry', severity: 'info' })
+        return
+      }
+      const text = buildEmptyLlmRetryMessage(original, mode)
+      if (!text) return
+      const injectSpec = Boolean(activeTodo && todoInjectedIdRef.current !== activeTodo.id)
+      const todoOptions = activeTodo
+        ? { activeTodoId: activeTodo.id, injectTodoSpec: injectSpec }
+        : undefined
+      try {
+        const result = await deliverUserMessage(text, todoOptions)
+        if (injectSpec && activeTodo) todoInjectedIdRef.current = activeTodo.id
+        if (result.queued) {
+          setSnackbar({
+            message: 'Retry queued — will send when the current turn finishes',
+            severity: 'info',
+          })
+        } else {
+          setSnackbar({
+            message: mode === 'exact' ? 'Retrying last message…' : 'Retrying with hint…',
+            severity: 'info',
+          })
+        }
+      } catch (err) {
+        turnWallStartMsRef.current = null
+        turnAssistantMessageIdRef.current = null
+        turnHadAssistantOutputRef.current = false
+        turnTimingActiveRef.current = false
+        setTrackTurnResources(false)
+        thinkingTimingRef.current.reset()
+        if (err instanceof Error && err.name === 'AbortError') {
+          setStatusMessage('Stopped')
+          return
+        }
+        removeLastPendingUserMessage()
+        setSnackbar({
+          message: err instanceof Error ? err.message : String(err),
+          severity: 'error',
+        })
+      }
+    },
+    [
+      isRunning,
+      activeTodo,
+      deliverUserMessage,
+      rememberUserMessageForRetry,
+      removeLastPendingUserMessage,
+    ]
+  )
+
   const sendProceedMessage = useCallback(async () => {
     if (!isRunning) return
     const msg = PROCEED_AFTER_FILES_MESSAGE
+    rememberUserMessageForRetry(msg)
     lastUserPromptCharsRef.current = msg.length
     lastAssistantStreamRef.current = ''
     stallWatch.touchEvent('user_send')
@@ -1583,23 +1680,13 @@ function AppShell({
     }
 
     setInputValue('')
-    lastUserPromptCharsRef.current = text.length
-    lastAssistantStreamRef.current = ''
-    stallWatch.touchEvent('user_send')
-
-    appendUserMessageToChat(text, true)
+    rememberUserMessageForRetry(text)
     const injectSpec = Boolean(activeTodo && todoInjectedIdRef.current !== activeTodo.id)
     const todoOptions = activeTodo
       ? { activeTodoId: activeTodo.id, injectTodoSpec: injectSpec }
       : undefined
-    const turnStartMs = Date.now()
-    if (isBusy) {
-      pendingTurnTimingQueueRef.current.push({ promptChars: text.length, turnStartMs })
-    } else {
-      startTurnTimingRef.current(text.length, turnStartMs)
-    }
     try {
-      const result = await send(text, todoOptions)
+      const result = await deliverUserMessage(text, todoOptions)
       if (injectSpec && activeTodo) todoInjectedIdRef.current = activeTodo.id
       if (result.queued) {
         setSnackbar({
@@ -1812,6 +1899,8 @@ function AppShell({
               onSuggestedQueueAdds={() => void handleQueueSuggestedAdds()}
               onSuggestedDismiss={handleDismissSuggested}
               onSuggestedClearAll={handleClearSuggested}
+              lastUserMessageForRetry={lastUserMessageForRetry}
+              onRetryEmptyLlm={(mode) => void handleRetryEmptyLlm(mode)}
             />
             </>
           )}

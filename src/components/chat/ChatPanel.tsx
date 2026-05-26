@@ -24,6 +24,7 @@ import { ChatFolderAttach } from './ChatFolderAttach'
 import { ChatImageAttach } from './ChatImageAttach'
 import { CommandAssist } from './CommandAssist'
 import { SuggestedFilesTray } from './SuggestedFilesTray'
+import { EmptyLlmWarning } from './EmptyLlmWarning'
 import { TokenStatsBar } from './TokenStatsBar'
 import { OllamaStatusMessage } from './OllamaStatusMessage'
 import type { VisionClientCommandId } from '../../ipc/visionClientCommands'
@@ -53,6 +54,8 @@ export interface ToolEvent {
   name?: string
   input?: string
   output?: string
+  /** Set when core reported an empty LLM body (UI copy may be rewritten). */
+  emptyLlm?: boolean
 }
 
 interface ChatPanelProps {
@@ -95,6 +98,8 @@ interface ChatPanelProps {
   thinkingTimingPrefs?: ThinkingTimingPrefs
   turnActivityHint?: string
   turnStalled?: boolean
+  lastUserMessageForRetry?: string | null
+  onRetryEmptyLlm?: (mode: 'exact' | 'nudge') => void
 }
 
 export function ChatPanel({
@@ -137,6 +142,8 @@ export function ChatPanel({
   thinkingTimingPrefs,
   turnActivityHint = '',
   turnStalled = false,
+  lastUserMessageForRetry = null,
+  onRetryEmptyLlm,
 }: ChatPanelProps) {
   const pathTabIndex = useRef(0)
   const pathPrefix = parseFileCommandInput(inputValue)?.pathPrefix ?? ''
@@ -247,16 +254,26 @@ export function ChatPanel({
             ) : (
               <Box key={`tool-${entry.item.id}`} sx={{ width: '100%' }}>
                 {entry.item.type === 'tool_warning' ? (
-                  <Alert
-                    severity="warning"
-                    sx={{ mb: 1 }}
-                    data-testid="chat-tool-warning"
-                    onClose={() => onDismissToolEvent(entry.item.id)}
-                  >
-                    <Typography variant="body2" component="span">
-                      {entry.item.output}
-                    </Typography>
-                  </Alert>
+                  entry.item.emptyLlm && onRetryEmptyLlm ? (
+                    <EmptyLlmWarning
+                      message={entry.item.output ?? ''}
+                      lastUserMessage={lastUserMessageForRetry}
+                      disabled={!isRunning}
+                      onRetry={onRetryEmptyLlm}
+                      onDismiss={() => onDismissToolEvent(entry.item.id)}
+                    />
+                  ) : (
+                    <Alert
+                      severity="warning"
+                      sx={{ mb: 1 }}
+                      data-testid="chat-tool-warning"
+                      onClose={() => onDismissToolEvent(entry.item.id)}
+                    >
+                      <Typography variant="body2" component="span">
+                        {entry.item.output}
+                      </Typography>
+                    </Alert>
+                  )
                 ) : (
                   <Paper
                     data-testid="chat-tool-output"

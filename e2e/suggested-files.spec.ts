@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { expectOptimisticSend } from './helpers/chatSend'
-import { suggestedFilesTurnEvents } from './helpers/fixtures'
+import { suggestedFilesTurnEvents, suggestedFilesTurnEventsNoCta } from './helpers/fixtures'
 import { openChat, startMockSession } from './helpers/session'
 
 test.describe('Suggested files tray (roadmap #32)', () => {
@@ -20,14 +20,20 @@ test.describe('Suggested files tray (roadmap #32)', () => {
     await expect(tray).toContainText('src/suggested-b.ts')
   })
 
-  test('queue /add enqueues separate user messages', async ({ page }) => {
+})
+
+test.describe('Suggested files — add all', () => {
+  test('batches paths via POST /files and updates context chip', async ({ page }) => {
+    await startMockSession(page, { messageTurns: [suggestedFilesTurnEventsNoCta()] })
+    await openChat(page)
+
     await page.getByTestId('chat-input').fill('list files')
     await page.getByTestId('chat-send').click()
-
     await expect(page.getByTestId('suggested-files-tray')).toBeVisible({ timeout: 15_000 })
-    await page.getByTestId('suggested-files-queue-adds').click()
+    await page.getByTestId('suggested-files-add-all').click()
 
-    await expect(page.getByText('/add src/suggested-a.ts')).toBeVisible()
-    await expect(page.getByText('/add src/suggested-b.ts')).toBeVisible()
+    await expect(page.getByTestId('session-context-chip')).toContainText('2 file', {
+      timeout: 15_000,
+    })
   })
 })

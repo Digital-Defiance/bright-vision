@@ -79,12 +79,23 @@ export function slowTurnEvents() {
   ]
 }
 
-/** Assistant lists files to add — exercises roadmap #32 tray. */
+/** Assistant lists files to add — exercises roadmap #32 tray + proceed CTA. */
 export function suggestedFilesTurnEvents() {
   return [
     {
       type: 'token',
       text: `► **ANSWER**\nAdd these next:\n\n- \`src/suggested-a.ts\`\n- \`src/suggested-b.ts\`\n\nPlease add these files when ready.\n`,
+    },
+    { type: 'done', edited_files: [] },
+  ]
+}
+
+/** Path list without “please add” CTA — tray shows Add all / Add while busy. */
+export function suggestedFilesTurnEventsNoCta() {
+  return [
+    {
+      type: 'token',
+      text: `► **ANSWER**\nRelated paths:\n\n- \`src/suggested-a.ts\`\n- \`src/suggested-b.ts\`\n`,
     },
     { type: 'done', edited_files: [] },
   ]

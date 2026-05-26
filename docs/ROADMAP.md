@@ -96,6 +96,7 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 | **34** | **Partial** | **Thinking timers** — live elapsed on current section; durations on completed Thinking/Reasoning/Answer chips; per-model averages vs prompt length in Settings (`localStorage`). See [§ #34 design](#34-thinking-timers) |
 | **35** | **Partial** | **Context window awareness** — header chip: file count + last `Tokens:` sent / ~added estimate; sync `files_in_chat` after `done` + `/add`; desktop byte estimate on `addFiles`. See [§ #35](#35-context-window--file-counter) |
 | **36** | **Partial** | **LLM ping** — Terminal/Settings **Ping LLM**: Ollama tags + 1-token generate + optional core `/health`; no repo edits. See [§ #36](#36-llm-ping) |
+| **37** | **Done** | **Empty LLM response** — rewrite legacy “provider account” copy for Ollama; **Retry** (exact resend) + **Retry with hint** (append nudge); remember last user message in `App.tsx`. `emptyLlmResponse.ts`, `EmptyLlmWarning.tsx`. **Upstream:** cecli `base_coder.py` still emits legacy text until core patch. |
 
 ## Spec-driven development (#18)
 

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { expectOptimisticSend } from './helpers/chatSend'
-import { defaultTurnEvents } from './helpers/fixtures'
+import { defaultTurnEvents, hangingTurnEvents } from './helpers/fixtures'
 import { openChat, startMockSession } from './helpers/session'
 
 test.describe('Chat UX (roadmap #1–2, #9–10, #13)', () => {
@@ -29,6 +29,8 @@ test.describe('Chat UX (roadmap #1–2, #9–10, #13)', () => {
   })
 
   test('thinking timer visible during turn', async ({ page }) => {
+    await startMockSession(page, { messageTurns: [hangingTurnEvents()] })
+    await openChat(page)
     await page.getByTestId('chat-input').fill('think about this')
     await page.getByTestId('chat-send').click()
     await expect(page.getByTestId('vision-activity')).toBeVisible({ timeout: 15_000 })
