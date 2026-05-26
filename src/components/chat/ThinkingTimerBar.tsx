@@ -1,9 +1,16 @@
-import { Box, Typography } from '@mui/material'
+import { Box, Tooltip, Typography } from '@mui/material'
+import type { TurnEtaEstimate } from '../../utils/turnEtaEstimate'
 import type { LiveThinkingState } from '../../utils/thinkingTiming'
 import { formatDurationMs } from '../../utils/thinkingTiming'
 
-/** Compact Response / Think display for the top activity bar. */
-export function ThinkingTimerInline({ live }: { live: LiveThinkingState }) {
+/** Compact Response / Think / ETA display for the top activity bar. */
+export function ThinkingTimerInline({
+  live,
+  eta = null,
+}: {
+  live: LiveThinkingState
+  eta?: TurnEtaEstimate | null
+}) {
   return (
     <Box
       component="span"
@@ -17,22 +24,46 @@ export function ThinkingTimerInline({ live }: { live: LiveThinkingState }) {
         letterSpacing: '0.01em',
         textTransform: 'none',
         color: 'text.secondary',
+        display: 'inline-flex',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 0.5,
       }}
     >
-      Response{' '}
-      <Box component="span" sx={{ color: 'primary.light' }}>
-        {formatDurationMs(live.responseElapsedMs)}
-      </Box>
-      {' · Think '}
-      <Box component="span" sx={{ color: 'secondary.light' }}>
-        {formatDurationMs(live.thoughtElapsedMs)}
-      </Box>
+      <span>
+        Response{' '}
+        <Box component="span" sx={{ color: 'primary.light' }}>
+          {formatDurationMs(live.responseElapsedMs)}
+        </Box>
+        {' · Think '}
+        <Box component="span" sx={{ color: 'secondary.light' }}>
+          {formatDurationMs(live.thoughtElapsedMs)}
+        </Box>
+      </span>
+      {eta?.shortLabel && (
+        <Tooltip title={eta.tooltip} enterDelay={400}>
+          <Box
+            component="span"
+            sx={{ color: 'info.light', cursor: 'help' }}
+            data-testid="thinking-timer-eta"
+          >
+            · {eta.shortLabel}
+          </Box>
+        </Tooltip>
+      )}
     </Box>
   )
 }
 
 /** @deprecated Use ThinkingTimerInline in VisionActivityBar */
-export function ThinkingTimerBar({ live }: { live: LiveThinkingState; lastEventAgoMs?: number | null }) {
+export function ThinkingTimerBar({
+  live,
+  eta = null,
+}: {
+  live: LiveThinkingState
+  lastEventAgoMs?: number | null
+  eta?: TurnEtaEstimate | null
+}) {
   return (
     <Typography
       data-testid="thinking-timer"
@@ -48,7 +79,7 @@ export function ThinkingTimerBar({ live }: { live: LiveThinkingState; lastEventA
         fontFamily: 'var(--vision-font-chat, monospace)',
       }}
     >
-      <ThinkingTimerInline live={live} />
+      <ThinkingTimerInline live={live} eta={eta} />
     </Typography>
   )
 }

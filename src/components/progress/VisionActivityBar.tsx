@@ -1,5 +1,6 @@
 import { Box, LinearProgress, Typography } from '@mui/material'
 import { ThinkingTimerInline } from '../chat/ThinkingTimerBar'
+import type { TurnEtaEstimate } from '../../utils/turnEtaEstimate'
 import type { LiveThinkingState } from '../../utils/thinkingTiming'
 import type { ProcessSnapshot } from '../../progress/types'
 import './VisionActivityBar.scss'
@@ -7,9 +8,14 @@ import './VisionActivityBar.scss'
 interface VisionActivityBarProps {
   process: ProcessSnapshot
   liveTiming?: LiveThinkingState | null
+  turnEta?: TurnEtaEstimate | null
 }
 
-export function VisionActivityBar({ process, liveTiming = null }: VisionActivityBarProps) {
+export function VisionActivityBar({
+  process,
+  liveTiming = null,
+  turnEta = null,
+}: VisionActivityBarProps) {
   const show = process.active || process.phase === 'error' || liveTiming != null
   if (!show) return null
 
@@ -67,7 +73,7 @@ export function VisionActivityBar({ process, liveTiming = null }: VisionActivity
             </Box>
           )}
         </Typography>
-        {liveTiming && <ThinkingTimerInline live={liveTiming} />}
+        {liveTiming && <ThinkingTimerInline live={liveTiming} eta={turnEta} />}
         {(process.detail || countLabel) && (
           <Typography variant="caption" className="vision-activity__detail" component="span">
             {countLabel && process.detail

@@ -10,6 +10,7 @@ import {
   parseAssistantContent,
   type AssistantContentSegment,
 } from '../../utils/proposedEdits'
+import { ChatFenceBlock } from './ChatFenceBlock'
 import { ProposedEditBlock } from './ProposedEditBlock'
 
 function sectionLabel(kind: string, durationMs?: number): string {
@@ -36,6 +37,16 @@ function renderSegment(
       <Typography key={key} variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
         {seg.content}
       </Typography>
+    )
+  }
+  if (seg.type === 'display_fence') {
+    return (
+      <ChatFenceBlock
+        key={key}
+        language={seg.language}
+        body={seg.body}
+        complete={seg.complete}
+      />
     )
   }
   const applied = isProposedEditApplied(seg.title, appliedFiles)

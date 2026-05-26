@@ -37,10 +37,18 @@ export interface TurnTimingRecord {
   tokensReceived?: number
   /** Peak CPU % while the turn was active (desktop poll; optional). */
   peakCpuPct?: number
+  /** Mean CPU % across polls during the turn. */
+  avgCpuPct?: number
   /** Peak system RAM % during the turn. */
   peakMemPct?: number
+  /** Mean system RAM % across polls during the turn. */
+  avgMemPct?: number
   /** Peak GPU % when available (null = no GPU sample with a reading). */
   peakGpuPct?: number | null
+  /** Mean GPU % across polls that reported GPU (optional). */
+  avgGpuPct?: number | null
+  /** Resource poll count for this turn (desktop). */
+  resourceSampleCount?: number
 }
 
 export interface ThinkingStatsStore {
@@ -92,9 +100,13 @@ export const TIMING_STATS_CSV_HEADERS = [
   'tokens_sent',
   'tokens_received',
   'output_tps',
+  'avg_cpu_pct',
   'peak_cpu_pct',
+  'avg_mem_pct',
   'peak_mem_pct',
+  'avg_gpu_pct',
   'peak_gpu_pct',
+  'resource_sample_count',
 ] as const
 
 /** @deprecated Use ModelTimingStats via buildTimingStatsView */
@@ -189,8 +201,12 @@ export function recordTurnTiming(
     thinkMs: number
     promptChars: number
     peakCpuPct?: number
+    avgCpuPct?: number
     peakMemPct?: number
+    avgMemPct?: number
     peakGpuPct?: number | null
+    avgGpuPct?: number | null
+    resourceSampleCount?: number
     tokensSent?: number
     tokensReceived?: number
   }
@@ -210,11 +226,18 @@ export function recordTurnTiming(
           tokensReceived: Math.max(0, sample.tokensReceived),
         }
       : {}),
-    ...(sample.peakCpuPct != null && sample.peakMemPct != null
+    ...(sample.peakCpuPct != null &&
+    sample.avgCpuPct != null &&
+    sample.peakMemPct != null &&
+    sample.avgMemPct != null
       ? {
           peakCpuPct: sample.peakCpuPct,
+          avgCpuPct: sample.avgCpuPct,
           peakMemPct: sample.peakMemPct,
+          avgMemPct: sample.avgMemPct,
           peakGpuPct: sample.peakGpuPct ?? null,
+          avgGpuPct: sample.avgGpuPct ?? null,
+          resourceSampleCount: sample.resourceSampleCount ?? 0,
         }
       : {}),
   }
@@ -313,9 +336,13 @@ export function formatTurnTimingCsvRow(record: TurnTimingRecord): string {
     record.tokensSent ?? '',
     record.tokensReceived ?? '',
     tps != null ? tps.toFixed(3) : '',
+    record.avgCpuPct ?? '',
     record.peakCpuPct ?? '',
+    record.avgMemPct ?? '',
     record.peakMemPct ?? '',
+    record.avgGpuPct ?? '',
     record.peakGpuPct ?? '',
+    record.resourceSampleCount ?? '',
   ]
     .map(csvEscape)
     .join(',')
@@ -446,4 +473,14 @@ export function exportThinkingStatsJson(store: ThinkingStatsStore): string {
 export function formatThinkSharePct(share: number | null): string {
   if (share == null || !Number.isFinite(share)) return '—'
   return `${Math.round(share * 100)}%`
+}
+
+/** Short display label for LiteLLM / Ollama model ids in tables. */
+export { formatAvgPeakPct } from '../ipc/resourceSnapshot'
+
+export function formatModelLabel(model: string): string {
+  const m = model.trim()
+  if (m.startsWith('ollama_chat/')) return m.slice('ollama_chat/'.length)
+  if (m.startsWith('ollama/')) return m.slice('ollama/'.length)
+  return m || 'unknown'
 }

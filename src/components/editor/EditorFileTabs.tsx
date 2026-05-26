@@ -16,13 +16,7 @@ interface EditorFileTabsProps {
 
 export function EditorFileTabs({ tabs, activePath, onSelect, onClose }: EditorFileTabsProps) {
   if (tabs.length === 0) {
-    return (
-      <Box sx={{ px: 2, py: 1, borderBottom: 1, borderColor: 'divider' }}>
-        <Typography variant="body2" color="text.secondary">
-          Open a file from the explorer →
-        </Typography>
-      </Box>
-    )
+    return null
   }
 
   return (

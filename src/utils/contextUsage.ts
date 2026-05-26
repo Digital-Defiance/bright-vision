@@ -33,16 +33,37 @@ function parseTokenCount(token: string): number | null {
   return Math.round(n)
 }
 
-/** Parse `Tokens: 1.2k sent, 450 received` from core tool_output. */
+/**
+ * Parse token usage from core `tool_output`.
+ * - Legacy aider: `Tokens: 1.2k sent, 450 received`
+ * - cecli: `1.2k ↑ 450 ↓` (optional cache segments before ↑, cost/speed lines after)
+ */
 export function parseTokenUsageReport(text: string): TokenUsageReport | null {
   const t = text.trim()
-  if (!t.startsWith('Tokens:')) return null
-  const m = t.match(/Tokens:\s*(.+?)\s*sent,\s*(.+?)\s*received/i)
-  if (!m) return null
-  const tokensSent = parseTokenCount(m[1])
-  const tokensReceived = parseTokenCount(m[2])
-  if (tokensSent === null || tokensReceived === null) return null
-  return { tokensSent, tokensReceived, raw: t }
+  if (!t) return null
+
+  const legacy = t.match(/\bTokens:\s*(.+?)\s*sent,\s*(.+?)\s*received/i)
+  if (legacy) {
+    const tokensSent = parseTokenCount(legacy[1])
+    const tokensReceived = parseTokenCount(legacy[2])
+    if (tokensSent !== null && tokensReceived !== null) {
+      return { tokensSent, tokensReceived, raw: t }
+    }
+  }
+
+  const cecli = t.match(
+    /(\d+(?:\.\d+)?k?(?:\/\d+(?:\.\d+)?k?)*)\s*↑\s*(\d+(?:\.\d+)?k?)\s*↓/i
+  )
+  if (cecli) {
+    const sentPart = cecli[1].split('/')[0]?.trim() ?? ''
+    const tokensSent = parseTokenCount(sentPart)
+    const tokensReceived = parseTokenCount(cecli[2])
+    if (tokensSent !== null && tokensReceived !== null) {
+      return { tokensSent, tokensReceived, raw: t }
+    }
+  }
+
+  return null
 }
 
 export function formatTokenCount(n: number): string {

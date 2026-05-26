@@ -2,32 +2,33 @@ import { useCallback, useEffect, useRef } from 'react'
 import {
   emptyTurnResourcePeak,
   fetchResourceSnapshot,
-  hasTurnResourcePeak,
+  finalizeTurnResourceStats,
   mergeSnapshotIntoPeak,
-  type TurnResourcePeak,
+  type TurnResourceAccumulator,
+  type TurnResourceStats,
 } from '../ipc/resourceSnapshot'
 import { isTauriRuntime } from '../ipc/isTauri'
 
 /**
- * Poll system CPU/RAM/GPU while a chat turn is active; keep per-turn peaks for stats history.
+ * Poll system CPU/RAM/GPU while a chat turn is active; keep per-turn avg + peak for stats history.
  */
 export function useTurnResourcePeak(
   sampling: boolean,
   pollIntervalSec: number
 ): {
   resetPeak: () => void
-  takePeak: () => TurnResourcePeak | undefined
+  takePeak: () => TurnResourceStats | undefined
 } {
-  const peakRef = useRef<TurnResourcePeak>(emptyTurnResourcePeak())
+  const peakRef = useRef<TurnResourceAccumulator>(emptyTurnResourcePeak())
 
   const resetPeak = useCallback(() => {
     peakRef.current = emptyTurnResourcePeak()
   }, [])
 
-  const takePeak = useCallback((): TurnResourcePeak | undefined => {
-    const peak = peakRef.current
+  const takePeak = useCallback((): TurnResourceStats | undefined => {
+    const stats = finalizeTurnResourceStats(peakRef.current)
     peakRef.current = emptyTurnResourcePeak()
-    return hasTurnResourcePeak(peak) ? peak : undefined
+    return stats
   }, [])
 
   useEffect(() => {

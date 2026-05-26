@@ -8,6 +8,13 @@ export type ProposedEditKind = 'search_replace' | 'fenced_file' | 'code'
 export type AssistantContentSegment =
   | { type: 'prose'; content: string }
   | {
+      type: 'display_fence'
+      language: string
+      body: string
+      /** False while the closing fence is still streaming. */
+      complete: boolean
+    }
+  | {
       type: 'proposed_edit'
       title: string
       language: string
@@ -97,7 +104,7 @@ export function parseAssistantContent(content: string): AssistantContentSegment[
     }
 
     const kind = classifyEdit(body, pathHint)
-    const isProposed = kind !== 'code' || Boolean(pathHint) || body.length > 120
+    const isProposed = kind === 'search_replace' || kind === 'fenced_file'
 
     if (isProposed) {
       segments.push({
@@ -109,8 +116,10 @@ export function parseAssistantContent(content: string): AssistantContentSegment[
       })
     } else {
       segments.push({
-        type: 'prose',
-        content: content.slice(fence, fence + consumed),
+        type: 'display_fence',
+        language,
+        body,
+        complete: close !== -1,
       })
     }
 

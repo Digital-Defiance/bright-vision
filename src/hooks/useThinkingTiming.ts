@@ -22,8 +22,8 @@ import {
 } from '../utils/thinkingTiming'
 import { getActiveAssistantSection } from '../utils/chatStream'
 import {
-  hasTurnResourcePeak,
-  type TurnResourcePeak,
+  hasTurnResourceStats,
+  type TurnResourceStats,
 } from '../ipc/resourceSnapshot'
 
 export type { LiveThinkingState } from '../utils/thinkingTiming'
@@ -101,7 +101,7 @@ export function useThinkingTiming(model: string, prefs: ThinkingTimingPrefs) {
   const recordCompletedTurn = useCallback(
     (
       timing: TurnThinkingTiming,
-      resources?: TurnResourcePeak,
+      resources?: TurnResourceStats,
       tokens?: { tokensSent: number; tokensReceived: number }
     ): TurnTimingRecord | null => {
       if (timing.turnDurationMs <= 0) return null
@@ -117,11 +117,15 @@ export function useThinkingTiming(model: string, prefs: ThinkingTimingPrefs) {
                 tokensReceived: tokens.tokensReceived,
               }
             : {}),
-          ...(resources && hasTurnResourcePeak(resources)
+          ...(resources && hasTurnResourceStats(resources)
             ? {
                 peakCpuPct: resources.peakCpuPct,
+                avgCpuPct: resources.avgCpuPct,
                 peakMemPct: resources.peakMemPct,
+                avgMemPct: resources.avgMemPct,
                 peakGpuPct: resources.peakGpuPct,
+                avgGpuPct: resources.avgGpuPct,
+                resourceSampleCount: resources.sampleCount,
               }
             : {}),
         })

@@ -8,8 +8,8 @@ export interface EditorPrefs {
 }
 
 export const DEFAULT_EDITOR_PREFS: EditorPrefs = {
-  explorerOpen: false,
-  explorerSizePct: 28,
+  explorerOpen: true,
+  explorerSizePct: 32,
 }
 
 export function loadEditorPrefs(): EditorPrefs {
@@ -21,7 +21,7 @@ export function loadEditorPrefs(): EditorPrefs {
       explorerOpen: parsed.explorerOpen ?? DEFAULT_EDITOR_PREFS.explorerOpen,
       explorerSizePct:
         typeof parsed.explorerSizePct === 'number'
-          ? Math.min(50, Math.max(15, parsed.explorerSizePct))
+          ? Math.min(50, Math.max(22, parsed.explorerSizePct))
           : DEFAULT_EDITOR_PREFS.explorerSizePct,
     }
   } catch {

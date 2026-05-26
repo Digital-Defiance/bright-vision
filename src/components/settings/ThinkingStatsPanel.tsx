@@ -22,7 +22,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
-import { formatPeakPct } from '../../ipc/resourceSnapshot'
+import { formatAvgPeakPct } from '../../ipc/resourceSnapshot'
 import { isTauriRuntime } from '../../ipc/isTauri'
 import {
   downloadThinkingStatsCsv,
@@ -34,6 +34,7 @@ import {
   computeOutputTps,
   computeRunningAvgOutputTps,
   exportThinkingStatsJson,
+  formatModelLabel,
   formatOutputTps,
   formatThinkSharePct,
   listModelsInHistory,
@@ -178,7 +179,7 @@ export function ThinkingStatsPanel({
     : store.history.length
 
   return (
-    <Box sx={{ mt: 2 }} data-testid="timing-stats-panel">
+    <Box sx={{ mt: 2, width: '100%', minWidth: 0 }} data-testid="timing-stats-panel">
       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
         <FormControl size="small" sx={{ minWidth: 200 }}>
           <InputLabel id="timing-stats-filter-label">Scope</InputLabel>
@@ -355,24 +356,30 @@ export function ThinkingStatsPanel({
         History (newest first, last {TIMING_STATS_DISPLAY_ROWS} turns
         {storedCount > TIMING_STATS_DISPLAY_ROWS ? ` · ${storedCount} stored` : ''}
         )
-        {isTauriRuntime() ? ' · peak CPU/RAM/GPU sampled while the turn runs' : ''}
-        {' · TPS when core emits Tokens: on the turn'}
+        {isTauriRuntime()
+          ? ' · CPU/RAM/GPU: avg / peak % while the turn runs (system-wide polls)'
+          : ''}
+        {' · TPS when core emits a usage line (↑↓ or Tokens:) on the turn'}
       </Typography>
-      <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320 }}>
+      <TableContainer
+        component={Paper}
+        variant="outlined"
+        sx={{ maxHeight: 360, width: '100%', overflow: 'auto' }}
+      >
         <Table size="small" stickyHeader data-testid="timing-stats-history">
           <TableHead>
             <TableRow>
               <TableCell>When</TableCell>
-              {filter === 'all' && <TableCell>Model</TableCell>}
+              <TableCell>Model</TableCell>
               <TableCell align="right">Response</TableCell>
               <TableCell align="right">TPS</TableCell>
               <TableCell align="right">Think</TableCell>
               <TableCell align="right">Think %</TableCell>
               {isTauriRuntime() && (
                 <>
-                  <TableCell align="right">CPU peak</TableCell>
-                  <TableCell align="right">RAM peak</TableCell>
-                  <TableCell align="right">GPU peak</TableCell>
+                  <TableCell align="right">CPU avg/max</TableCell>
+                  <TableCell align="right">RAM avg/max</TableCell>
+                  <TableCell align="right">GPU avg/max</TableCell>
                 </>
               )}
               <TableCell align="right">Prompt</TableCell>
@@ -385,18 +392,18 @@ export function ThinkingStatsPanel({
                 <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.75rem' }}>
                   {new Date(row.at).toLocaleString()}
                 </TableCell>
-                {filter === 'all' && (
-                  <TableCell
-                    sx={{
-                      maxWidth: 160,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      fontSize: '0.75rem',
-                    }}
-                  >
-                    {row.model}
-                  </TableCell>
-                )}
+                <TableCell
+                  sx={{
+                    maxWidth: 160,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    fontSize: '0.75rem',
+                    fontFamily: 'var(--vision-font-chat, monospace)',
+                  }}
+                  title={row.model}
+                >
+                  {formatModelLabel(row.model)}
+                </TableCell>
                 <TableCell align="right">{formatDurationMs(row.responseMs)}</TableCell>
                 <TableCell align="right">
                   {formatOutputTps(computeOutputTps(row.tokensReceived, row.responseMs))}
@@ -405,9 +412,29 @@ export function ThinkingStatsPanel({
                 <TableCell align="right">{formatThinkSharePct(thinkShare(row))}</TableCell>
                 {isTauriRuntime() && (
                   <>
-                    <TableCell align="right">{formatPeakPct(row.peakCpuPct)}</TableCell>
-                    <TableCell align="right">{formatPeakPct(row.peakMemPct)}</TableCell>
-                    <TableCell align="right">{formatPeakPct(row.peakGpuPct)}</TableCell>
+                    <TableCell
+                      align="right"
+                      sx={{ fontFamily: 'var(--vision-font-chat, monospace)', fontSize: '0.75rem' }}
+                      title={
+                        row.resourceSampleCount
+                          ? `${row.resourceSampleCount} samples · avg then peak %`
+                          : undefined
+                      }
+                    >
+                      {formatAvgPeakPct(row.avgCpuPct, row.peakCpuPct)}
+                    </TableCell>
+                    <TableCell
+                      align="right"
+                      sx={{ fontFamily: 'var(--vision-font-chat, monospace)', fontSize: '0.75rem' }}
+                    >
+                      {formatAvgPeakPct(row.avgMemPct, row.peakMemPct)}
+                    </TableCell>
+                    <TableCell
+                      align="right"
+                      sx={{ fontFamily: 'var(--vision-font-chat, monospace)', fontSize: '0.75rem' }}
+                    >
+                      {formatAvgPeakPct(row.avgGpuPct, row.peakGpuPct)}
+                    </TableCell>
                   </>
                 )}
                 <TableCell align="right">{row.promptChars.toLocaleString()}</TableCell>

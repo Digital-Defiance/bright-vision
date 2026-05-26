@@ -182,9 +182,10 @@ export function FileExplorer({
     <Box
       sx={{
         height: '100%',
+        width: '100%',
         display: 'flex',
         flexDirection: 'column',
-        minWidth: 0,
+        minWidth: 200,
         bgcolor: 'background.paper',
         borderLeft: 1,
         borderColor: 'divider',
@@ -202,7 +203,7 @@ export function FileExplorer({
           borderColor: 'divider',
         }}
       >
-        <Typography variant="caption" fontWeight={600} sx={{ flex: 1 }}>
+        <Typography variant="caption" fontWeight={600} sx={{ flex: 1 }} noWrap>
           Explorer
         </Typography>
         <Tooltip title="Refresh">

@@ -122,7 +122,7 @@ export function SettingsPanel({
   }, [refreshLocalLlm])
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={3} sx={{ width: '100%', maxWidth: '100%' }}>
       <Typography variant="h5" fontWeight={600}>
         Model & system
       </Typography>

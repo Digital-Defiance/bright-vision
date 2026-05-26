@@ -17,7 +17,7 @@ import TerminalIcon from '@mui/icons-material/Terminal'
 import CodeIcon from '@mui/icons-material/Code'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import StopIcon from '@mui/icons-material/Stop'
-import { Alert, Box, Button, Chip, Container, Paper, Snackbar, Stack, Typography } from '@mui/material'
+import { Alert, Box, Button, Chip, Paper, Snackbar, Stack, Typography } from '@mui/material'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
 import { DISPLAY_CORE, ErrorSource, prefixForTechnicalLog, prefixForUserFacing } from './brand'
@@ -128,9 +128,11 @@ import { useResourceOverlay } from './hooks/useResourceOverlay'
 import {
   clearAllThinkingStats,
   clearModelThinkingStats,
+  computeOutputTps,
   loadThinkingStats,
   saveThinkingStats,
 } from './utils/thinkingStats'
+import { estimateTurnEta } from './utils/turnEtaEstimate'
 import {
   resolveMessageTurnTiming,
   shouldRecordTurnInHistory,
@@ -324,7 +326,10 @@ function AppShell({
   const turnAssistantMessageIdRef = useRef<number | null>(null)
   /** True once this turn streams at least one assistant token (vs. empty queued follow-up). */
   const turnHadAssistantOutputRef = useRef(false)
-  const turnTokenUsageRef = useRef<{ tokensSent: number; tokensReceived: number } | null>(null)
+  const [turnTokenUsage, setTurnTokenUsage] = useState<{
+    tokensSent: number
+    tokensReceived: number
+  } | null>(null)
   const refreshSessionInfoRef = useRef<() => Promise<import('./ipc/httpClient').CoreSessionInfo | null>>(
     async () => null
   )
@@ -340,7 +345,7 @@ function AppShell({
     reset: () => void
     recordCompletedTurn: (
       t: TurnThinkingTiming,
-      resources?: import('./ipc/resourceSnapshot').TurnResourcePeak,
+      resources?: import('./ipc/resourceSnapshot').TurnResourceStats,
       tokens?: { tokensSent: number; tokensReceived: number }
     ) => import('./utils/thinkingStats').TurnTimingRecord | null
   }>({
@@ -354,7 +359,7 @@ function AppShell({
     turnWallStartMsRef.current = turnStartMs
     turnAssistantMessageIdRef.current = null
     turnHadAssistantOutputRef.current = false
-    turnTokenUsageRef.current = null
+    setTurnTokenUsage(null)
     thinkingTimingRef.current.beginTurn(promptChars, turnStartMs)
     turnTimingActiveRef.current = true
   })
@@ -713,10 +718,10 @@ function AppShell({
           if (report) {
             setContextUsage((prev) => ({ ...prev, lastReport: report }))
             if (turnTimingActiveRef.current) {
-              turnTokenUsageRef.current = {
+              setTurnTokenUsage({
                 tokensSent: report.tokensSent,
                 tokensReceived: report.tokensReceived,
-              }
+              })
             }
           }
           break
@@ -840,9 +845,9 @@ function AppShell({
               const recorded = thinkingTimingRef.current.recordCompletedTurn(
                 turnTiming,
                 takeTurnResourcePeakRef.current(),
-                turnTokenUsageRef.current ?? undefined
+                turnTokenUsage ?? undefined
               )
-              turnTokenUsageRef.current = null
+              setTurnTokenUsage(null)
               if (
                 recorded &&
                 thinkingTimingPrefs.timingStatsAutoAppendCsv &&
@@ -1140,11 +1145,35 @@ function AppShell({
   startTurnTimingRef.current = (promptChars: number, turnStartMs: number) => {
     turnWallStartMsRef.current = turnStartMs
     turnAssistantMessageIdRef.current = null
+    setTurnTokenUsage(null)
     resetTurnResourcePeak()
     setTrackTurnResources(true)
     thinkingTiming.beginTurn(promptChars, turnStartMs)
     turnTimingActiveRef.current = true
   }
+
+  const turnEta = useMemo(() => {
+    if (!thinkingTiming.live || !isRunning) return null
+    const liveTps =
+      turnTokenUsage && thinkingTiming.live.responseElapsedMs > 500
+        ? computeOutputTps(turnTokenUsage.tokensReceived, thinkingTiming.live.responseElapsedMs)
+        : null
+    return estimateTurnEta({
+      model: savedConfig.model,
+      promptChars: lastUserPromptCharsRef.current,
+      elapsedMs: thinkingTiming.live.responseElapsedMs,
+      statsStore: thinkingTiming.statsStore,
+      progressFraction: process.snapshot.progress,
+      liveOutputTps: liveTps,
+    })
+  }, [
+    thinkingTiming.live,
+    thinkingTiming.statsStore,
+    savedConfig.model,
+    process.snapshot.progress,
+    turnTokenUsage,
+    isRunning,
+  ])
 
   const handleCancelSend = useCallback(() => {
     cancelSend()
@@ -2093,6 +2122,7 @@ function AppShell({
         process={process.snapshot}
         isRunning={isRunning}
         liveTiming={thinkingTiming.live}
+        turnEta={turnEta}
         headerExtra={headerExtra}
         railFooter={
           resourceOverlay.enabled ? (
@@ -2333,7 +2363,7 @@ function AppShell({
           )}
 
           {activeTab === 'settings' && (
-            <Container maxWidth="sm" disableGutters>
+            <Box sx={{ width: '100%', minWidth: 0 }}>
               <SettingsPanel
                 config={config}
                 appearance={appearance}
@@ -2362,7 +2392,7 @@ function AppShell({
                 onReset={handleReset}
                 appVersions={appVersions}
               />
-            </Container>
+            </Box>
           )}
       </AppChrome>
 

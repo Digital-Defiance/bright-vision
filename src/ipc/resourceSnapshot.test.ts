@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   emptyTurnResourcePeak,
+  finalizeTurnResourceStats,
+  formatAvgPeakPct,
   formatResourceOverlayLine,
   hasTurnResourcePeak,
   mergeSnapshotIntoPeak,
@@ -35,7 +37,7 @@ describe('resourceSnapshot', () => {
     expect(formatResourceOverlayLine(sample, true)).toContain('GPU')
   })
 
-  it('tracks per-turn peaks across polls', () => {
+  it('tracks per-turn avg and peak across polls', () => {
     let peak = emptyTurnResourcePeak()
     expect(hasTurnResourcePeak(peak)).toBe(false)
     peak = mergeSnapshotIntoPeak(peak, { ...sample, cpuPct: 10, memPct: 50 })
@@ -45,5 +47,11 @@ describe('resourceSnapshot', () => {
     expect(peak.peakMemPct).toBe(80)
     expect(peak.peakGpuPct).toBe(55)
     expect(peak.sampleCount).toBe(2)
+
+    const stats = finalizeTurnResourceStats(peak)
+    expect(stats?.avgCpuPct).toBe(54.5)
+    expect(stats?.avgMemPct).toBe(65)
+    expect(stats?.avgGpuPct).toBe(55)
+    expect(formatAvgPeakPct(stats?.avgCpuPct, stats?.peakCpuPct)).toBe('55 / 99%')
   })
 })

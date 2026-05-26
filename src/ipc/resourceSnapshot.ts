@@ -12,40 +12,104 @@ export interface ResourceSnapshot {
   scope: string
 }
 
-/** Peak system utilization observed during one chat turn (polled while the turn is active). */
-export interface TurnResourcePeak {
+/** Running max + sums while polling during an active chat turn. */
+export interface TurnResourceAccumulator {
   peakCpuPct: number
   peakMemPct: number
   peakGpuPct: number | null
+  sumCpuPct: number
+  sumMemPct: number
+  sumGpuPct: number
+  gpuSampleCount: number
   sampleCount: number
 }
 
-export function emptyTurnResourcePeak(): TurnResourcePeak {
-  return { peakCpuPct: 0, peakMemPct: 0, peakGpuPct: null, sampleCount: 0 }
+/** Finalized per-turn CPU/RAM/GPU stats for timing history. */
+export interface TurnResourceStats {
+  peakCpuPct: number
+  peakMemPct: number
+  peakGpuPct: number | null
+  avgCpuPct: number
+  avgMemPct: number
+  avgGpuPct: number | null
+  sampleCount: number
 }
 
-export function hasTurnResourcePeak(peak: TurnResourcePeak): boolean {
-  return peak.sampleCount > 0
+/** @deprecated Use TurnResourceAccumulator */
+export type TurnResourcePeak = TurnResourceAccumulator
+
+export function emptyTurnResourcePeak(): TurnResourceAccumulator {
+  return {
+    peakCpuPct: 0,
+    peakMemPct: 0,
+    peakGpuPct: null,
+    sumCpuPct: 0,
+    sumMemPct: 0,
+    sumGpuPct: 0,
+    gpuSampleCount: 0,
+    sampleCount: 0,
+  }
+}
+
+export function hasTurnResourcePeak(accum: TurnResourceAccumulator): boolean {
+  return accum.sampleCount > 0
+}
+
+export function hasTurnResourceStats(stats: TurnResourceStats): boolean {
+  return stats.sampleCount > 0
 }
 
 export function mergeSnapshotIntoPeak(
-  peak: TurnResourcePeak,
+  peak: TurnResourceAccumulator,
   snapshot: ResourceSnapshot
-): TurnResourcePeak {
+): TurnResourceAccumulator {
+  const gpuPct = snapshot.gpuPct
   return {
     peakCpuPct: Math.max(peak.peakCpuPct, snapshot.cpuPct),
     peakMemPct: Math.max(peak.peakMemPct, snapshot.memPct),
     peakGpuPct:
-      snapshot.gpuPct != null
-        ? Math.max(peak.peakGpuPct ?? 0, snapshot.gpuPct)
-        : peak.peakGpuPct,
+      gpuPct != null ? Math.max(peak.peakGpuPct ?? 0, gpuPct) : peak.peakGpuPct,
+    sumCpuPct: peak.sumCpuPct + snapshot.cpuPct,
+    sumMemPct: peak.sumMemPct + snapshot.memPct,
+    sumGpuPct: peak.sumGpuPct + (gpuPct ?? 0),
+    gpuSampleCount: peak.gpuSampleCount + (gpuPct != null ? 1 : 0),
     sampleCount: peak.sampleCount + 1,
+  }
+}
+
+export function finalizeTurnResourceStats(
+  accum: TurnResourceAccumulator
+): TurnResourceStats | undefined {
+  if (accum.sampleCount <= 0) return undefined
+  const n = accum.sampleCount
+  return {
+    peakCpuPct: accum.peakCpuPct,
+    peakMemPct: accum.peakMemPct,
+    peakGpuPct: accum.peakGpuPct,
+    avgCpuPct: accum.sumCpuPct / n,
+    avgMemPct: accum.sumMemPct / n,
+    avgGpuPct:
+      accum.gpuSampleCount > 0 ? accum.sumGpuPct / accum.gpuSampleCount : null,
+    sampleCount: n,
   }
 }
 
 export function formatPeakPct(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—'
   return `${Math.round(n)}%`
+}
+
+/** Compact `avg / peak` for timing history cells. */
+export function formatAvgPeakPct(
+  avg: number | null | undefined,
+  peak: number | null | undefined
+): string {
+  const a = avg != null && Number.isFinite(avg) ? Math.round(avg) : null
+  const p = peak != null && Number.isFinite(peak) ? Math.round(peak) : null
+  if (a == null && p == null) return '—'
+  if (a == null) return `${p}%`
+  if (p == null) return `${a}%`
+  return `${a} / ${p}%`
 }
 
 export interface ResourceOverlayRow {

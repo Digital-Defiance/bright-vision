@@ -2,6 +2,7 @@ import { Box, IconButton, Paper, Stack, Toolbar, Tooltip, Typography } from '@mu
 import type { ReactNode } from 'react'
 import { BrandLogo } from '../brand/BrandLogo'
 import type { ProcessSnapshot } from '../../progress/types'
+import type { TurnEtaEstimate } from '../../utils/turnEtaEstimate'
 import type { LiveThinkingState } from '../../utils/thinkingTiming'
 import { VisionActivityBar } from '../progress/VisionActivityBar'
 
@@ -18,6 +19,7 @@ interface AppChromeProps {
   process: ProcessSnapshot
   isRunning: boolean
   liveTiming?: LiveThinkingState | null
+  turnEta?: TurnEtaEstimate | null
   headerExtra?: ReactNode
   children: ReactNode
   /** CPU/RAM/GPU strip anchored in the left nav rail (not over main content). */
@@ -33,6 +35,7 @@ export function AppChrome({
   process,
   isRunning,
   liveTiming = null,
+  turnEta = null,
   headerExtra,
   children,
   railFooter,
@@ -134,10 +137,17 @@ export function AppChrome({
             />
             {headerExtra}
           </Toolbar>
-          <VisionActivityBar process={process} liveTiming={liveTiming} />
+          <VisionActivityBar process={process} liveTiming={liveTiming} turnEta={turnEta} />
         </Paper>
 
-        <Box sx={{ flex: 1, overflow: 'auto', p: 3 }}>
+        <Box
+          sx={{
+            flex: 1,
+            overflow: 'auto',
+            minHeight: 0,
+            p: activeTab === 'editor' ? 0 : 3,
+          }}
+        >
           {children}
         </Box>
       </Box>

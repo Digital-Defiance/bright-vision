@@ -13,6 +13,28 @@ describe('contextUsage', () => {
     expect(r?.tokensReceived).toBe(450)
   })
 
+  it('parses cecli ↑↓ usage report', () => {
+    const r = parseTokenUsageReport('1.2k ↑ 450 ↓')
+    expect(r?.tokensSent).toBe(1200)
+    expect(r?.tokensReceived).toBe(450)
+  })
+
+  it('parses cecli usage with cache segments and trailing cost', () => {
+    const r = parseTokenUsageReport(
+      '1.2k/500 ↑ 450 ↓ $0.00 • 2.1k ↑↓ $0.00\nLLM elapsed time: 12.34 seconds'
+    )
+    expect(r?.tokensSent).toBe(1200)
+    expect(r?.tokensReceived).toBe(450)
+  })
+
+  it('parses legacy Tokens line inside multiline tool_output', () => {
+    const r = parseTokenUsageReport(
+      '[BrightVision Core] Tokens: 120 sent, 45 received\nEdited: src/App.tsx'
+    )
+    expect(r?.tokensSent).toBe(120)
+    expect(r?.tokensReceived).toBe(45)
+  })
+
   it('formats session chip', () => {
     expect(
       formatSessionContextChip(3, {
