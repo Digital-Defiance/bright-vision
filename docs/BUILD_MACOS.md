@@ -29,9 +29,48 @@ Shortcut (prompts for `APPLE_PASSWORD` if not set — avoids signed-but-not-nota
 
 ```bash
 yarn build:mac
+# release with explicit semver (updates package.json, tauri.conf.json, Cargo.toml):
+yarn build:mac 0.2.0
+yarn build:mac --version 0.2.0
 # sign only, no notarization prompt:
 yarn build:mac -- --skip-notarize
 ```
+
+DMG filename follows Tauri: `Bright Vision_<version>_universal.dmg` (from `productName` + `version` in `src-tauri/tauri.conf.json`). Without a version argument, the script uses `package.json` `version` (currently `0.1.0`).
+
+### GitHub release + Homebrew tap
+
+After a successful build, `--publish` uploads the DMG to [Digital-Defiance/bright-vision](https://github.com/Digital-Defiance/bright-vision) and updates `~/Code/homebrew-tap/Casks/bright-vision.rb` (`version` + `sha256`).
+
+Requires [GitHub CLI](https://cli.github.com/): `brew install gh && gh auth login`.
+
+```bash
+# Build, notarize, create release v0.2.0, upload DMG, update cask
+yarn build:mac 0.2.0 --publish
+
+# Also commit and push homebrew-tap (prompts before push unless NONINTERACTIVE=1)
+yarn build:mac 0.2.0 --publish --push-tap
+
+# Non-interactive CI-style
+NONINTERACTIVE=1 yarn build:mac 0.2.0 --publish --push-tap
+```
+
+| Flag | Effect |
+|------|--------|
+| `--publish` | `gh release create` / upload + update cask |
+| `--push-tap` | Commit & push `homebrew-tap` (implies `--publish`) |
+| `--release-tag v0.1.0-bright2` | Git tag / release name (default `v<VERSION>`) |
+| `--no-push-tag` | Do not create/push git tag (release tag must exist) |
+
+Release asset name (no spaces): `Bright.Vision_<version>_universal.dmg` — matches the cask `url`.
+
+Update cask only (DMG already built):
+
+```bash
+bash scripts/update-bright-vision-cask.sh 0.2.0 "$(shasum -a 256 'path/to/Bright.Vision_0.2.0_universal.dmg' | awk '{print $1}')"
+```
+
+Environment: `GITHUB_REPO` (default `Digital-Defiance/bright-vision`), `HOMEBREW_TAP_DIR` (default `~/Code/homebrew-tap`).
 
 `scripts/build-macos.sh` checks and prompts for every missing variable before building:
 
