@@ -1,6 +1,6 @@
 {
   "productName": "Bright Vision",
-  "version": "0.1.0-bright5",
+  "version": "0.1.0-bright6",
   "identifier": "com.digitaldefiance.bright-vision",
   "build": {
     "frontendDist": "../dist",

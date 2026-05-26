@@ -75,7 +75,7 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 | 3 | **Done** | Stop in-flight turn (`cancelSend` + AbortSignal on fetch) |
 | 4 | **Done** | Queue messages while busy (`useVisionSession` queue + Queue button in `ChatPanel`) |
 | 12 | **Done** | `/add` / `/drop` path completion via Tauri `complete_workspace_path` + Tab in chat |
-| **32** | **Partial** | **Suggested files tray** — parse assistant **Answer** for repo-relative paths (`-` / `*` / `1.` lists + backticks); tray above chat input with **Add all**, **Queue `/add`**, dismiss; uses `addFiles` + message queue (#4). Warn when paths fail to land in `files_in_chat`. **Open:** e2e polish, tree picker tie-in (#28). See [§ #32 design](#32-suggested-files--queued-add) |
+| **32** | **Partial** | **Suggested files tray** — parse assistant **Answer** for repo-relative paths (`-` / `*` / `1.` lists + backticks); tray above chat input with **Add all**, **Queue `/add`**, dismiss; uses `addFiles` + message queue (#4). Clearer copy when adds fail (ignore vs wrong workspace): `addFileMessages.ts`, cecli `add.py`. **Open:** e2e polish, tree picker tie-in (#28). See [§ #32 design](#32-suggested-files--queued-add) |
 
 ## Approvals, workspace & engine
 

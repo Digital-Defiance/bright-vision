@@ -72,6 +72,10 @@ import {
   isEmptyLlmWarning,
   rewriteEmptyLlmWarningIfNeeded,
 } from './utils/emptyLlmResponse'
+import {
+  formatFilesNotAddedSnackbar,
+  rewriteAddFileToolMessage,
+} from './utils/addFileMessages'
 import { ChatPanel, type ChatMessage, type ToolEvent } from './components/chat/ChatPanel'
 import { TodoPanel } from './components/todos/TodoPanel'
 import { GitPanel } from './components/GitPanel'
@@ -623,8 +627,9 @@ function AppShell({
         break
       }
       case 'tool_error': {
-        const text = String(ev.text ?? '')
-        if (!text.trim()) break
+        const raw = String(ev.text ?? '')
+        if (!raw.trim()) break
+        const text = rewriteAddFileToolMessage(raw, savedConfig.workingDir)
         streamingAssistantId.current = null
         setToolEvents((prev) =>
           capList(
@@ -870,7 +875,7 @@ function AppShell({
           { id: orderId, text: JSON.stringify(ev), type: 'stdout' },
         ])
     }
-  }, [process, bumpGitRefresh, nextChatMessageId, isLocalLlmModel])
+  }, [process, bumpGitRefresh, nextChatMessageId, isLocalLlmModel, savedConfig.workingDir])
 
   const { pendingConfirm, setPendingConfirm, dismissConfirm, lastGit, filesInChat, setFilesInChat, wrapHandler } =
     useSessionActivity()
@@ -950,12 +955,12 @@ function AppShell({
       }
       if (missing.length) {
         setSnackbar({
-          message: `Not added to context: ${missing.join(', ')}`,
+          message: formatFilesNotAddedSnackbar(missing, savedConfig.workingDir),
           severity: 'warning',
         })
       }
     },
-    [syncSessionFiles, recordAddedContextEstimate]
+    [syncSessionFiles, recordAddedContextEstimate, savedConfig.workingDir]
   )
 
   const stallWatch = useSessionStallWatch(isBusy, queuedCount)
