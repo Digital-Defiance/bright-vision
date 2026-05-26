@@ -7,6 +7,7 @@ import {
   isAwaitingFilesCta,
   mergeSuggestedPaths,
   parseAddCommandPath,
+  stripFileMentionPrefix,
 } from './suggestedFiles'
 
 const KIRO_SPEC_ANSWER = `Answer
@@ -92,8 +93,16 @@ describe('suggestedFiles', () => {
 
   it('parses /add command paths', () => {
     expect(parseAddCommandPath('/add src/foo.ts')).toBe('src/foo.ts')
+    expect(parseAddCommandPath('/add @src/foo.ts')).toBe('src/foo.ts')
     expect(parseAddCommandPath('/add  ')).toBeNull()
     expect(parseAddCommandPath('hello')).toBeNull()
+  })
+
+  it('strips @ mention prefix from suggested paths', () => {
+    expect(stripFileMentionPrefix('@src/main.py')).toBe('src/main.py')
+    expect(
+      extractSuggestedFilePaths('Add `@src/main.py` and `@src/utils/foo.ts` when ready.')
+    ).toEqual(['src/main.py', 'src/utils/foo.ts'])
   })
 
   it('merges session tray without duplicates and respects files_in_chat', () => {

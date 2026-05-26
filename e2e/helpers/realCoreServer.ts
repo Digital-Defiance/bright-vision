@@ -10,7 +10,7 @@ function resolvePython(): string {
   const candidates = [
     process.env.E2E_PYTHON,
     path.join(REPO_ROOT, '.venv', 'bin', 'python'),
-    path.join(REPO_ROOT, 'bright-vision-core', '.venv', 'bin', 'python'),
+    path.join(REPO_ROOT, 'BrightVision-core', '.venv', 'bin', 'python'),
   ].filter(Boolean) as string[]
   for (const p of candidates) {
     if (fs.existsSync(p)) return p
@@ -75,7 +75,7 @@ export async function startRealCoreServer(): Promise<void> {
       'warning',
     ],
     {
-      cwd: path.join(REPO_ROOT, 'bright-vision-core'),
+      cwd: path.join(REPO_ROOT, 'BrightVision-core'),
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
     }

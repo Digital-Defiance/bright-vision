@@ -18,8 +18,8 @@ test.describe('Release & submodule hygiene (#19, #31)', () => {
     expect(modules).toContain('bright-vision-core')
   })
 
-  test('bright-vision-core submodule directory is present', () => {
-    expect(existsSync(join(ROOT, 'bright-vision-core'))).toBe(true)
+  test('BrightVision-core submodule directory is present', () => {
+    expect(existsSync(join(ROOT, 'BrightVision-core'))).toBe(true)
   })
 
   test('verify_submodule script exists and is executable', () => {

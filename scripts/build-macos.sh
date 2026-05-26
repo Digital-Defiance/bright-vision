@@ -24,7 +24,7 @@ PUBLISH=0
 PUSH_TAP=0
 PUSH_GIT_TAG=1
 RELEASE_TAG=""
-GITHUB_REPO="${GITHUB_REPO:-Digital-Defiance/bright-vision}"
+GITHUB_REPO="${GITHUB_REPO:-Digital-Defiance/BrightVision}"
 HOMEBREW_TAP_DIR="${HOMEBREW_TAP_DIR:-${HOME}/Code/homebrew-tap}"
 
 die() {
@@ -59,7 +59,7 @@ Environment (set before build or enter when prompted):
 
   Publish (--publish)
     gh                  GitHub CLI (gh auth login)
-    GITHUB_REPO         default Digital-Defiance/bright-vision
+    GITHUB_REPO         default Digital-Defiance/BrightVision
     HOMEBREW_TAP_DIR    default ~/Code/homebrew-tap
 EOF
   exit 1
@@ -283,20 +283,20 @@ publish_github_and_homebrew() {
   _release_url="https://github.com/${GITHUB_REPO}/releases/download/${_tag}/${_asset_name}"
   echo "Release asset: ${_release_url}" >&2
 
-  bash "${ROOT}/scripts/update-bright-vision-cask.sh" "$APP_VERSION" "$_sha"
+  bash "${ROOT}/scripts/update-brightvision-cask.sh" "$APP_VERSION" "$_sha"
 
   if [ "$PUSH_TAP" -eq 1 ]; then
-    _cask="${HOMEBREW_TAP_DIR}/Casks/bright-vision.rb"
+    _cask="${HOMEBREW_TAP_DIR}/Casks/brightvision.rb"
     if [ ! -d "${HOMEBREW_TAP_DIR}/.git" ]; then
       die "not a git repo: ${HOMEBREW_TAP_DIR}"
     fi
     (
       cd "$HOMEBREW_TAP_DIR"
-      git add "Casks/bright-vision.rb"
+      git add "Casks/brightvision.rb"
       if git diff --cached --quiet; then
         echo "homebrew-tap: no cask changes to commit." >&2
       else
-        _msg="bright-vision ${APP_VERSION}"
+        _msg="brightvision ${APP_VERSION}"
         if is_interactive && [ "${NONINTERACTIVE:-}" != "1" ]; then
           git commit -m "$_msg"
           printf "Push homebrew-tap to origin? [y/N] "
@@ -314,7 +314,7 @@ publish_github_and_homebrew() {
     )
   else
     echo "homebrew-tap updated locally. Commit with:" >&2
-    echo "  cd ${HOMEBREW_TAP_DIR} && git add Casks/bright-vision.rb && git commit -m 'bright-vision ${APP_VERSION}' && git push" >&2
+    echo "  cd ${HOMEBREW_TAP_DIR} && git add Casks/brightvision.rb && git commit -m 'brightvision ${APP_VERSION}' && git push" >&2
   fi
 }
 
@@ -539,7 +539,7 @@ print_release_env_summary() {
   fi
   if [ "$PUBLISH" -eq 1 ]; then
     echo "  Publish: GitHub ${GITHUB_REPO} tag $(release_tag_name)" >&2
-    echo "  Homebrew tap: ${HOMEBREW_TAP_DIR}/Casks/bright-vision.rb" >&2
+    echo "  Homebrew tap: ${HOMEBREW_TAP_DIR}/Casks/brightvision.rb" >&2
   fi
 }
 

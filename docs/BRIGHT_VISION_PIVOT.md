@@ -23,7 +23,7 @@ Cherry-picking shell commits into `bright-vision-core` is wrong (UI/docs). Cherr
 | New engine submodule | `bright-vision-core` → raw **cecli** today | `bright_vision_core` + ported Vision API |
 | Website | `docs/index.html` | Rebuild (rewrite, not cherry-pick) |
 | PyPI | `aider-vision-core` | `bright-vision-core` |
-| Homebrew | `aider-vision` cask | `bright-vision` cask |
+| Homebrew | `aider-vision` cask | `brightvision` cask |
 
 ## What the shell actually needs from core
 
@@ -101,15 +101,15 @@ Then mechanical pass:
 1. New IA: hero (BrightVision + cyan/magenta logo), install (Homebrew + Ollama + built-in Local LLM), docs links.
 2. `docs/CNAME` → `bright-vision.digitaldefiance.org` (or your chosen host).
 3. Replace hero art with `assets/bright-vision.png` / logo SVG.
-4. Links to `Digital-Defiance/bright-vision`, `bright-vision-core`, homebrew-tap formula `bright-vision`.
+4. Links to `Digital-Defiance/BrightVision`, `bright-vision-core`, homebrew-tap cask `brightvision`.
 
 ### Phase E — Distribution
 
 | Channel | Action |
 |---------|--------|
 | **PyPI** | New project `bright-vision-core`; deprecate `aider-vision-core` README pointer |
-| **Homebrew** | New cask `bright-vision`; retire or alias `aider-vision` |
-| **GitHub** | Rename `aider-vision` → `bright-vision` (redirects); archive or mark `aider-vision-core` read-only |
+| **Homebrew** | Cask `brightvision`; retire or alias `aider-vision` / `bright-vision` |
+| **GitHub** | Repos `Digital-Defiance/BrightVision`, `Digital-Defiance/BrightVision-core`; archive legacy `aider-vision*` |
 | **Discord / README badges** | Update after rename |
 
 ## rsync vs cherry-pick

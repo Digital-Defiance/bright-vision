@@ -7,8 +7,8 @@
 ## First-time setup (developers)
 
 ```bash
-git clone https://github.com/Digital-Defiance/aider-vision.git   # repo name may become bright-vision
-cd aider-vision
+git clone https://github.com/Digital-Defiance/BrightVision.git
+cd BrightVision
 git submodule update --init --recursive
 source activate.sh          # pip install -e bright-vision-core
 yarn install

@@ -40,7 +40,7 @@ DMG filename follows Tauri: `BrightVision_<version>_universal.dmg` (from `produc
 
 ### GitHub release + Homebrew tap
 
-After a successful build, `--publish` uploads the DMG to [Digital-Defiance/bright-vision](https://github.com/Digital-Defiance/bright-vision) and updates `~/Code/homebrew-tap/Casks/bright-vision.rb` (`version` + `sha256`).
+After a successful build, `--publish` uploads the DMG to [Digital-Defiance/BrightVision](https://github.com/Digital-Defiance/BrightVision) and updates `~/Code/homebrew-tap/Casks/brightvision.rb` (`version` + `sha256`).
 
 Requires [GitHub CLI](https://cli.github.com/): `brew install gh && gh auth login`.
 
@@ -62,17 +62,17 @@ NONINTERACTIVE=1 yarn build:mac 0.2.0 --publish --push-tap
 | `--release-tag v0.1.0-bright2` | Git tag / release name (default `v<VERSION>`) |
 | `--no-push-tag` | Do not create/push git tag (release tag must exist) |
 
-Release asset name: `BrightVision_<version>_universal.dmg` — same as the Tauri DMG and the cask `url`. Homebrew cask token stays `bright-vision`; the installed app is `BrightVision.app`.
+Release asset name: `BrightVision_<version>_universal.dmg` — same as the Tauri DMG and the cask `url`. Homebrew cask token: `brightvision`; the installed app is `BrightVision.app`.
 
 Update cask only (DMG already built):
 
 ```bash
-bash scripts/update-bright-vision-cask.sh 0.2.0 "$(shasum -a 256 'path/to/BrightVision_0.2.0_universal.dmg' | awk '{print $1}')"
+bash scripts/update-brightvision-cask.sh 0.2.0 "$(shasum -a 256 'path/to/BrightVision_0.2.0_universal.dmg' | awk '{print $1}')"
 ```
 
-Reference cask: [scripts/Casks/bright-vision.rb.example](../scripts/Casks/bright-vision.rb.example)
+Reference cask: [scripts/Casks/brightvision.rb.example](../scripts/Casks/brightvision.rb.example)
 
-Environment: `GITHUB_REPO` (default `Digital-Defiance/bright-vision`), `HOMEBREW_TAP_DIR` (default `~/Code/homebrew-tap`).
+Environment: `GITHUB_REPO` (default `Digital-Defiance/BrightVision`), `HOMEBREW_TAP_DIR` (default `~/Code/homebrew-tap`).
 
 `scripts/build-macos.sh` checks and prompts for every missing variable before building:
 

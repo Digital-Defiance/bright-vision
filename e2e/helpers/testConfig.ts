@@ -11,7 +11,7 @@ export const E2E_CONFIG = {
   autoApproveLimit: 0,
   promptBeforeCommit: false,
   autoStageOnDone: true,
-  coreEnginePath: 'bright-vision-core',
+  coreEnginePath: 'BrightVision-core',
   pythonPath: '',
   coreApiUrl: '/api/core',
   coreApiToken: '',

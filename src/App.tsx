@@ -207,8 +207,11 @@ function migrateConfig(raw: Partial<VisionConfig> & Record<string, unknown>): Vi
   if (typeof merged.manageLocalLlm !== 'boolean') {
     merged.manageLocalLlm = true
   }
-  if (merged.coreEnginePath === 'aider-vision-core') {
-    merged.coreEnginePath = 'bright-vision-core'
+  if (
+    merged.coreEnginePath === 'aider-vision-core' ||
+    merged.coreEnginePath === 'bright-vision-core'
+  ) {
+    merged.coreEnginePath = 'BrightVision-core'
   }
   if (!merged.coreApiUrl || merged.coreApiUrl === DEFAULT_CONFIG.coreApiUrl) {
     if (!isTauriRuntime()) merged.coreApiUrl = defaultCoreApiUrl()
@@ -1245,7 +1248,7 @@ function AppShell({
   )
 
   const handleOpenInEditor = useCallback((path: string) => {
-    const normalized = path.replace(/\\/g, '/').trim()
+    const normalized = path.replace(/^@+/, '').replace(/\\/g, '/').trim()
     if (!normalized) return
     setEditorPendingPath(normalized)
     setActiveTab('editor')

@@ -7,7 +7,7 @@ import { isTauriRuntime } from './isTauri'
 export const CORE_ENGINE_DIR =
   (typeof import.meta !== 'undefined' &&
     import.meta.env?.VITE_CORE_ENGINE_DIR) ||
-  'bright-vision-core'
+  'BrightVision-core'
 
 export interface VisionConfig {
   model: string

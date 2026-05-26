@@ -10,6 +10,7 @@ test.describe('Model hopper (#39)', () => {
   test('hopper lists models with enable toggles', async ({ page }) => {
     await expect(page.getByTestId('model-router-settings')).toBeVisible()
     await expect(page.getByTestId('model-hopper-editor')).toBeVisible()
+    await page.getByTestId('pref-model-router-enabled').click()
     await expect(page.getByTestId('model-hopper-enable-hopper-fast-deepseek')).toBeVisible()
     await page.getByTestId('model-hopper-add').click()
     await expect(page.locator('[data-testid^="model-hopper-row-"]')).toHaveCount(4)

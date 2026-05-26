@@ -20,8 +20,13 @@ const NUMBERED_PATH_LINE = new RegExp(
 
 const BACKTICK_PATH = new RegExp(`\`([^\\n\`]+\\.(?:${FILE_EXT}))\``, 'gi')
 
+/** Strip Cursor-style @ file mentions (`@src/foo.ts`) before resolving paths. */
+export function stripFileMentionPrefix(raw: string): string {
+  return raw.trim().replace(/^@+/, '')
+}
+
 function normalizeSuggestedPath(raw: string): string | null {
-  let p = raw.trim().replace(/^`+|`+$/g, '').replace(/^\.\//, '')
+  let p = stripFileMentionPrefix(raw).replace(/^`+|`+$/g, '').replace(/^\.\//, '')
   if (!p || p.includes('://') || p.startsWith('http')) return null
   if (!p.includes('/') || /\s/.test(p)) return null
   if (p.length < 4) return null

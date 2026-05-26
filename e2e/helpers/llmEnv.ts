@@ -115,7 +115,7 @@ export function buildLlmE2eConfig() {
     autoApproveLimit: 0,
     promptBeforeCommit: true,
     autoStageOnDone: false,
-    coreEnginePath: 'bright-vision-core',
+    coreEnginePath: 'BrightVision-core',
     pythonPath: '',
     coreApiUrl: '/api/core',
     coreApiToken: '',

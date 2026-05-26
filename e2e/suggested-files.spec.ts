@@ -20,6 +20,14 @@ test.describe('Suggested files tray (roadmap #32)', () => {
     await expect(tray).toContainText('src/suggested-b.ts')
   })
 
+})
+
+test.describe('Suggested files tray — open in editor (mock Tauri)', () => {
+  test.beforeEach(async ({ page }) => {
+    await startMockSession(page, { messageTurns: [suggestedFilesTurnEvents()], tauri: true })
+    await openChat(page)
+  })
+
   test('opens suggested path in editor', async ({ page }) => {
     await page.getByTestId('chat-input').fill('Which files should I add?')
     await page.getByTestId('chat-send').click()

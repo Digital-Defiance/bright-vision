@@ -14,15 +14,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-ENGINE_NAME = os.environ.get("BRIGHT_VISION_ENGINE", "bright-vision-core")
-CORE = ROOT / ENGINE_NAME
-
-if ENGINE_NAME == "bright-vision-core":
-    SUB_REL = "bright-vision-core/bright_vision_core/session.py"
+ENGINE_NAME = os.environ.get("BRIGHT_VISION_ENGINE", "BrightVision-core")
+if ENGINE_NAME in ("bright-vision-core", "BrightVision-core"):
+    CORE = ROOT / "BrightVision-core"
+    SUB_REL = "BrightVision-core/bright_vision_core/session.py"
     PKG = "bright_vision_core"
-else:
+elif ENGINE_NAME == "aider-vision-core":
+    CORE = ROOT / "aider-vision-core"
     SUB_REL = "aider-vision-core/aider_vision_core/session.py"
     PKG = "aider_vision_core"
+else:
+    CORE = ROOT / ENGINE_NAME
+    SUB_REL = f"{ENGINE_NAME}/bright_vision_core/session.py"
+    PKG = "bright_vision_core"
 
 
 def _python_hint() -> str:

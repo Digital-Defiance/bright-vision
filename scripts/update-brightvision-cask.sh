@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Update digital-defiance/homebrew-tap Casks/bright-vision.rb (version + sha256).
+# Update digital-defiance/homebrew-tap Casks/brightvision.rb (version + sha256).
 #
-# Cask token stays bright-vision; DMG/app binary use BrightVision (trademark).
+# Cask token: brightvision. DMG/app binary: BrightVision (trademark).
+# GitHub releases: Digital-Defiance/BrightVision
 #
 # Usage:
-#   bash scripts/update-bright-vision-cask.sh 0.2.0 <sha256>
-#   HOMEBREW_TAP_DIR=~/Code/homebrew-tap bash scripts/update-bright-vision-cask.sh 0.2.0 <sha256>
+#   bash scripts/update-brightvision-cask.sh 0.2.0 <sha256>
+#   HOMEBREW_TAP_DIR=~/Code/homebrew-tap bash scripts/update-brightvision-cask.sh 0.2.0 <sha256>
 
 set -e
 
@@ -13,8 +14,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="${1:-}"
 SHA256="${2:-}"
 HOMEBREW_TAP_DIR="${HOMEBREW_TAP_DIR:-${HOME}/Code/homebrew-tap}"
-GITHUB_REPO="${GITHUB_REPO:-Digital-Defiance/bright-vision}"
-CASK_PATH="${CASK_PATH:-${HOMEBREW_TAP_DIR}/Casks/bright-vision.rb}"
+GITHUB_REPO="${GITHUB_REPO:-Digital-Defiance/BrightVision}"
+CASK_PATH="${CASK_PATH:-${HOMEBREW_TAP_DIR}/Casks/brightvision.rb}"
 DMG_ASSET='BrightVision_#{version}_universal.dmg'
 APP_BUNDLE='BrightVision.app'
 
@@ -42,7 +43,7 @@ fi
 # Universal DMG — do not restrict to Apple Silicon only.
 "${SED_INPLACE[@]}" '/depends_on arch: :arm64/d' "$CASK_PATH"
 
-# Release asset + installed app bundle (migrate legacy Bright.Vision / spaced names).
+# Release asset + installed app bundle (migrate legacy names).
 "${SED_INPLACE[@]}" 's/Bright\.Vision_#{version}_universal\.dmg/BrightVision_#{version}_universal.dmg/g' "$CASK_PATH"
 "${SED_INPLACE[@]}" 's/Bright Vision_#{version}_universal\.dmg/BrightVision_#{version}_universal.dmg/g' "$CASK_PATH"
 "${SED_INPLACE[@]}" "s|^  url .*|  url \"https://github.com/${GITHUB_REPO}/releases/download/v#{version}/${DMG_ASSET}\"|" "$CASK_PATH"
