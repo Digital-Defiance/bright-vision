@@ -2,8 +2,8 @@
  * Product identity — keep in sync with bright-vision-core/bright_vision_core/brand.py
  */
 
-import headerLogoPng from './assets/brand/bright-vision-horiz-white.png'
-import railLogoPng from './assets/brand/aider-vision-square-logo.png'
+import headerLogoPng from './assets/brand/bright-vision-horiz-bold-tx-white.png'
+import railLogoPng from './assets/brand/bright_vision_bold_logo-tx.png'
 
 export const PRODUCT_VISION = 'bright-vision'
 export const PRODUCT_CORE = 'bright-vision-core'

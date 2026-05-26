@@ -240,7 +240,7 @@ Maps the high-level product charter to tracked work. Items **23–24** are large
 
 **Detection:** Section boundaries from streamed `► **THINKING**` / `**REASONING**` / `**ANSWER**` markers (`getActiveAssistantSection`); timer runs for the whole turn until `done` (survives tool_output gaps that split assistant bubbles).
 
-**Known context:** Response time is anchored at **Send** (`turnWallStartMsRef`); Stop no longer resets that anchor before `done`. Timing attaches only to the assistant bubble for the current turn (not an earlier message).
+**Known context:** Response time is anchored at **Send** (`turnWallStartMsRef`); Stop no longer resets that anchor before `done`. Timing attaches only to the assistant bubble for the current turn (not an earlier message). **Queued sends** keep per-message Send time and restart the live timer after `done` when more messages are queued; `user_message` starts the timer if a turn begins without a prior `beginTurn`.
 
 **Open / v2:**
 

@@ -233,6 +233,9 @@ function AppShell({
   const turnTimingActiveRef = useRef(false)
   /** Send wall-clock; survives tracker reset until `done` finalizes the turn. */
   const turnWallStartMsRef = useRef<number | null>(null)
+  /** Wall-clock + prompt size for messages queued while a turn is in flight. */
+  const pendingTurnTimingQueueRef = useRef<{ promptChars: number; turnStartMs: number }[]>([])
+  const queuedCountRef = useRef(0)
   /** Assistant bubble for the in-flight turn (avoids attributing timing to an older message). */
   const turnAssistantMessageIdRef = useRef<number | null>(null)
   const refreshSessionInfoRef = useRef<() => Promise<import('./ipc/httpClient').CoreSessionInfo | null>>(
@@ -255,6 +258,24 @@ function AppShell({
     finalizeTurn: () => null,
     reset: () => {},
     recordCompletedTurn: () => {},
+  })
+  const startTurnTimingRef = useRef((promptChars: number, turnStartMs: number) => {
+    turnWallStartMsRef.current = turnStartMs
+    turnAssistantMessageIdRef.current = null
+    thinkingTimingRef.current.beginTurn(promptChars, turnStartMs)
+    turnTimingActiveRef.current = true
+  })
+  const armNextQueuedTurnTimingRef = useRef(() => {
+    const pending = pendingTurnTimingQueueRef.current.shift()
+    if (pending) {
+      startTurnTimingRef.current(pending.promptChars, pending.turnStartMs)
+      return true
+    }
+    if (queuedCountRef.current > 0) {
+      startTurnTimingRef.current(lastUserPromptCharsRef.current, Date.now())
+      return true
+    }
+    return false
   })
   const unlistenersRef = useRef<UnlistenFn[]>([])
   const [suggestedPaths, setSuggestedPaths] = useState<string[]>([])
@@ -468,6 +489,12 @@ function AppShell({
       case 'user_message': {
         streamingAssistantId.current = null
         lastAssistantStreamRef.current = ''
+        if (!turnTimingActiveRef.current) {
+          const wall = turnWallStartMsRef.current ?? Date.now()
+          if (turnWallStartMsRef.current == null) turnWallStartMsRef.current = wall
+          const chars = lastUserPromptCharsRef.current || String(ev.text ?? '').length
+          startTurnTimingRef.current(chars, wall)
+        }
         const serverText = String(ev.text ?? '')
         const pendingId = shiftPendingUserMessageId(pendingUserMessageIdsRef.current)
         setChatMessages((prev) =>
@@ -634,12 +661,22 @@ function AppShell({
             if (turnTiming) thinkingTimingRef.current.recordCompletedTurn(turnTiming)
           }
         }
-        turnWallStartMsRef.current = null
         turnAssistantMessageIdRef.current = null
-        turnTimingActiveRef.current = false
-        thinkingTimingRef.current.reset()
         streamingAssistantId.current = null
         setStatusMessage('Ready')
+        const moreQueued = queuedCountRef.current > 0
+        if (moreQueued) {
+          if (!armNextQueuedTurnTimingRef.current()) {
+            turnWallStartMsRef.current = null
+            turnTimingActiveRef.current = false
+            thinkingTimingRef.current.reset()
+          }
+        } else {
+          turnWallStartMsRef.current = null
+          turnTimingActiveRef.current = false
+          thinkingTimingRef.current.reset()
+          pendingTurnTimingQueueRef.current = []
+        }
         setChatMessages((prev) => {
           const attachId =
             turnAssistantId ??
@@ -786,6 +823,8 @@ function AppShell({
     patchSessionFiles,
   } = useVisionSession(wrapHandler(handleCoreEvent))
 
+  queuedCountRef.current = queuedCount
+
   refreshSessionInfoRef.current = refreshSessionInfo
 
   const syncSessionFiles = useCallback(
@@ -842,12 +881,19 @@ function AppShell({
     reset: thinkingTiming.reset,
     recordCompletedTurn: thinkingTiming.recordCompletedTurn,
   }
+  startTurnTimingRef.current = (promptChars: number, turnStartMs: number) => {
+    turnWallStartMsRef.current = turnStartMs
+    turnAssistantMessageIdRef.current = null
+    thinkingTiming.beginTurn(promptChars, turnStartMs)
+    turnTimingActiveRef.current = true
+  }
 
   const handleCancelSend = useCallback(() => {
     cancelSend()
     // Keep turnWallStartMsRef until `done` so wall-clock response time stays correct.
     thinkingTiming.reset()
     turnTimingActiveRef.current = false
+    pendingTurnTimingQueueRef.current = []
   }, [thinkingTiming, cancelSend])
 
   const lifecycleActive = isSessionLifecycleActive(
@@ -1084,6 +1130,7 @@ function AppShell({
       // Do not clear turnWallStartMsRef here — late `done` still finalizes full Send→done time.
       thinkingTiming.reset()
       turnTimingActiveRef.current = false
+      pendingTurnTimingQueueRef.current = []
       setRemainingAutoApproves(0)
       setTerminalLines((prev) => [
         ...prev,
@@ -1384,10 +1431,11 @@ function AppShell({
       ? { activeTodoId: activeTodo.id, injectTodoSpec: injectSpec }
       : undefined
     const turnStartMs = Date.now()
-    turnWallStartMsRef.current = turnStartMs
-    turnAssistantMessageIdRef.current = null
-    thinkingTimingRef.current.beginTurn(text.length, turnStartMs)
-    turnTimingActiveRef.current = true
+    if (isBusy) {
+      pendingTurnTimingQueueRef.current.push({ promptChars: text.length, turnStartMs })
+    } else {
+      startTurnTimingRef.current(text.length, turnStartMs)
+    }
     try {
       const result = await send(text, todoOptions)
       if (injectSpec && activeTodo) todoInjectedIdRef.current = activeTodo.id

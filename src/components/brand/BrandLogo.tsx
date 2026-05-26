@@ -1,6 +1,6 @@
 import { Box } from '@mui/material'
-import headerSvg from '../../assets/brand/bright-vision-horiz-white.svg?raw'
-import railSvg from '../../assets/brand/bright-vision-logo.svg?raw'
+import headerSvg from '../../assets/brand/bright-vision-horiz-bold-tx-white.svg?raw'
+import railSvg from '../../assets/brand/bright_vision_bold_logo-tx.svg?raw'
 import {
   BRAND_HEADER_LOGO_PNG,
   BRAND_LOGO_MODE,
