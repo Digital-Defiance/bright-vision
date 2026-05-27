@@ -1,7 +1,20 @@
-import { Button, FormControlLabel, Paper, Stack, Switch, Typography } from '@mui/material'
+import {
+  Button,
+  FormControl,
+  FormControlLabel,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Stack,
+  Switch,
+  Typography,
+} from '@mui/material'
+import { isTauriRuntime } from '../../ipc/isTauri'
 import {
   DEFAULT_THINKING_TIMING_PREFS,
   type ThinkingTimingPrefs,
+  type TimingResourceDisplay,
 } from '../../theme/thinkingTimingPrefs'
 import type { ThinkingStatsStore } from '../../utils/thinkingStats'
 import { ThinkingStatsPanel } from './ThinkingStatsPanel'
@@ -73,6 +86,27 @@ export function ThinkingTimingSection({
           }
           label="Statistics & history in Settings"
         />
+        {isTauriRuntime() && (
+          <FormControl size="small" sx={{ minWidth: 220, mt: 0.5 }}>
+            <InputLabel id="timing-resource-display-label">Resource columns</InputLabel>
+            <Select
+              labelId="timing-resource-display-label"
+              label="Resource columns"
+              value={prefs.resourceDisplay ?? 'avgPeak'}
+              onChange={(e) =>
+                onChange({
+                  ...prefs,
+                  resourceDisplay: e.target.value as TimingResourceDisplay,
+                })
+              }
+              data-testid="timing-resource-display"
+            >
+              <MenuItem value="avgPeak">Avg / peak (default)</MenuItem>
+              <MenuItem value="avg">Average only</MenuItem>
+              <MenuItem value="peak">Peak only</MenuItem>
+            </Select>
+          </FormControl>
+        )}
         <Button
           size="small"
           sx={{ alignSelf: 'flex-start', mt: 0.5 }}

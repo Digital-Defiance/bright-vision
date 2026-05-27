@@ -1,37 +1,23 @@
 import MemoryIcon from '@mui/icons-material/Memory'
-import NetworkPingIcon from '@mui/icons-material/NetworkPing'
-import PlayArrowIcon from '@mui/icons-material/PlayArrow'
-import RefreshIcon from '@mui/icons-material/Refresh'
-import StopIcon from '@mui/icons-material/Stop'
 import {
   Alert,
-  Box,
-  Button,
   Chip,
-  CircularProgress,
   Paper,
   Stack,
   Typography,
 } from '@mui/material'
-import { invoke } from '@tauri-apps/api/core'
-import { useCallback, useEffect, useState } from 'react'
 import type { VisionConfig } from '../../ipc/config'
-import {
-  formatLlmPingHint,
-  formatLlmPingSummary,
-  isOllamaVisionModel,
-  resolveLocalLlmForConfig,
-  type LlmPingResult,
-  type LocalLlmRuntimeStatus,
-  type OllamaModelsSnapshot,
-} from '../../ipc/localLlm'
+import { isOllamaVisionModel } from '../../ipc/localLlm'
 import { isTauriRuntime } from '../../ipc/isTauri'
+import { useLocalLlmControls, type LocalLlmControls } from '../../hooks/useLocalLlmControls'
+import { LocalLlmActionButtons } from './LocalLlmActionButtons'
 
-interface LocalLlmPanelProps {
+interface LocalLlmPanelViewProps {
   config: VisionConfig
   onManageChange: (manage: boolean) => void
-  onLogLines?: (lines: string[]) => void
   compact?: boolean
+  controls: LocalLlmControls
+  hideActions?: boolean
 }
 
 function statusChip(ok: boolean, yes: string, no: string) {
@@ -45,117 +31,14 @@ function statusChip(ok: boolean, yes: string, no: string) {
   )
 }
 
-export function LocalLlmPanel({
+function LocalLlmPanelView({
   config,
   onManageChange,
-  onLogLines,
   compact = false,
-}: LocalLlmPanelProps) {
-  const [status, setStatus] = useState<LocalLlmRuntimeStatus | null>(null)
-  const [modelsSnapshot, setModelsSnapshot] = useState<OllamaModelsSnapshot | null>(null)
-  const [pingResult, setPingResult] = useState<LlmPingResult | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const { ollamaHost, modelTag } = resolveLocalLlmForConfig(config)
-  const ollamaModel = isOllamaVisionModel(config.model)
-
-  const refresh = useCallback(async () => {
-    if (!isTauriRuntime() || !modelTag) {
-      setStatus(null)
-      setModelsSnapshot(null)
-      return
-    }
-    setError(null)
-    try {
-      try {
-        const keepLogs = await invoke<string[]>('local_llm_refresh_keep_alive', {
-          ollamaHost,
-          modelTag,
-        })
-        onLogLines?.(keepLogs.map((l) => `[local-llm] ${l}`))
-      } catch {
-        // Ollama may be stopped; status fetch below still runs.
-      }
-      const [s, models] = await Promise.all([
-        invoke<LocalLlmRuntimeStatus>('local_llm_status', { ollamaHost, modelTag }),
-        invoke<OllamaModelsSnapshot>('ollama_models_snapshot', { ollamaHost, modelTag }),
-      ])
-      setStatus(s)
-      setModelsSnapshot(models)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    }
-  }, [ollamaHost, modelTag, onLogLines])
-
-  useEffect(() => {
-    void refresh()
-  }, [refresh])
-
-  const runStart = async () => {
-    if (!modelTag) return
-    setBusy(true)
-    setError(null)
-    try {
-      const s = await invoke<LocalLlmRuntimeStatus>('local_llm_start_plain', {
-        ollamaHost,
-        modelTag,
-      })
-      setStatus(s)
-      onLogLines?.(s.logs.map((l) => `[local-llm] ${l}`))
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setError(msg)
-      onLogLines?.([`[local-llm] Error: ${msg}`])
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const runPing = async () => {
-    if (!modelTag) return
-    setBusy(true)
-    setError(null)
-    setPingResult(null)
-    try {
-      const r = await invoke<LlmPingResult>('llm_ping', {
-        ollamaHost,
-        modelTag,
-        coreApiUrl: config.coreApiUrl?.trim() || null,
-      })
-      setPingResult(r)
-      onLogLines?.(r.logs.map((l) => `[ping] ${l}`))
-      if (!r.generateOk) {
-        setError(r.error ?? 'LLM ping failed — see Terminal for details')
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setError(msg)
-      onLogLines?.([`[ping] Error: ${msg}`])
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const runStop = async (keepOllama: boolean) => {
-    if (!modelTag) return
-    setBusy(true)
-    setError(null)
-    try {
-      const logs = await invoke<string[]>('local_llm_stop_plain', {
-        ollamaHost,
-        modelTag,
-        keepOllama,
-      })
-      onLogLines?.(logs.map((l) => `[local-llm] ${l}`))
-      await refresh()
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setError(msg)
-    } finally {
-      setBusy(false)
-    }
-  }
+  controls,
+  hideActions = false,
+}: LocalLlmPanelViewProps) {
+  const { ollamaHost, modelTag, status, modelsSnapshot, canRun } = controls
 
   if (!isTauriRuntime()) {
     return (
@@ -166,7 +49,7 @@ export function LocalLlmPanel({
     )
   }
 
-  if (!ollamaModel) {
+  if (!isOllamaVisionModel(config.model)) {
     return (
       <Alert severity="info" sx={{ mb: compact ? 0 : 2 }}>
         LLM model is not an Ollama provider (<code>ollama_chat/…</code>). Local LLM controls apply
@@ -192,7 +75,7 @@ export function LocalLlmPanel({
         <Typography variant="caption" color="text.secondary">
           Starts Ollama if needed, pulls your tag, and preloads with{' '}
           <code>keep_alive: -1</code> only when the model is not already in{' '}
-          <code>/api/ps</code>. Host and model tag come from <code>local-llm.env</code> and Settings.
+          <code>/api/ps</code>. Host and model tag come from env files and Settings above.
         </Typography>
         <Stack direction="row" flexWrap="wrap" gap={0.75} alignItems="center">
           {statusChip(status?.ollamaRunning ?? false, 'Ollama up', 'Ollama down')}
@@ -231,49 +114,8 @@ export function LocalLlmPanel({
             </Typography>
           </Paper>
         )}
-        <Stack direction="row" flexWrap="wrap" gap={1} alignItems="center">
-          <Button
-            size="small"
-            variant="contained"
-            color="success"
-            startIcon={busy ? <CircularProgress size={14} color="inherit" /> : <PlayArrowIcon />}
-            disabled={busy}
-            data-testid="local-llm-start"
-            onClick={() => void runStart()}
-          >
-            Start Local LLM
-          </Button>
-          <Button
-            size="small"
-            variant="outlined"
-            color="error"
-            startIcon={<StopIcon />}
-            disabled={busy}
-            data-testid="local-llm-stop"
-            onClick={() => void runStop(true)}
-          >
-            Unload model
-          </Button>
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<NetworkPingIcon />}
-            disabled={busy}
-            data-testid="local-llm-ping"
-            onClick={() => void runPing()}
-          >
-            Ping LLM
-          </Button>
-          <Button
-            size="small"
-            variant="text"
-            startIcon={<RefreshIcon />}
-            disabled={busy}
-            onClick={() => void refresh()}
-          >
-            Refresh
-          </Button>
-          <Box sx={{ flex: 1 }} />
+        {!hideActions && canRun && <LocalLlmActionButtons controls={controls} />}
+        <Stack direction="row" justifyContent="flex-end">
           <Chip
             size="small"
             label={config.manageLocalLlm ? 'Auto before session' : 'Manual only'}
@@ -282,36 +124,36 @@ export function LocalLlmPanel({
             sx={{ cursor: 'pointer' }}
           />
         </Stack>
-        {pingResult && (
-          <Alert
-            severity={pingResult.generateOk ? 'success' : 'warning'}
-            data-testid="local-llm-ping-result"
-            onClose={() => setPingResult(null)}
-          >
-            {formatLlmPingSummary(pingResult)}
-            {formatLlmPingHint(pingResult) && (
-              <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
-                {formatLlmPingHint(pingResult)}
-              </Typography>
-            )}
-            {pingResult.responsePreview && (
-              <Typography
-                component="span"
-                variant="caption"
-                display="block"
-                sx={{ mt: 0.5, fontFamily: 'monospace' }}
-              >
-                Response: {pingResult.responsePreview}
-              </Typography>
-            )}
-          </Alert>
-        )}
-        {error && (
-          <Alert severity="error" onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
       </Stack>
     </Paper>
   )
+}
+
+interface LocalLlmPanelProps {
+  config: VisionConfig
+  onManageChange: (manage: boolean) => void
+  onLogLines?: (lines: string[]) => void
+  compact?: boolean
+  controls?: LocalLlmControls
+  hideActions?: boolean
+}
+
+export function LocalLlmPanel({
+  controls: externalControls,
+  onLogLines,
+  ...rest
+}: LocalLlmPanelProps) {
+  if (externalControls) {
+    return <LocalLlmPanelView {...rest} controls={externalControls} />
+  }
+  return <LocalLlmPanelWithHook {...rest} onLogLines={onLogLines} />
+}
+
+function LocalLlmPanelWithHook({
+  config,
+  onLogLines,
+  ...rest
+}: Omit<LocalLlmPanelProps, 'controls'>) {
+  const controls = useLocalLlmControls(config, onLogLines)
+  return <LocalLlmPanelView config={config} controls={controls} {...rest} />
 }

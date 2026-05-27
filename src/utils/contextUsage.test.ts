@@ -29,7 +29,7 @@ describe('contextUsage', () => {
 
   it('parses legacy Tokens line inside multiline tool_output', () => {
     const r = parseTokenUsageReport(
-      '[BrightVision Core] Tokens: 120 sent, 45 received\nEdited: src/App.tsx'
+      '[Cecli] Tokens: 120 sent, 45 received\nEdited: src/App.tsx'
     )
     expect(r?.tokensSent).toBe(120)
     expect(r?.tokensReceived).toBe(45)

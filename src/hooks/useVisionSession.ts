@@ -14,7 +14,17 @@ import { createVisionApiSession, type VisionApiSession } from '../ipc/visionApi'
 import { parseAddCommandPath } from '../utils/suggestedFiles'
 import { useProcess } from '../progress/processStore'
 
-export function useVisionSession(onCoreEvent: (event: CoreEventBase) => void) {
+export interface UseVisionSessionOptions {
+  /** Called when a user message is actually sent to core (not when queued). */
+  onOutboundMessage?: (content: string) => void
+}
+
+export function useVisionSession(
+  onCoreEvent: (event: CoreEventBase) => void,
+  options: UseVisionSessionOptions = {}
+) {
+  const onOutboundMessageRef = useRef(options.onOutboundMessage)
+  onOutboundMessageRef.current = options.onOutboundMessage
   const process = useProcess()
   const [isRunning, setIsRunning] = useState(false)
   const [isStarting, setIsStarting] = useState(false)
@@ -160,6 +170,7 @@ export function useVisionSession(onCoreEvent: (event: CoreEventBase) => void) {
         }
         return
       }
+      onOutboundMessageRef.current?.(content)
       inflightRef.current += 1
       setBusyFromInflight()
       process.begin('reasoning', 'Sending')

@@ -53,8 +53,7 @@ test.describe('Core API session lifecycle (mocked /api/core)', () => {
   })
 
   test('unreachable health shows error then recovery', async ({ page }) => {
-    await installMockCoreApi(page)
-    await page.route('**/api/core/health', (route) => route.abort('failed'))
+    await installMockCoreApi(page, { healthFail: true })
     await page.reload()
     await page.getByTestId('nav-terminal').click()
 

@@ -15,7 +15,7 @@ Three-layer specs, workspace/session todo routes, RepoSet superproject
 support, and headless HTTP API on cecli.
 EOF
 )"
-git tag -a v0.1.0-bright -m "BrightVision Core: cecli + headless API"
+git tag -a v0.1.0-bright -m "Cecli: cecli + headless API"
 git push origin main --tags   # when ready
 ```
 

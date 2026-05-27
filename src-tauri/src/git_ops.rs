@@ -75,6 +75,7 @@ pub fn commit_graph(workspace: &Path, limit: u32) -> Result<Vec<GitGraphNode>, S
 mod tests {
     use super::*;
     use std::fs;
+    use std::path::PathBuf;
     use std::process::Command;
 
     #[test]
@@ -98,25 +99,36 @@ mod tests {
 
     #[test]
     fn commit_graph_linear_repo() {
-        let dir = std::env::temp_dir().join(format!("av-git-graph-{}", std::process::id()));
+        // Under workspace target/ so sandboxed `cargo test` can run `git init` (system temp may be blocked).
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join(format!("git-graph-test-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
-        let init = |args: &[&str]| {
-            Command::new("git")
+        let git = |args: &[&str]| {
+            let out = Command::new("git")
                 .args(args)
                 .current_dir(&dir)
                 .output()
                 .expect("git command");
+            assert!(
+                out.status.success(),
+                "git {:?} failed: {}",
+                args,
+                String::from_utf8_lossy(&out.stderr)
+            );
+            out
         };
-        init(&["init"]);
-        init(&["config", "user.email", "t@test.com"]);
-        init(&["config", "user.name", "Test"]);
+        git(&["init"]);
+        assert!(dir.join(".git").is_dir(), "expected fresh repo under {dir:?}");
+        git(&["config", "user.email", "t@test.com"]);
+        git(&["config", "user.name", "Test"]);
         fs::write(dir.join("a.txt"), "1\n").unwrap();
-        init(&["add", "a.txt"]);
-        init(&["commit", "-m", "first"]);
+        git(&["add", "a.txt"]);
+        git(&["commit", "-m", "first"]);
         fs::write(dir.join("a.txt"), "2\n").unwrap();
-        init(&["add", "a.txt"]);
-        init(&["commit", "-m", "second"]);
+        git(&["add", "a.txt"]);
+        git(&["commit", "-m", "second"]);
 
         let graph = commit_graph(&dir, 10).unwrap();
         assert_eq!(graph.len(), 2);

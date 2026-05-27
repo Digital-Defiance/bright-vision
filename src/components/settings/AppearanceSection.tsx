@@ -122,7 +122,7 @@ export function AppearanceSection({ appearance, onChange }: AppearanceSectionPro
           customKey="terminalFontCustom"
           appearance={appearance}
           onChange={onChange}
-          sample={'[BrightVision Core] Tokens: 120 sent, 45 received\nEdited: src/App.tsx'}
+          sample={'[Cecli] Tokens: 120 sent, 45 received\nEdited: src/App.tsx'}
         />
       </Stack>
     </Paper>

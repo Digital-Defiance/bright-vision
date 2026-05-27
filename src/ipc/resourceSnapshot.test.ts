@@ -3,6 +3,7 @@ import {
   emptyTurnResourcePeak,
   finalizeTurnResourceStats,
   formatAvgPeakPct,
+  formatResourcePct,
   formatResourceOverlayLine,
   hasTurnResourcePeak,
   mergeSnapshotIntoPeak,
@@ -53,5 +54,8 @@ describe('resourceSnapshot', () => {
     expect(stats?.avgMemPct).toBe(65)
     expect(stats?.avgGpuPct).toBe(55)
     expect(formatAvgPeakPct(stats?.avgCpuPct, stats?.peakCpuPct)).toBe('55 / 99%')
+    expect(formatResourcePct(stats?.avgCpuPct, stats?.peakCpuPct, 'avgPeak')).toBe('55 / 99%')
+    expect(formatResourcePct(stats?.avgCpuPct, stats?.peakCpuPct, 'avg')).toBe('55%')
+    expect(formatResourcePct(stats?.avgCpuPct, stats?.peakCpuPct, 'peak')).toBe('99%')
   })
 })

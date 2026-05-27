@@ -1,6 +1,6 @@
 {
   "name": "bright-vision",
-  "version": "0.1.1-bright2",
+  "version": "0.1.1-bright3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -16,15 +16,15 @@
     "test:fast": "yarn tsc --noEmit && yarn test",
     "test:local": "yarn tsc --noEmit && yarn test && yarn test:rust",
     "test:e2e": "playwright test",
-    "test:e2e:llm": "E2E_LLM=1 playwright test -c playwright.llm.config.ts",
-    "test:llm:core": "cd BrightVision-core && E2E_LLM=1 python -m pytest tests/basic/test_hello_llm.py -q",
+    "test:e2e:llm": "E2E_LLM=1 E2E_PYTHON=.venv/bin/python3 playwright test -c playwright.llm.config.ts",
+    "test:llm:core": "E2E_LLM=1 python3 -m pytest tests/core/test_hello_llm.py -q",
     "test:full": "yarn tsc --noEmit && yarn test && yarn test:rust && yarn test:e2e",
     "test:all": "yarn test:full",
     "test:local:sh": "sh scripts/test-local.sh",
-    "test:git-workspace": "cd BrightVision-core && python -m pytest tests/basic/test_git_workspace.py tests/basic/test_http_api.py -q",
-    "test:bright-core": "cd BrightVision-core && python -m pytest tests/basic/test_git_workspace.py tests/basic/test_workspace_todos.py tests/basic/test_http_api.py tests/basic/test_http_session_todos.py tests/basic/test_superproject_integration.py -q",
+    "test:git-workspace": "python -m pytest tests/core/test_git_workspace.py tests/core/test_http_api.py -q",
+    "test:bright-core": "python -m pytest tests/core/test_git_workspace.py tests/core/test_workspace_todos.py tests/core/test_http_api.py tests/core/test_http_session_todos.py tests/core/test_superproject_integration.py -q",
     "verify:submodule": "sh scripts/verify_submodule.sh",
-    "sync:core": "bash BrightVision-core/scripts/sync_bright_vision.sh"
+    "sync:core": "bash cecli/scripts/sync_bright_vision.sh"
   },
   "dependencies": {
     "@babel/runtime": "^7.26.0",

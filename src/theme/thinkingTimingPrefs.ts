@@ -2,11 +2,15 @@ import { THINKING_TIMING_STORAGE_KEY } from '../storageKeys'
 
 export { THINKING_TIMING_STORAGE_KEY }
 
+export type TimingResourceDisplay = 'avgPeak' | 'peak' | 'avg'
+
 export interface ThinkingTimingPrefs {
   showLiveTimer: boolean
   showSectionDurations: boolean
   showMessageTurnTotal: boolean
   showStatsInSettings: boolean
+  /** CPU/RAM/GPU columns in timing history (desktop). */
+  resourceDisplay: TimingResourceDisplay
   /** Workspace-relative or absolute path; empty = CSV file export disabled. */
   timingStatsCsvPath: string
   /** Append one row after each recorded turn when `timingStatsCsvPath` is set (desktop). */
@@ -18,6 +22,7 @@ export const DEFAULT_THINKING_TIMING_PREFS: ThinkingTimingPrefs = {
   showSectionDurations: true,
   showMessageTurnTotal: true,
   showStatsInSettings: true,
+  resourceDisplay: 'avgPeak',
   timingStatsCsvPath: '.bright-vision/timing-history.csv',
   timingStatsAutoAppendCsv: false,
 }

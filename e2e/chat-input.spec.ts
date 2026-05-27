@@ -32,8 +32,10 @@ test.describe('Chat input & session control (roadmap #3–5)', () => {
     await expect(page.getByTestId('chat-queue')).toBeVisible({ timeout: 10_000 })
     await page.getByTestId('chat-input').fill('queued follow-up')
     await page.getByTestId('chat-queue').click()
-    await expectOptimisticSend(page, 'queued follow-up')
-
+    await expect(page.getByTestId('chat-input')).toHaveValue('')
+    await expect(
+      page.getByTestId('chat-message-user').filter({ hasText: 'queued follow-up' })
+    ).toHaveCount(0)
     await expect(page.getByText(/1 message queued/i)).toBeVisible()
     await page.getByTestId('chat-stop-turn').click({ force: true })
   })
@@ -63,7 +65,7 @@ test.describe('Chat input & session control (roadmap #3–5)', () => {
     const input = page.getByTestId('chat-input')
     await input.fill('line one\nline two')
     await expect(input).toHaveValue('line one\nline two')
-    await expect(page.getByRole('button', { name: 'Send' })).toBeEnabled()
+    await expect(page.getByTestId('chat-send')).toBeEnabled()
     await expect(page.getByText('line one', { exact: true })).toHaveCount(0)
   })
 })

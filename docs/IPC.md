@@ -1,6 +1,6 @@
-# Aider Vision IPC
+# BrightVision IPC
 
-React is the **head**. All prompting goes through the **Vision HTTP API** (same contract in desktop and browser). The engine in `aider-vision-core/` is headless — no interactive CLI in the product.
+React is the **head**. All prompting goes through the **Vision HTTP API** (same contract in desktop and browser). The engine in `BrightVision-core/` is headless — no interactive cecli CLI in the product.
 
 See `docs/ARCHITECTURE.md`.
 
@@ -9,10 +9,12 @@ See `docs/ARCHITECTURE.md`.
 For browser-only clients, run the core API server:
 
 ```bash
-aider-vision-core-serve --host 127.0.0.1 --port 8741
+bright-vision-core-serve --host 127.0.0.1 --port 8741
 ```
 
-See `aider-vision-core/aider_vision_core/http_api.py` — create session, `POST /sessions/{id}/messages` returns Server-Sent Events with the same event dicts.
+(Installed via `pip install -e BrightVision-core/` or `source activate.sh`.)
+
+Implementation: `BrightVision-core/bright_vision_core/http_api.py` — create session, `POST /sessions/{id}/messages` returns Server-Sent Events with event dicts consumed by `src/ipc/events.ts`.
 
 Answer blocking confirms while a message is in flight:
 
@@ -38,6 +40,8 @@ POST /sessions/{session_id}/files/upload
 ```
 
 Response includes updated `files_in_chat` and `events` (tool_output / errors).
+
+> **Note:** Workspace metadata paths still use `.aider-vision/` under the project root (todos, specs, attachments). Product branding is BrightVision; on-disk layout is unchanged until a dedicated migration.
 
 ### Workspace tasks (spec-driven)
 
@@ -85,20 +89,20 @@ POST   /workspaces/todos/{id}/sync-spec-files?workspace=…   import specs from 
 
 `auto_completed` is true when a PATCH checklist update completes every item (task marked done).
 
-Optional auth: set `AIDER_VISION_TOKEN` and send `Authorization: Bearer <token>`.
+Optional auth: set `AIDER_VISION_TOKEN` (or `BRIGHT_VISION_TOKEN` where supported) and send `Authorization: Bearer <token>`.
 
 ## Multi-repo workspaces (including nested submodules)
 
-Point `workspace` at the **git superproject root** (e.g. this repo, which contains the `bright-vision-core` submodule).
+Point `workspace` at the **git superproject root** (e.g. this repo, which contains the `BrightVision-core` submodule).
 
-Core uses `create_git_workspace()` / `RepoSet`:
+Core uses `create_git_workspace()` / `RepoSet` in `bright_vision_core`:
 
 - Discovers submodule roots via `git submodule status --recursive` **and** a recursive `.gitmodules` walk.
 - Opens a `GitRepo` per nested checkout (e.g. `vendor/lib`, `vendor/lib/pkg`).
 - Excludes submodule **gitlink** paths (mode `160000`) from repo-map file lists — only real files are indexed.
 - Commits run innermost repos first, then update parent gitlinks.
 
-For self-dev on BrightVision: set working directory to the parent repo, not `bright-vision-core/` alone.
+For self-dev on BrightVision: set working directory to the parent repo, not `BrightVision-core/` alone.
 
 ## Web dev proxy
 
@@ -106,11 +110,13 @@ Vite proxies `/api/core` → `http://127.0.0.1:8741`. In browser mode, set **Cor
 
 ## Desktop
 
-Tauri spawns `aider-vision-core/scripts/vision_serve.py` and React uses `CoreHttpClient` against `http://127.0.0.1:8741` (returned from `start_core_api`).
+Tauri spawns `BrightVision-core/scripts/vision_serve.py` (wrapper around `bright-vision-core-serve`). React uses `CoreHttpClient` against `http://127.0.0.1:8741` (URL from `start_core_api`).
+
+TypeScript client: `src/ipc/httpClient.ts`, session factory in `src/ipc/commands.ts` / hooks.
 
 ## SSE event shapes
 
-Each `data:` line in the message stream is a JSON object:
+Each `data:` line in the message stream is a JSON object (must stay aligned with `src/ipc/events.ts`):
 
 ```json
 {"type": "user_message", "text": "..."}
@@ -121,3 +127,5 @@ Each `data:` line in the message stream is a JSON object:
 {"type": "done", "assistant_text": "...", "edited_files": ["src/foo.ts"], "commit_hash": "abc123"}
 {"type": "error", "text": "..."}
 ```
+
+Python sources: `BrightVision-core/bright_vision_core/event_io.py`, `session.py`.

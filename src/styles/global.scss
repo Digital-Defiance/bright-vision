@@ -1,3 +1,4 @@
+@use 'sass:color';
 @use 'variables' as *;
 @use 'brand';
 
@@ -86,5 +87,5 @@ body {
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background-color: lighten($vision-divider, 8%);
+  background-color: color.adjust($vision-divider, $lightness: 8%);
 }

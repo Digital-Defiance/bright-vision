@@ -76,14 +76,51 @@ If you see progress text in chat:
 2. Restart the API process (quit and reopen the app).
 3. Progress should appear in the **header activity bar**, not chat.
 
+## `cecli` submodule points at `bright-vision-core.git`
+
+Parent `.gitmodules` uses **`Digital-Defiance/cecli` only**. A stale submodule checkout may still have `origin` → `bright-vision-core.git` from the old monolithic bundle.
+
+```bash
+sh scripts/fix-cecli-submodule-remote.sh
+git -C cecli fetch upstream v0.100.1
+git -C cecli checkout upstream/v0.100.1
+```
+
+See [CECLI_PIN.md](./CECLI_PIN.md).
+
+## `activate.sh`: `command not found: pip` / python not under `.venv`
+
+Usually a **stale `.venv`** from an old checkout path (e.g. `aider-vision`) or macOS `/usr/bin/python3` (3.9) used to create the venv.
+
+```bash
+deactivate 2>/dev/null
+cd /path/to/BrightVision
+source activate.sh   # recreates .venv when activate paths or Python < 3.10
+```
+
+Optional: `export BRIGHT_VISION_PYTHON=/opt/homebrew/bin/python3.14` before sourcing if `pick_python` does not find 3.10+.
+
+Set **Settings → Python** to `.venv/bin/python3` or leave blank for auto-detect.
+
 ## `uvicorn is required`
 
 ```bash
 source activate.sh
-pip install "uvicorn[standard]"
 ```
 
-Set **Settings → Python** to `.venv/bin/python3` or leave blank for auto-detect.
+(`activate.sh` installs `uvicorn[standard]`; only run `pip install "uvicorn[standard]"` manually if you skipped activate.)
+
+## Tauri build: `failed to read plugin permissions` under `/Volumes/Code/aider-vision/…`
+
+The `src-tauri/target/` directory has **stale absolute paths** from an old checkout name (`aider-vision`, `bright-vision`). Cargo/Tauri then looks for generated files at a path that no longer exists.
+
+```bash
+rm -rf src-tauri/target
+cd src-tauri && cargo test
+# or: yarn test:rust
+```
+
+If it persists, check you are not setting `CARGO_TARGET_DIR` to an old project path.
 
 ## `cargo` not found (`yarn build:mac`)
 

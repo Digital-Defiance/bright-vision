@@ -286,8 +286,7 @@ async fn start_core_api(
         .arg("--port")
         .arg(port.to_string())
         .current_dir(&engine_root)
-        // Prefer submodule sources over an older pip-installed aider_vision_core.
-        .env("PYTHONPATH", engine_pythonpath(&engine_root))
+        .env("PYTHONSAFEPATH", "1")
         .env("NO_COLOR", "1")
         .env("BRIGHT_VISION_HEADLESS", "1")
         .env("AIDER_VISION_HEADLESS", "1")
@@ -351,16 +350,6 @@ fn engine_install_path(core_engine_path: String) -> Result<String, String> {
     resolve_app_engine(&core_engine_path).map(|p| p.to_string_lossy().into_owned())
 }
 
-fn engine_pythonpath(engine_root: &Path) -> String {
-    format!(
-        "{}{}",
-        engine_root.display(),
-        std::env::var("PYTHONPATH")
-            .map(|p| format!(":{p}"))
-            .unwrap_or_default()
-    )
-}
-
 #[derive(Serialize, Deserialize)]
 struct EngineVersions {
     bright_vision_core: String,
@@ -394,7 +383,7 @@ print(json.dumps(out))
         .arg("-c")
         .arg(script)
         .current_dir(&engine_root)
-        .env("PYTHONPATH", engine_pythonpath(&engine_root))
+        .env("PYTHONSAFEPATH", "1")
         .output()
         .map_err(|e| format!("Failed to query engine versions: {e}"))?;
     if !output.status.success() {

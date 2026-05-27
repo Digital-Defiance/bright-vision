@@ -6,52 +6,28 @@
   <img width="400" alt="BrightVision" title="BrightVision" src="https://bright-vision.digitaldefiance.org/bright-vision-white.svg" />
 </div>
 
-A lightweight, cross-platform desktop IDE built with **Tauri** and **React** — **local LLM first**, spec-driven tasks, and superproject/submodule git — powered by **[BrightVision Core](https://github.com/Digital-Defiance/BrightVision-core)** (a **fork²** on [cecli](https://github.com/dwash96/cecli): bundled cecli + ported headless HTTP API from our earlier `aider-vision-core` — see [lineage](https://github.com/Digital-Defiance/BrightVision-core/blob/main/docs/LINEAGE.md)).
+A **local-LLM-first** desktop IDE (Tauri + React) for AI-assisted coding — spec-driven tasks, superproject git, and a headless engine you control. **Two days of focused product work** (May 2026) shipped a full chat loop, tasks, git, editor, timing intelligence, and cecli agent hooks — not a thin wrapper.
 
-<img width="1392" height="832" alt="Screenshot 2026-05-25 at 1 46 13 PM" src="https://github.com/user-attachments/assets/646e3140-72c5-4760-84ae-24b4b9015434" />
+**Powered by [Cecli](https://cecli.dev)** — the coding agent from [dwash96/cecli](https://github.com/dwash96/cecli) (coders, slash commands, agents, MCP, LiteLLM). BrightVision adds a thin **`bright_vision_core`** HTTP/SSE layer so the React shell never drives the terminal CLI. Vision HTTP layer: **`bright_vision_core/`** in this repo (optional PyPI `bright-vision-core`). Cecli agent: git submodule **`cecli/`** → [Digital-Defiance/cecli](https://github.com/Digital-Defiance/cecli).
 
-## 🚀 Features
+<img width="1392" height="832" alt="BrightVision screenshot" src="https://github.com/user-attachments/assets/646e3140-72c5-4760-84ae-24b4b9015434" />
 
-- **Vision API**: All prompting goes through the HTTP API (React is the head; core is headless under `bright-vision-core/`).
-- **Local LLM**: Ollama + built-in Local LLM panel; defaults to on-device models — see [docs/LOCAL_LLM.md](docs/LOCAL_LLM.md).
-- **Chat UX**: Streaming replies, Thinking/Answer sections, proposed-edit accordions, confirm flow, queue/stop, `/add` path completion (desktop), image/PDF attach.
-- **Tasks & specs**: EARS/spec-driven workflow (`.bright-vision/todos.json`, generate/refine spec, steered **Implement** steps) — [docs/SPEC_DRIVEN_DEV.md](docs/SPEC_DRIVEN_DEV.md).
-- **Git tab**: Working tree, diffs, commit graph, stage/undo, auto-stage after turns (desktop).
-- **Superproject + submodules**: Multi-repo workspace via `RepoSet` — [docs/SUBMODULE_VERIFICATION.md](docs/SUBMODULE_VERIFICATION.md).
-- **Native performance**: Rust + Tauri v2 on macOS, Linux, and Windows.
+## What BrightVision does
 
-## 🗺 Roadmap status
+| Pillar | Highlights |
+|--------|------------|
+| **Chat** | Streaming Thinking/Answer, Mermaid + highlighted fences, proposed edits, confirm/queue/stop, clear history + `/clear`, suggested-files tray, model router, empty-LLM retry |
+| **Engine** | **[Cecli](https://cecli.dev)** under the hood; Vision HTTP API only — React never shells into the cecli TUI; SSE events drive the UI |
+| **Tasks** | EARS/spec workflow v1–v5 — todos, layered specs, generate/refine, Implement steps |
+| **Git** | Status, diffs, graph, stage/commit/undo (desktop) |
+| **Editor** | CM6 tabs, explorer, open-from-chat |
+| **Local LLM** | Ollama panel, hopper preload, ping, resource overlay (CPU/RAM/GPU) |
+| **Agents** | `/agent`, `/invoke-agent`, `/spawn-agent`, `/reap-agent` + sub-agent registry in chat & Settings |
+| **Timing** | Live Response/Think bar, per-model ETA, Settings history (TPS, avg/peak resources, CSV) |
 
-Living backlog: **[docs/ROADMAP.md](docs/ROADMAP.md)** · [project site](https://bright-vision.digitaldefiance.org/#roadmap).
+Full catalog: **[docs/FEATURES.md](docs/FEATURES.md)** · backlog: **[docs/ROADMAP.md](docs/ROADMAP.md)**
 
-**Current focus:** [cecli engine migration](docs/CECLI_MIGRATION_ROADMAP.md) (default engine `bright-vision-core`) then **dogfooding** on real repos (`yarn tauri dev`).
-
-Quick checks: `yarn test:local` · core: `yarn test:bright-core`
-
-## 🛠 Tech Stack
-
-- **Backend**: Rust + Tauri v2
-- **Frontend**: React + TypeScript + Vite
-- **Engine**: Python — `bright_vision_core` (HTTP/SSE) on **cecli** (coders, agents, commands)
-- **Styling**: MUI v6 + Emotion; global SCSS in `src/styles/`
-- **Package Manager**: Yarn
-
-## 🔒 Local LLM first (privacy-first)
-
-BrightVision targets **local inference** on your hardware:
-
-1. Install **[Ollama](https://ollama.com/)**.
-2. Copy **`local-llm.env.example`** → **`local-llm.env`** (`DATA_MODEL`, optional `OLLAMA_HOST`) — **[docs/LOCAL_LLM.md](docs/LOCAL_LLM.md)**. Local LLM is built into the app (Rust + Python); no `local-llm.sh` required.
-3. **Desktop:** **Terminal → Local LLM → Start**, or **Auto before session** + **Terminal → Start**.
-4. Chat when the session is live.
-
-Cloud providers still work via LiteLLM model strings and API keys in the environment.
-
-## Note
-
-Dogfooding target: BrightVision builds itself. Primary local setup: **Qwen Coder 3.6 27b q4_K_M** on Apple Silicon (64GB RAM).
-
-## 📦 Getting Started
+## Quick start
 
 ### macOS (Homebrew)
 
@@ -60,61 +36,53 @@ brew tap digital-defiance/tap
 brew install brightvision
 ```
 
-Installs `BrightVision.app` to `/Applications/`. Tap: [digital-defiance/homebrew-tap](https://github.com/Digital-Defiance/homebrew-tap)
-
 ### From source
-
-#### Prerequisites
-
-- Node.js (v18+)
-- Rust (latest stable)
-- Yarn (v3+)
-- Python 3.10+ (for the engine submodule)
-
-#### Installation
 
 ```bash
 git clone https://github.com/Digital-Defiance/BrightVision.git
-cd bright-vision
+cd BrightVision
 git submodule update --init --recursive
 yarn install
-source activate.sh    # editable bright-vision-core + uvicorn
+source activate.sh
 yarn tauri dev
 ```
 
-Production build: `yarn tauri build`
+1. Install [Ollama](https://ollama.com/) and copy `local-llm.env.example` → `local-llm.env` ([docs/LOCAL_LLM.md](docs/LOCAL_LLM.md))  
+2. **Terminal → Start** (launches core on `:8741`)  
+3. **Chat** when the session is live  
 
-Legacy engine: `BRIGHT_VISION_ENGINE=bright-vision-core source activate.sh`
+## Tech stack
 
-## ⚙️ Configuration
+- **Shell**: Tauri v2 (Rust) + React 18 + TypeScript + Vite + MUI v6  
+- **Engine**: **[Cecli](https://cecli.dev)** (submodule `cecli/`) + Vision HTTP `bright_vision_core/` (this repo; `pip install -e .`)  
+- **Tests**: `yarn test:fast` · `yarn test:local` · [TESTING.md](docs/TESTING.md)  
 
-**Settings → Model & system:** LLM model (default `ollama_chat/qwen3.6:27b-q4_K_M`), LiteLLM extra params, project workspace, context files, engine path (`bright-vision-core`).
+## Configuration
 
-**Settings → Appearance:** UI / chat / terminal fonts (default chat: Glass TTY VT220).
+**Settings** — model, workspace, fonts, timing stats, suggested files, model hopper, agents (`subagent_paths` in cecli config).
 
-See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), [docs/USER_WORKFLOW.md](docs/USER_WORKFLOW.md), [docs/LOCAL_LLM.md](docs/LOCAL_LLM.md).
+**Agents (cecli)** — define sub-agents as `*.md` under paths in `.cecli.conf.yml`; use chat **Agents** chips or `/invoke-agent reviewer …`. See Settings → Agents & sub-agents.
 
-## 📚 Documentation
+## Documentation
 
 | Doc | Topic |
 |-----|--------|
-| [CECLI_MIGRATION_ROADMAP.md](docs/CECLI_MIGRATION_ROADMAP.md) | Engine port status (cecli + bright_vision_core) |
-| [LOCAL_LLM.md](docs/LOCAL_LLM.md) | Ollama, Local LLM panel, `local-llm.env` |
-| [ROADMAP.md](docs/ROADMAP.md) | Product backlog |
-| [TESTING.md](docs/TESTING.md) | `yarn test:local` / `test:full` |
-| [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Setup and conventions |
-| [IPC.md](docs/IPC.md) | HTTP API and SSE events |
-| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Connecting, orphaned `:8741` |
-| [SUBMODULE_VERIFICATION.md](docs/SUBMODULE_VERIFICATION.md) | Superproject + submodules |
-| [SPEC_DRIVEN_DEV.md](docs/SPEC_DRIVEN_DEV.md) | Tasks / spec-driven workflow |
-| [RELEASE.md](docs/RELEASE.md) | Tag core and bump submodule |
+| [FEATURES.md](docs/FEATURES.md) | Product feature catalog |
+| [ROADMAP.md](docs/ROADMAP.md) | Status & fix order |
+| [ENGINE_TRANSITION.md](docs/ENGINE_TRANSITION.md) | Split `BrightVision-core` → `cecli/` submodule + parent `bright_vision_core` |
+| [UPSTREAM_CECLI.md](docs/UPSTREAM_CECLI.md) | Cecli upstream + slim-down strategy |
+| [CECLI_MIGRATION_ROADMAP.md](docs/CECLI_MIGRATION_ROADMAP.md) | Engine port to cecli |
+| [LOCAL_LLM.md](docs/LOCAL_LLM.md) | Ollama & local panel |
+| [SPEC_DRIVEN_DEV.md](docs/SPEC_DRIVEN_DEV.md) | Tasks workflow |
+| [IPC.md](docs/IPC.md) | HTTP API & SSE |
+| [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Dev setup |
+| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Stuck sessions, `:8741` |
+| [TESTING.md](docs/TESTING.md) | Test matrix |
 
-## 📜 License
+## License
 
-MIT — see `LICENSE`.
+MIT — see `LICENSE`. Copyright (c) 2026 Digital Defiance, Jessica Mulein
 
-Copyright (c) 2026 Digital Defiance, Jessica Mulein
+## Contributing
 
-## 🤝 Contributing
-
-Read **[docs/ROADMAP.md](docs/ROADMAP.md)** and **[docs/CECLI_MIGRATION_ROADMAP.md](docs/CECLI_MIGRATION_ROADMAP.md)** before substantive work. Open issues with repro (workspace path, expected vs actual).
+Read **ROADMAP.md** before substantive work. Open issues with repro steps (workspace path, expected vs actual).

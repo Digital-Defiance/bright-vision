@@ -13,13 +13,14 @@ test.describe('Release & submodule hygiene (#19, #31)', () => {
     expect(md).toMatch(/yarn test:(full|all)/)
   })
 
-  test('.gitmodules references bright-vision-core', () => {
+  test('.gitmodules references cecli submodule', () => {
     const modules = readFileSync(join(ROOT, '.gitmodules'), 'utf8')
-    expect(modules).toContain('bright-vision-core')
+    expect(modules).toContain('[submodule "cecli"]')
+    expect(modules).toContain('Digital-Defiance/cecli.git')
   })
 
-  test('BrightVision-core submodule directory is present', () => {
-    expect(existsSync(join(ROOT, 'BrightVision-core'))).toBe(true)
+  test('cecli submodule directory is present', () => {
+    expect(existsSync(join(ROOT, 'cecli/cecli'))).toBe(true)
   })
 
   test('verify_submodule script exists and is executable', () => {

@@ -79,6 +79,14 @@ export function slowTurnEvents() {
   ]
 }
 
+/** Core `/clear` command acknowledgement (no assistant body). */
+export function clearTurnEvents() {
+  return [
+    { type: 'tool_output', text: 'All chat history cleared.' },
+    { type: 'done', edited_files: [] },
+  ]
+}
+
 /** Assistant lists files to add — exercises roadmap #32 tray + proceed CTA. */
 export function suggestedFilesTurnEvents() {
   return [

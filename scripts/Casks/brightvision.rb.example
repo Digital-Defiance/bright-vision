@@ -6,7 +6,7 @@ cask "brightvision" do
 
   url "https://github.com/Digital-Defiance/BrightVision/releases/download/v#{version}/BrightVision_#{version}_universal.dmg"
   name "BrightVision"
-  desc "Local LLM-first desktop IDE (Tauri + BrightVision Core)"
+  desc "Local LLM-first desktop IDE (Tauri + Cecli)"
   homepage "https://bright-vision.digitaldefiance.org/"
 
   app "BrightVision.app"

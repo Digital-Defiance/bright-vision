@@ -6,15 +6,17 @@ Living backlog for chat UX, engine behavior, spec-driven work, and charter-level
 
 **Agents:** Read this file before substantive work; follow **Suggested fix order** until open items are **Done**; update statuses in the same session when you ship or learn something new. Instructions: `AGENTS.md` (Product roadmap) and `.cursor/rules/roadmap.mdc`.
 
-## Current focus — cecli engine migration (Priority)
+## Current focus — upstream cecli + thin `bright_vision_core` (Priority)
 
-**Status:** Gate A4/A8 pytest green; default engine `bright-vision-core`. **Next:** dogfood `yarn tauri dev`, pin submodule SHA in parent, optional deinit `aider-vision-core`.
+**Status:** Vision HTTP layer ported (Gate A4/A8). **Next:** [ENGINE_TRANSITION.md](./ENGINE_TRANSITION.md) — submodule `cecli/` → `Digital-Defiance/cecli` (PR fork), `bright_vision_core/` in parent repo, retire `BrightVision-core` submodule; upstream PR for two cecli hunks per [UPSTREAM_CECLI.md](./UPSTREAM_CECLI.md).
 
 | Doc | Use when |
 |-----|----------|
-| [CECLI_MIGRATION_ROADMAP.md](./CECLI_MIGRATION_ROADMAP.md) | **Agent execution plan** — phases, gates, sessions, checklist |
-| [CORE_FILE_MERGE.md](./CORE_FILE_MERGE.md) | Per-file PORT_NEW / MERGE_HUNKS / KEEP_CECLI |
-| [BRIGHT_VISION_PIVOT.md](./BRIGHT_VISION_PIVOT.md) | Rebrand, website, PyPI/Homebrew (after engine swap) |
+| [UPSTREAM_CECLI.md](./UPSTREAM_CECLI.md) | **Active strategy** — slim fork, upstream dep, no website in engine repo |
+| [CECLI_PIN.md](./CECLI_PIN.md) | **Pin policy** — submodule SHA, integration branches, ship before PyPI |
+| [CECLI_MIGRATION_ROADMAP.md](./CECLI_MIGRATION_ROADMAP.md) | Historical port execution (phases A–B); archive when U6 done |
+| [CORE_FILE_MERGE.md](./CORE_FILE_MERGE.md) | Per-file PORT_NEW / MERGE_HUNKS (still valid for Vision layer) |
+| [BRIGHT_VISION_PIVOT.md](./BRIGHT_VISION_PIVOT.md) | Product rebrand; **product** website = parent `docs/index.html` only |
 
 ---
 
@@ -99,6 +101,7 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 | **37** | **Done** | **Empty LLM response** — rewrite legacy “provider account” copy for Ollama; **Retry** (exact resend) + **Retry with hint** (append nudge); remember last user message in `App.tsx`. `emptyLlmResponse.ts`, `EmptyLlmWarning.tsx`. **Upstream:** cecli `base_coder.py` still emits legacy text until core patch. |
 | **38** | **Done** | **Editor** — left-rail tab; file tabs + CM6 + explorer + git badges + open-from-chat; optional language packs (Settings). See [§ #38](#38--editor-rail-tab--file-tabs--explorer) |
 | **39** | **Done** | **Local model router** — hopper, Tauri preload/swap, chat escalate + force tier. See [§ #39](#39--local-model-router) |
+| **40** | **Partial** | **cecli agents in Vision** — chat agent bar, Settings registry, `GET …/subagents`, slash fallbacks (`/agent`, `/invoke-agent`, `/spawn-agent`, `/reap-agent`). See [§ #40](#40--cecli-agents-in-vision) |
 
 ## Spec-driven development (#18)
 
@@ -245,12 +248,13 @@ Maps the high-level product charter to tracked work. Items **23–24** are large
 
 **Known context:** Response time is anchored at **Send** (`turnWallStartMsRef`); Stop no longer resets that anchor before `done`. Timing attaches only to the assistant bubble for the current turn (not an earlier message). **Queued sends** keep per-message Send time and restart the live timer after `done` when more messages are queued; `user_message` starts the timer if a turn begins without a prior `beginTurn`. **Fix:** short queued follow-ups (e.g. `proceed`, 7 chars) no longer overwrite a long reply’s bubble timing or pollute history (`resolveMessageTurnTiming`, `shouldRecordTurnInHistory`).
 
-**Shipped (Partial):** Settings timing history stores **peak** CPU/RAM/GPU per turn (polled while the turn is active on desktop); last 7 rows in the history table. **Output TPS** (running avg + per-turn column when core reports `Tokens:`); optional **CSV path** + download / write-all / append-after-turn (`write_timing_stats_csv`, up to 300 stored turns).
+**Shipped (Partial):** Settings timing history stores **avg + peak** CPU/RAM/GPU per turn (polled while the turn is active on desktop); **Resource columns** select (avg/peak/both). **Output TPS** (running avg + per-turn column when core reports `Tokens:` or cecli `↑↓`); optional **CSV path** + download / write-all / append-after-turn (`write_timing_stats_csv`, up to 300 stored turns). **Turn ETA** (`~Nm left*`) from per-model median/p90 + prompt scale + progress + output TPS; tooltip notes GPU is not an ETA input yet. **Chat clear** (`chat-clear-history`) clears UI then sends **`/clear`** when session is running (queued if busy).
 
 **Open / v2:**
 
 - Burndown chart or trend line in Settings / Tasks.
-- Mean vs peak toggle; process-scoped utilization (core + Ollama PIDs).
+- Process-scoped utilization (core + Ollama PIDs).
+- **GPU surge → ETA** — log GPU alongside turn duration; only blend into ETA after offline correlation on dogfood machines.
 - Sync stats across machines (JSON export shipped).
 - Input TPS and tokens-sent rate alongside output TPS for bottleneck splits.
 - Core SSE fields (`section_started`, `thought_ms`) instead of parser-only.
@@ -369,6 +373,42 @@ Prefer **permissive licenses** and **small bundle** ([AGENTS.md](../AGENTS.md)).
 
 ---
 
+## #40 — cecli agents in Vision
+
+**Problem:** cecli ships **agent mode** and **sub-agents** (`.md` definitions, `AgentService`, `/agent`, `/spawn-agent`, `/invoke-agent`, `Delegate` tool), but Vision only exposes generic slash commands in chat — no agent picker, sub-agent status, or HTTP-first workflows for delegation.
+
+**cecli surface (keep; do not fork):**
+
+| Piece | Role |
+|--------|------|
+| `/agent <prompt>` | Temporary agent mode on primary coder (`AgentCoder`, tool registry) |
+| `subagent_paths` + `*.md` | Registry of named sub-agents (YAML front matter + system prompt) |
+| `/invoke-agent <name> <prompt>` | Blocking sub-agent run; summary back to primary |
+| `/spawn-agent <name>` | Non-blocking sub-agent; TUI switches via agent pills |
+| `/reap-agent` | Force-destroy active sub-agent |
+| `Delegate` tool | Primary agent delegates autonomously |
+
+**Shipped (Partial):**
+
+1. **`GET /sessions/{id}/subagents`** — scans `subagent_paths`, returns registry names + prompt preview.
+2. **Chat** — **Agents** chip row (`ChatAgentBar`): `/agent`, `/invoke-agent`, `/spawn-agent`, `/reap-agent`; registered sub-agent chips (click → invoke, double-click → spawn).
+3. **Settings → Agents & sub-agents** — docs links + loaded registry when session is live.
+4. **Commands** — agent slash commands merged into palette with fallback summaries.
+
+**Open / v2:**
+
+1. **`POST /sessions/{id}/agents/invoke`** — dedicated invoke without typing slash commands; stream sub-agent SSE.
+2. **Header** — active sub-agent pill + reap when stuck (TUI parity).
+3. **async_bridge** — graceful cancel (no `Task was destroyed` stderr on Stop).
+
+**Non-goals (v1):** Full TUI agent-pill parity, parallel sub-agent graphs in React, MCP server UI.
+
+**Depends on:** Stable headless session + `async_bridge` teardown (#34 / core lifecycle); dogfood with `agent: true` or `/agent` on real repos.
+
+**Refs:** `BrightVision-core/cecli/helpers/agents/`, `cecli/website/docs/config/agent-mode.md`, `subagents.md`.
+
+---
+
 ## Known context
 
 - **Local testing (no CI required):** `yarn test:fast` / `yarn test:local` / `yarn test:full`; see [TESTING.md](./TESTING.md). Playwright mocks `/api/core` + Tauri `invoke` — does **not** replace `yarn tauri dev` dogfooding ([e2e/ROADMAP_COVERAGE.md](../e2e/ROADMAP_COVERAGE.md)).
@@ -381,6 +421,7 @@ Prefer **permissive licenses** and **small bundle** ([AGENTS.md](../AGENTS.md)).
 - **Tasks:** `.aider-vision/todos.json`; workspace API when session + core up; Tauri file mirror when core is down.
 - **18d:** Task list uses **manual order** (Up/Down); `depends_on` shows **blocked** chip, not auto-sort.
 - **Dogfooding friction to watch:** wrong workspace (submodule-only root), proposed vs applied edits, commit in wrong repo, Tasks generate-spec + Implement on real core.
+- **Orange `[BrightVision] Task was destroyed…` in chat:** Python asyncio stderr when the core event loop is closed while tasks still wait (common after **Stop** mid-turn or SSE abort during “Waiting for Ollama”; can also appear under heavy Ollama load). Usually harmless noise; recovery = **Stop** → optional **Clear queue** → **Terminal Stop/Start** if still stuck. Manual **`proceed` while a turn is running** is **queued** (bubble appears only when it is actually sent) — it does not preempt the current Ollama wait.
 
 ## Suggested fix order
 
@@ -394,6 +435,7 @@ Prefer **permissive licenses** and **small bundle** ([AGENTS.md](../AGENTS.md)).
 6. **#29, #30** — Plugins, remaining web parity (longer horizon).
 7. **#33** — Resource overlay when local LLM / long runs make CPU/GPU visibility painful (CPU/RAM first; GPU best-effort).
 8. **#38** — Editor left-rail tab + file tabs + explorer after core chat/context loop is stable; spike CodeMirror + `react-resizable-panels`; extend `TabId` / `NAV` — do not merge Chat into a top tab row.
+9. **#40** — cecli agents/sub-agents in Vision after core loop + asyncio teardown are stable.
 
 ## Related docs
 

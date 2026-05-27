@@ -93,6 +93,7 @@ import { GitPanel } from './components/GitPanel'
 import { useWorkspaceTodos } from './hooks/useWorkspaceTodos'
 import { WelcomePanel } from './components/onboarding/WelcomePanel'
 import { SettingsPanel } from './components/settings/SettingsPanel'
+import type { SubAgentInfo } from './ipc/agentCommands'
 
 const EditorPanel = lazy(() =>
   import('./components/editor/EditorPanel').then((m) => ({ default: m.EditorPanel }))
@@ -211,9 +212,10 @@ function migrateConfig(raw: Partial<VisionConfig> & Record<string, unknown>): Vi
   }
   if (
     merged.coreEnginePath === 'aider-vision-core' ||
-    merged.coreEnginePath === 'bright-vision-core'
+    merged.coreEnginePath === 'bright-vision-core' ||
+    merged.coreEnginePath === 'BrightVision-core'
   ) {
-    merged.coreEnginePath = 'BrightVision-core'
+    merged.coreEnginePath = '.'
   }
   if (!merged.coreApiUrl || merged.coreApiUrl === DEFAULT_CONFIG.coreApiUrl) {
     if (!isTauriRuntime()) merged.coreApiUrl = defaultCoreApiUrl()
@@ -378,6 +380,8 @@ function AppShell({
   const unlistenersRef = useRef<UnlistenFn[]>([])
   const [suggestedPaths, setSuggestedPaths] = useState<string[]>([])
   const [suggestedAwaitingProceed, setSuggestedAwaitingProceed] = useState(false)
+  const [subagents, setSubagents] = useState<SubAgentInfo[]>([])
+  const [agentModeAvailable, setAgentModeAvailable] = useState(false)
   const [trackTurnResources, setTrackTurnResources] = useState(false)
   const [lastUserMessageForRetry, setLastUserMessageForRetry] = useState<string | null>(null)
   const lastUserMessageForRetryRef = useRef<string | null>(null)
@@ -1053,6 +1057,16 @@ function AppShell({
   useEffect(() => {
     setSuggestedPaths((prev) => filterPathsNotInChat(prev, filesInChat))
   }, [filesInChat])
+
+  const onOutboundMessage = useCallback(
+    (content: string) => {
+      if (content.trim() === '/clear') return
+      appendUserMessageToChat(content, true)
+      startTurnTimingRef.current(content.length, Date.now())
+    },
+    [appendUserMessageToChat]
+  )
+
   const {
     isRunning,
     isStarting,
@@ -1071,7 +1085,7 @@ function AppShell({
     undo,
     refreshSessionInfo,
     patchSessionFiles,
-  } = useVisionSession(wrapHandler(handleCoreEvent))
+  } = useVisionSession(wrapHandler(handleCoreEvent), { onOutboundMessage })
 
   queuedCountRef.current = queuedCount
 
@@ -1092,6 +1106,26 @@ function AppShell({
     if (!isRunning || !files) return
     syncSessionFiles(files)
   }, [sessionInfo?.files_in_chat, isRunning, syncSessionFiles])
+
+  useEffect(() => {
+    const client = httpClient
+    const sid = sessionInfo?.session_id
+    if (!client || !sid || !isRunning) {
+      setSubagents([])
+      setAgentModeAvailable(false)
+      return
+    }
+    void client
+      .listSubagents(sid)
+      .then((data) => {
+        setSubagents(data.subagents)
+        setAgentModeAvailable(data.agent_mode_available)
+      })
+      .catch(() => {
+        setSubagents([])
+        setAgentModeAvailable(false)
+      })
+  }, [httpClient, sessionInfo?.session_id, isRunning])
 
   const recordAddedContextEstimate = useCallback(async (paths: string[]) => {
     if (!paths.length) return
@@ -1649,17 +1683,20 @@ function AppShell({
       lastAssistantStreamRef.current = ''
       setRouterEscalateOffer(null)
       stallWatch.touchEvent('user_send')
-      appendUserMessageToChat(text, true)
-      const turnStartMs = Date.now()
-      if (isBusy) {
-        pendingTurnTimingQueueRef.current.push({ promptChars: text.length, turnStartMs })
-      } else {
-        startTurnTimingRef.current(text.length, turnStartMs)
-      }
       const result = await send(text, { ...todoOptions, ...sendExtras })
+      if (result.queued) {
+        const trimmed = text.trim()
+        setSnackbar({
+          message:
+            trimmed.toLowerCase() === 'proceed'
+              ? '“proceed” is queued — the current turn is still running; the model has not received it yet.'
+              : 'Queued — will send when the agent finishes the current turn',
+          severity: 'info',
+        })
+      }
       return result
     },
-    [isBusy, send, appendUserMessageToChat, stallWatch]
+    [send, stallWatch]
   )
 
   const handleEscalateRouter = useCallback(async () => {
@@ -1770,24 +1807,8 @@ function AppShell({
     if (!isRunning) return
     const msg = PROCEED_AFTER_FILES_MESSAGE
     rememberUserMessageForRetry(msg)
-    lastUserPromptCharsRef.current = msg.length
-    lastAssistantStreamRef.current = ''
-    stallWatch.touchEvent('user_send')
-    appendUserMessageToChat(msg, true)
-    const turnStartMs = Date.now()
-    if (isBusy) {
-      pendingTurnTimingQueueRef.current.push({ promptChars: msg.length, turnStartMs })
-    } else {
-      startTurnTimingRef.current(msg.length, turnStartMs)
-    }
     try {
-      const result = await send(msg)
-      if (result.queued) {
-        setSnackbar({
-          message: 'Queued “proceed” — will send when the current turn finishes',
-          severity: 'info',
-        })
-      }
+      await deliverUserMessage(msg)
     } catch (err) {
       turnWallStartMsRef.current = null
       turnAssistantMessageIdRef.current = null
@@ -1800,14 +1821,7 @@ function AppShell({
         severity: 'error',
       })
     }
-  }, [
-    isRunning,
-    isBusy,
-    send,
-    appendUserMessageToChat,
-    removeLastPendingUserMessage,
-    stallWatch,
-  ])
+  }, [isRunning, deliverUserMessage, removeLastPendingUserMessage, stallWatch])
 
   const runSuggestedAddAndProceed = useCallback(
     async (paths: string[], opts?: { proceed?: boolean }) => {
@@ -1977,12 +1991,7 @@ function AppShell({
     try {
       const result = await deliverUserMessage(text, todoOptions)
       if (injectSpec && activeTodo) todoInjectedIdRef.current = activeTodo.id
-      if (result.queued) {
-        setSnackbar({
-          message: 'Queued — will send when the agent finishes the current turn',
-          severity: 'info',
-        })
-      } else {
+      if (!result.queued) {
         void reloadTodos()
       }
     } catch (err) {
@@ -2031,6 +2040,50 @@ function AppShell({
   const handleDismissToolEvent = (toolEventId: number) => {
     setToolEvents((prev) => prev.filter((t) => t.id !== toolEventId))
   }
+
+  const handleClearChatHistory = useCallback(async () => {
+    if (chatMessages.length === 0 && toolEvents.length === 0) return
+    const syncCore = isRunning
+    if (
+      !window.confirm(
+        syncCore
+          ? 'Clear all messages and tool output from this view, and send /clear so the agent forgets prior turns?\n\nFiles stay in context (/drop to remove). File edits are not undone.'
+          : 'Clear all messages and tool output from this view? File edits are not undone.'
+      )
+    ) {
+      return
+    }
+    setChatMessages([])
+    setToolEvents([])
+    streamingAssistantId.current = null
+    turnAssistantMessageIdRef.current = null
+    pendingUserMessageIdsRef.current = []
+    setTokenStats(null)
+    setSuggestedPaths([])
+    setSuggestedAwaitingProceed(false)
+
+    if (!syncCore) return
+    try {
+      const result = await send('/clear')
+      if (result.queued) {
+        setSnackbar({
+          message: 'View cleared; /clear will run when the current turn finishes',
+          severity: 'info',
+        })
+      }
+    } catch (err) {
+      setSnackbar({
+        message:
+          err instanceof Error
+            ? `View cleared, but /clear failed: ${err.message}`
+            : `View cleared, but /clear failed: ${String(err)}`,
+        severity: 'warning',
+      })
+    } finally {
+      // /clear SSE may append tool_output; keep the clear control disabled.
+      setToolEvents([])
+    }
+  }, [chatMessages.length, toolEvents.length, isRunning, send])
 
   const handleUndo = async () => {
     try {
@@ -2170,6 +2223,7 @@ function AppShell({
               onConfirmAnswer={handleConfirmAnswer}
               onDismissMessage={handleDismissMessage}
               onDismissToolEvent={handleDismissToolEvent}
+              onClearHistory={handleClearChatHistory}
               commands={commands}
               onPickCommand={(cmd) => setInputValue(cmd)}
               useNativeImagePicker={isTauriRuntime()}
@@ -2202,6 +2256,8 @@ function AppShell({
               onEscalateRouter={() => void handleEscalateRouter()}
               onForceRouterTier={(tier) => void handleForceRouterTier(tier)}
               onDismissRouterEscalate={() => setRouterEscalateOffer(null)}
+              subagents={subagents}
+              agentModeAvailable={agentModeAvailable}
             />
             </>
           )}
@@ -2391,6 +2447,9 @@ function AppShell({
                 onSave={handleSave}
                 onReset={handleReset}
                 appVersions={appVersions}
+                subagents={subagents}
+                agentModeAvailable={agentModeAvailable}
+                sessionActive={isRunning}
               />
             </Box>
           )}

@@ -82,7 +82,7 @@ Central constants in `src/brand.ts` (already the right pattern):
 | `PRODUCT_VISION` | `bright-vision` |
 | `PRODUCT_CORE` | `bright-vision-core` |
 | `DISPLAY_VISION` | `BrightVision` |
-| `DISPLAY_CORE` | `BrightVision Core` |
+| `DISPLAY_CORE` | `Cecli` |
 | `DISPLAY_MONOGRAM` | `BV` |
 
 Then mechanical pass:

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="BrightVision — a lightweight, cross-platform desktop app for AI-assisted coding. Native Tauri + React, powered by BrightVision Core."
+      content="BrightVision — a lightweight, cross-platform desktop app for AI-assisted coding. Native Tauri + React, powered by Cecli."
     />
     <link rel="canonical" href="https://bright-vision.digitaldefiance.org/" />
     <meta
@@ -14,7 +14,7 @@
     />
     <meta
       property="og:description"
-      content="Cursor-like AI coding in a lightweight Tauri desktop app. Powered by BrightVision Core."
+      content="Cursor-like AI coding in a lightweight Tauri desktop app. Powered by Cecli."
     />
     <meta
       property="og:url"
@@ -841,6 +841,13 @@
           <a class="nav-docs" href="#why-vision">Why Vision</a>
           <a class="nav-docs" href="#features">Features</a>
           <a class="nav-docs" href="#architecture">Architecture</a>
+          <a
+            class="nav-docs"
+            href="https://cecli.dev"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Cecli</a
+          >
           <a class="nav-docs" href="#local-llm">Local LLM</a>
           <a class="nav-docs" href="#start">Get started</a>
           <a class="nav-docs" href="#roadmap">Roadmap</a>
@@ -868,29 +875,28 @@
               <strong>React</strong>. <strong>Privacy-first:</strong> run
               frontier models locally via
               <a href="#local-llm">Ollama + built-in Local LLM</a>, not rented cloud
-              inference. Cursor-like AI coding through a clean, focused workspace — powered by
+              inference.               Cursor-like AI coding through a clean, focused workspace — powered by
               <a
-                href="https://bright-vision-core.digitaldefiance.org"
+                href="https://cecli.dev"
                 target="_blank"
                 rel="noopener noreferrer"
-                >BrightVision Core</a
-              > — a <strong>fork²</strong> (“biforkation”):
-              <a
+                ><strong>Cecli</strong></a
+              >
+              (<a
+                href="https://github.com/dwash96/cecli"
+                target="_blank"
+                rel="noopener noreferrer"
+                >dwash96/cecli</a
+              >): coders, agents, MCP, and local models. BrightVision wraps Cecli with a
+              headless <code>bright_vision_core</code> HTTP/SSE API (no terminal UI in the app).
+              Lineage: <a
                 href="https://github.com/Aider-AI/aider"
                 target="_blank"
                 rel="noopener noreferrer"
                 >Aider</a
               >
-              →
-              <a
-                href="https://github.com/dwash96/cecli"
-                target="_blank"
-                rel="noopener noreferrer"
-                >Cecli</a
-              >
-              → BrightVision Core, with the Vision HTTP layer ported from our earlier
-              <code>aider-vision-core</code> engine (Aider→Bright docs, not replayed git history).
-              <a href="#lineage">Lineage ↓</a>
+              → Cecli → BrightVision.
+              <a href="#lineage">Details ↓</a>
             </p>
             <div class="hero-actions">
               <a class="btn btn-primary" href="#install-mac"
@@ -908,6 +914,7 @@
               >
             </div>
             <div class="hero-meta">
+              <span>First-class in days, not months</span>
               <span>Homebrew cask</span>
               <span>Signed &amp; notarized DMG</span>
               <span>Tauri v2 + Rust</span>
@@ -1103,61 +1110,113 @@
             Built for developers who want speed, not bloat
           </h2>
           <p class="section-desc">
-            No Electron shell. No VS Code fork. BrightVision pairs a native Rust
-            backend with a minimal React front end and a headless AI engine you
-            control.
+            No Electron shell. No VS Code fork. A native Rust shell, minimal React UI,
+            and a headless cecli engine — shipped as a coherent product in days of
+            dogfood, not a demo. Full list:
+            <a
+              href="https://github.com/Digital-Defiance/BrightVision/blob/main/docs/FEATURES.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              ><code>docs/FEATURES.md</code></a
+            >.
           </p>
           <div class="features">
             <article class="feature">
               <div class="feature-icon">01</div>
               <h3>Vision HTTP API</h3>
               <p>
-                All prompting flows through a structured HTTP API. React is the
-                head; the core engine stays headless under
-                <code>bright-vision-core/</code>.
+                Every turn is <code>POST /sessions/…/messages</code> + SSE. React is the
+                head; <strong>Cecli</strong> is the agent body, bridged by
+                <code>bright_vision_core</code>.
               </p>
             </article>
             <article class="feature">
               <div class="feature-icon">02</div>
               <h3>Chat &amp; streaming</h3>
               <p>
-                Thinking/Answer sections, proposed edits, confirm flow,
-                queue/stop, stream dedupe, and configurable fonts including
-                Glass TTY VT220 for chat.
+                Thinking / Reasoning / Answer, Mermaid + code fences, proposed edits,
+                confirm, queue/stop, clear history + <code>/clear</code>, Glass TTY font.
               </p>
             </article>
             <article class="feature">
               <div class="feature-icon">03</div>
-              <h3>Tasks &amp; spec-driven work</h3>
+              <h3>Turn timing &amp; ETA</h3>
               <p>
-                Tasks tab with <code>.bright-vision/todos.json</code>, layered
-                specs, generate/refine, and steered Implement steps (v1–v5
-                shipped).
+                Live Response/Think in the activity bar, <code>~Nm left*</code> estimates,
+                per-model history with TPS and avg/peak CPU/RAM/GPU (desktop).
               </p>
             </article>
             <article class="feature">
               <div class="feature-icon">04</div>
-              <h3>Git &amp; process</h3>
+              <h3>Local LLM &amp; router</h3>
               <p>
-                Git tab with diffs and commit graph; reliable core start/stop;
-                determinate progress during repo scan; Technical terminal for
-                engine output.
+                Ollama panel, model hopper preload, fast/heavy routing, escalate-to-heavy
+                when the fast model stalls — built for Apple Silicon dogfood.
               </p>
             </article>
             <article class="feature">
               <div class="feature-icon">05</div>
-              <h3>Submodule workspaces</h3>
+              <h3>Agents &amp; sub-agents</h3>
               <p>
-                Superproject layout with <code>bright-vision-core</code> as a
-                submodule — built to dogfood Vision on itself.
+                cecli <code>/agent</code>, <code>/invoke-agent</code>,
+                <code>/spawn-agent</code>, <code>/reap-agent</code>; registry chips in
+                chat; <code>GET …/subagents</code> when session is live.
               </p>
             </article>
             <article class="feature">
               <div class="feature-icon">06</div>
-              <h3>Native performance</h3>
+              <h3>Suggested files</h3>
               <p>
-                Rust + Tauri v2 keeps memory and startup time low on macOS,
-                Linux, and Windows — without sacrificing cross-platform parity.
+                Parses assistant answers for repo paths; tray with Add all, queue
+                <code>/add</code>, and <code>proceed</code> when the model waits.
+              </p>
+            </article>
+            <article class="feature">
+              <div class="feature-icon">07</div>
+              <h3>Tasks &amp; specs</h3>
+              <p>
+                <code>.bright-vision/todos.json</code>, layered EARS specs, generate/refine,
+                background jobs, steered Implement (v1–v5).
+              </p>
+            </article>
+            <article class="feature">
+              <div class="feature-icon">08</div>
+              <h3>Editor rail</h3>
+              <p>
+                File tabs, CodeMirror 6, collapsible explorer, git badges, open from chat
+                — separate from Chat on the left rail.
+              </p>
+            </article>
+            <article class="feature">
+              <div class="feature-icon">09</div>
+              <h3>Git tab</h3>
+              <p>
+                Branch, ahead/behind, working tree, stage/commit/undo, commit graph —
+                native Rust on desktop.
+              </p>
+            </article>
+            <article class="feature">
+              <div class="feature-icon">10</div>
+              <h3>Context &amp; attach</h3>
+              <p>
+                Session file chip, token estimates, images/PDF, terminal tail, folder attach,
+                <code>/add</code> Tab completion (desktop).
+              </p>
+            </article>
+            <article class="feature">
+              <div class="feature-icon">11</div>
+              <h3>Superproject git</h3>
+              <p>
+                Multi-repo <code>RepoSet</code> — dogfood BrightVision on the superproject,
+                not the submodule folder alone.
+              </p>
+            </article>
+            <article class="feature">
+              <div class="feature-icon">12</div>
+              <h3>Native shell</h3>
+              <p>
+                Tauri v2, resource overlay, signed macOS builds, Playwright e2e + core
+                pytest — lean by charter.
               </p>
             </article>
           </div>
@@ -1167,41 +1226,50 @@
       <section id="lineage">
         <div class="wrap">
           <p class="section-label">Lineage</p>
-          <h2 class="section-title">Fork² — Aider, Cecli, BrightVision Core</h2>
+          <h2 class="section-title">Lineage — Aider → Cecli → BrightVision</h2>
           <p class="section-desc">
-            <strong>BrightVision Core</strong> is a <em>biforkation</em>: the coding
-            agent stack comes from <strong>Cecli</strong> (itself a fork of
-            <strong>Aider</strong>). The headless API in
-            <code>bright_vision_core/</code> was copied and rewired from our prior
-            <code>aider-vision-core</code> product — file-by-file, with Aider→Bright
-            naming on docs and the site — not cherry-picked commits.
+            The coding agent is
+            <a href="https://cecli.dev" target="_blank" rel="noopener noreferrer"
+              ><strong>Cecli</strong></a
+            >
+            (<a
+              href="https://github.com/dwash96/cecli"
+              target="_blank"
+              rel="noopener noreferrer"
+              >dwash96/cecli</a
+            >), evolved from <strong>Aider</strong>. BrightVision is a desktop shell on top:
+            we ship Cecli plus a headless <code>bright_vision_core/</code> HTTP layer (ported
+            from our earlier <code>aider-vision-core</code> product — file merge, not replayed
+            git history).
           </p>
-          <div class="arch-flow" role="img" aria-label="Aider forks to Cecli, Cecli forks to bright-vision-core bundling cecli and bright_vision_core">
+          <div class="arch-flow" role="img" aria-label="Aider forks to Cecli; BrightVision bundles cecli with bright_vision_core HTTP API">
             <div class="arch-node">
               <strong>Aider</strong>pair programming<br />upstream
             </div>
             <div class="arch-arrow" aria-hidden="true">→</div>
             <div class="arch-node">
-              <strong>Cecli</strong>terminal agent<br /><code>cecli/</code>
+              <strong>Cecli</strong>coding agent<br /><code>cecli/</code> ·
+              <a href="https://cecli.dev" target="_blank" rel="noopener noreferrer"
+                >cecli.dev</a
+              >
             </div>
             <div class="arch-arrow" aria-hidden="true">→</div>
             <div class="arch-node">
-              <strong>BrightVision Core</strong>cecli + API<br /><code>bright_vision_core/</code>
+              <strong>BrightVision</strong>Cecli + HTTP<br /><code>bright_vision_core/</code>
             </div>
           </div>
           <p class="section-desc" style="margin-top: 1.25rem">
-            Product pages:
-            <a href="https://bright-vision.digitaldefiance.org">BrightVision</a>
-            (this site) ·
+            Docs:
+            <a href="https://bright-vision.digitaldefiance.org">BrightVision</a> (this site) ·
+            <a href="https://cecli.dev" target="_blank" rel="noopener noreferrer">Cecli</a>
+            (upstream agent docs) ·
             <a
-              href="https://bright-vision-core.digitaldefiance.org"
+              href="https://github.com/Digital-Defiance/BrightVision-core"
               target="_blank"
               rel="noopener noreferrer"
-              >BrightVision Core</a
+              >bright-vision-core</a
             >
-            (engine) · core docs site:
-            <code>bright_vision_core/website/</code> (Jekyll). Upstream Cecli docs remain in
-            <code>cecli/website/</code> (untouched).
+            (PyPI bundle: vendored <code>cecli/</code> + <code>bright_vision_core/</code>).
           </p>
         </div>
       </section>
@@ -1211,9 +1279,9 @@
           <p class="section-label">Architecture</p>
           <h2 class="section-title">Head and body, cleanly separated</h2>
           <p class="section-desc">
-            BrightVision <em>beheads</em> the old standalone Cecli UX. Users
-            never interact with the core CLI directly — every turn is
-            API-driven.
+            BrightVision <em>beheads</em> the Cecli terminal UX for this product. The
+            <strong>Cecli</strong> engine still runs every turn; users interact only through
+            the Vision HTTP API — not the interactive CLI.
           </p>
           <div
             class="arch-flow"
@@ -1229,9 +1297,8 @@
             </div>
             <div class="arch-arrow" aria-hidden="true">→</div>
             <div class="arch-node">
-              <strong>Body</strong>Session engine<br /><code
-                >bright-vision-core/</code
-              >
+              <strong>Body</strong>Cecli agent<br /><code>cecli/</code> +
+              <code>bright_vision_core/</code>
             </div>
             <div class="arch-arrow" aria-hidden="true">→</div>
             <div class="arch-node">
@@ -1245,6 +1312,12 @@
             >
             <span class="pill"><strong>Styling</strong> MUI v6 + Emotion</span>
             <span class="pill"><strong>Packages</strong> Yarn (PnP)</span>
+            <span class="pill"
+              ><strong>Agent</strong>
+              <a href="https://cecli.dev" target="_blank" rel="noopener noreferrer"
+                >Cecli</a
+              ></span
+            >
           </div>
           <p class="callout">
             <strong>Self-evolving by design.</strong> Primary validation is
@@ -1307,9 +1380,9 @@
               </h3>
               <ul>
                 <li>Stream dedupe + tool timeline order</li>
-                <li>Proposed edits, confirms, queue/stop</li>
-                <li>/add Tab completion (desktop)</li>
-                <li>Images/PDF attach, token stats</li>
+                <li>Proposed edits, confirms, queue/stop, clear + /clear</li>
+                <li>Fences, Mermaid, timing bar, turn ETA</li>
+                <li>Agents bar, suggested files, model router</li>
               </ul>
             </article>
             <article class="roadmap-card">
@@ -1446,37 +1519,79 @@ brew install brightvision</code></pre>
             <p class="install-path-label">Local LLM (recommended)</p>
             <h3>Privacy-first: Ollama + built-in Local LLM</h3>
             <p>
-              The <strong>desktop app</strong> starts Ollama, pulls your model, and
-              preloads it — use <strong>Terminal → Local LLM</strong> or
-              <strong>Auto before session</strong>. Install
+              Install
               <a
                 href="https://ollama.com/"
                 target="_blank"
                 rel="noopener noreferrer"
                 >Ollama</a
               >
-              from ollama.com. Vision does not bundle weights or the Ollama runtime.
+              from ollama.com (Vision does not bundle weights). The desktop app can
+              start Ollama, pull your model, and preload it — you configure a small
+              env file first, then use <strong>Settings</strong> or
+              <strong>Terminal → Local LLM</strong>.
             </p>
-            <pre><code># Install Ollama from https://ollama.com/
-
-mkdir -p local-llm
-cat &gt; local-llm/local-llm.env &lt;&lt;'EOF'
+            <h4 style="margin: 1.25rem 0 0.5rem; font-size: 1rem">Where to put env variables</h4>
+            <p>
+              Use <strong>one</strong> of these (same keys; different filenames). If you
+              use more than one, <strong>later paths win</strong> (repo
+              <code>local-llm.env</code> overrides XDG <code>env</code>).
+            </p>
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 0.75rem 0">
+              <thead>
+                <tr>
+                  <th style="text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border)">Location</th>
+                  <th style="text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border)">Filename</th>
+                  <th style="text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border)">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="padding: 0.35rem 0.5rem; vertical-align: top"><code>./local-llm.env</code> (repo root)</td>
+                  <td style="padding: 0.35rem 0.5rem"><code>local-llm.env</code></td>
+                  <td style="padding: 0.35rem 0.5rem">Recommended for development — copy from <code>local-llm.env.example</code></td>
+                </tr>
+                <tr>
+                  <td style="padding: 0.35rem 0.5rem; vertical-align: top"><code>~/.config/local-llm/env</code></td>
+                  <td style="padding: 0.35rem 0.5rem"><code>env</code> (no <code>.env</code> extension)</td>
+                  <td style="padding: 0.35rem 0.5rem">XDG / legacy local-llm layout — the file is literally named <code>env</code></td>
+                </tr>
+              </tbody>
+            </table>
+            <h4 style="margin: 1.25rem 0 0.5rem; font-size: 1rem">Option A — repo root (recommended)</h4>
+            <pre><code># In the BrightVision clone
+cp local-llm.env.example local-llm.env
+# Edit DATA_MODEL and optional OLLAMA_HOST</code></pre>
+            <h4 style="margin: 1.25rem 0 0.5rem; font-size: 1rem">Option B — XDG config</h4>
+            <pre><code>mkdir -p ~/.config/local-llm
+cat &gt; ~/.config/local-llm/env &lt;&lt;'EOF'
 OLLAMA_HOST=http://127.0.0.1:11434
 DATA_MODEL=qwen3.6:27b-q4_K_M
-EOF
-
-# BrightVision → Settings: ollama_chat/qwen3.6:27b-q4_K_M
-# Terminal → Local LLM → Start → Terminal → Start (session)</code></pre>
-            <p>
-              Edit <code>local-llm.env</code> (<code>DATA_MODEL</code>,
-              <code>OLLAMA_HOST</code>). Vision maps them to <strong>LLM model</strong>
-              and <strong>Ollama API base</strong> (auto on launch or
-              <strong>Sync settings from .env</strong> in Settings). Save, then
-              <strong>Terminal → Start</strong>.
-            </p>
+EOF</code></pre>
+            <p>Example contents (either file):</p>
+            <pre><code>OLLAMA_HOST=http://127.0.0.1:11434
+DATA_MODEL=qwen3.6:27b-q4_K_M</code></pre>
+            <h4 style="margin: 1.25rem 0 0.5rem; font-size: 1rem">In the app (three steps)</h4>
+            <ol style="margin: 0.5rem 0 1rem 1.25rem; padding: 0">
+              <li>
+                <strong>Settings → Ollama env files</strong> — confirm paths, click
+                <strong>Sync from env files</strong> (fills <strong>LLM model</strong> as
+                <code>ollama_chat/&lt;DATA_MODEL&gt;</code> and <strong>Ollama API base</strong>).
+              </li>
+              <li>
+                Same section — <strong>Start Local LLM</strong>, then <strong>Ping LLM</strong>
+                (or use <strong>Terminal → Local LLM</strong>). Ping checks Ollama inference;
+                it does not start the coding session.
+              </li>
+              <li>
+                <strong>Terminal → Start</strong> — spawns the Cecli-based engine (Vision HTTP on
+                <code>:8741</code>) for chat (or enable
+                <strong>Auto before session</strong> on the Local LLM panel).
+              </li>
+            </ol>
             <p class="install-note">
-              Optional: <code>LOCAL_LLM_DIR</code> or Settings → local-llm directory for
-              a custom <code>local-llm.env</code> path.
+              Optional: <code>LOCAL_LLM_DIR</code> or Settings → <em>Extra config directory</em>
+              for another folder containing <code>local-llm.env</code> (applied last).
               <a
                 href="https://github.com/Digital-Defiance/BrightVision/blob/main/docs/LOCAL_LLM.md"
                 target="_blank"
@@ -1498,7 +1613,10 @@ EOF
             <li>
               <div>
                 <h3>Clone and init submodules</h3>
-                <p>Fetch the superproject, init <code>bright-vision-core</code>, activate the venv.</p>
+                <p>
+                  Fetch the superproject, init <code>BrightVision-core</code> (Cecli +
+                  <code>bright_vision_core</code>), then <code>source activate.sh</code>.
+                </p>
                 <pre><code>git clone https://github.com/Digital-Defiance/BrightVision.git
 cd bright-vision
 git submodule update --init --recursive
@@ -1519,11 +1637,14 @@ source activate.sh</code></pre>
               <div>
                 <h3>Configure local LLM</h3>
                 <p>
-                  Create <code>local-llm/local-llm.env</code> (see Local LLM section
-                  above). In the app: <strong>Terminal → Local LLM → Start</strong>, or
-                  enable <strong>Auto before session</strong>.
+                  Copy <code>local-llm.env.example</code> → <code>local-llm.env</code> at
+                  the repo root (or use <code>~/.config/local-llm/env</code> — see
+                  <a href="#local-llm">Local LLM</a>). In the app:
+                  <strong>Settings → Sync from env files</strong>, then
+                  <strong>Start Local LLM</strong> and <strong>Ping LLM</strong>.
                 </p>
-                <pre><code># Or Settings → Sync settings from .env after editing local-llm.env</code></pre>
+                <pre><code>cp local-llm.env.example local-llm.env
+# yarn tauri dev → Settings → sync → Start → Ping → Terminal → Start</code></pre>
               </div>
             </li>
             <li>
@@ -1552,10 +1673,20 @@ source activate.sh</code></pre>
           <p class="section-label">Documentation</p>
           <h2 class="section-title">Dive deeper</h2>
           <p class="section-desc">
-            Architecture notes, IPC contracts, development guides, and
-            troubleshooting — all in the repo.
+            The agent engine is
+            <a href="https://cecli.dev" target="_blank" rel="noopener noreferrer">Cecli</a>.
+            BrightVision docs cover the desktop shell, HTTP API, and packaging.
           </p>
           <div class="docs-grid">
+            <a
+              class="doc-link"
+              href="https://cecli.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <strong>Cecli</strong>
+              <span>Upstream coding agent — agents, MCP, skills, terminal use</span>
+            </a>
             <a
               class="doc-link"
               href="https://github.com/Digital-Defiance/BrightVision/blob/main/docs/LOCAL_LLM.md"
@@ -1677,23 +1808,26 @@ source activate.sh</code></pre>
             >Local LLM guide</a
           >
           <a href="#lineage">Lineage</a>
+          <a href="https://cecli.dev" target="_blank" rel="noopener noreferrer"
+            >Cecli</a
+          >
           <a
-            href="https://bright-vision-core.digitaldefiance.org"
+            href="https://github.com/dwash96/cecli"
             target="_blank"
             rel="noopener noreferrer"
-            >Vision Core</a
+            >Cecli (GitHub)</a
+          >
+          <a
+            href="https://github.com/Digital-Defiance/BrightVision-core"
+            target="_blank"
+            rel="noopener noreferrer"
+            >bright-vision-core</a
           >
           <a
             href="https://github.com/Digital-Defiance/BrightVision-core/blob/main/docs/LINEAGE.md"
             target="_blank"
             rel="noopener noreferrer"
-            >Fork² docs</a
-          >
-          <a
-            href="https://github.com/cecli-dev/cecli"
-            target="_blank"
-            rel="noopener noreferrer"
-            >Cecli</a
+            >Lineage docs</a
           >
         </div>
       </div>

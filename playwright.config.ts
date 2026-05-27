@@ -13,9 +13,10 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:4173',
   },
   webServer: {
-    command: 'E2E=1 yarn build && E2E=1 yarn vite preview --host 127.0.0.1 --port 4173',
+    command: 'sh scripts/e2e-preview.sh',
     url: 'http://127.0.0.1:4173',
-    reuseExistingServer: !process.env.CI,
+    // Always start preview with E2E=1 (no :8741 proxy). Reusing an old preview causes proxy spam.
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 })

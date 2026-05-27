@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import type { TodoItem, TodoStore } from '../../src/todos/types'
 import {
+  clearTurnEvents,
   confirmTurnEvents,
   defaultTurnEvents,
   E2E_SESSION_ID,
@@ -118,6 +119,23 @@ export async function installMockCoreApi(page: Page, opts: MockCoreOptions = {})
     await route.continue()
   })
 
+  await page.route(`**/api/core/sessions/${sessionId}/subagents`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        subagents: [
+          {
+            name: 'reviewer',
+            model: null,
+            prompt_preview: 'Code review specialist for e2e.',
+          },
+        ],
+        agent_mode_available: true,
+      }),
+    })
+  })
+
   await page.route(`**/api/core/sessions/${sessionId}/commands`, async (route) => {
     await route.fulfill({
       status: 200,
@@ -129,18 +147,19 @@ export async function installMockCoreApi(page: Page, opts: MockCoreOptions = {})
   })
 
   await page.route(`**/api/core/sessions/${sessionId}/messages`, async (route) => {
-    if (opts.messageDelayMs) {
-      await new Promise((r) => setTimeout(r, opts.messageDelayMs))
-    }
     let events = nextTurn()
     try {
       const body = route.request().postDataJSON() as { content?: string }
       const content = body?.content?.trim()
       if (content) {
         events = [{ type: 'user_message', text: content }, ...events]
-        const addMatch = content.match(/^\/add\s+(\S+)/)
-        if (addMatch?.[1]) {
-          filesInChat = [...new Set([...filesInChat, addMatch[1]])]
+        if (content === '/clear') {
+          events = clearTurnEvents()
+        } else {
+          const addMatch = content.match(/^\/add\s+(\S+)/)
+          if (addMatch?.[1]) {
+            filesInChat = [...new Set([...filesInChat, addMatch[1]])]
+          }
         }
       }
     } catch {
@@ -150,27 +169,34 @@ export async function installMockCoreApi(page: Page, opts: MockCoreOptions = {})
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
     }
+    const holdMs = opts.messageDelayMs ?? 0
+    const eventDelayMs = opts.messageEventDelayMs ?? 0
 
-    if (opts.messageEventDelayMs && opts.messageEventDelayMs > 0) {
-      const delayMs = opts.messageEventDelayMs
+    if (holdMs > 0 || eventDelayMs > 0) {
       const encoder = new TextEncoder()
       const stream = new ReadableStream({
         async start(controller) {
           for (const ev of events) {
-            await new Promise((r) => setTimeout(r, delayMs))
+            if (eventDelayMs > 0) {
+              await new Promise((r) => setTimeout(r, eventDelayMs))
+            }
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(ev)}\n\n`))
+          }
+          if (holdMs > 0) {
+            await new Promise((r) => setTimeout(r, holdMs))
           }
           controller.close()
         },
       })
       await route.fulfill({ status: 200, headers, body: stream as unknown as string })
-    } else {
-      await route.fulfill({
-        status: 200,
-        headers,
-        body: formatSse(events),
-      })
+      return
     }
+
+    await route.fulfill({
+      status: 200,
+      headers,
+      body: formatSse(events),
+    })
   })
 
   await page.route(`**/api/core/sessions/${sessionId}/confirm`, async (route) => {

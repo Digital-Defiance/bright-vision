@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG } from './config'
 import {
   applyLocalLlmToConfig,
+  formatLocalLlmEnvPanel,
+  formatLocalLlmDirectoryHelper,
+  localLlmEnvFileNote,
   formatLlmPingHint,
   formatLlmPingSummary,
   isOllamaVisionModel,
@@ -63,6 +66,26 @@ describe('localLlm', () => {
         logs: [],
       })
     ).toBe('LLM OK (120ms) · Core OK (8ms)')
+  })
+
+  it('labels XDG env path and shows merge winner', () => {
+    expect(localLlmEnvFileNote('/Users/me/.config/local-llm/env')).toContain('env')
+    expect(localLlmEnvFileNote('/repo/local-llm.env')).toBeNull()
+    const panel = formatLocalLlmEnvPanel({
+      sources: ['/Users/me/.config/local-llm/env', '/repo/local-llm.env'],
+      ollamaHost: 'http://127.0.0.1:11434',
+      dataModel: 'llama3.2:3b',
+      llmMode: null,
+    })
+    expect(panel).toContain('later files override')
+    expect(panel).toContain('/repo/local-llm.env')
+    expect(panel).toContain('DATA_MODEL=llama3.2:3b')
+  })
+
+  it('directory helper mentions override file name', () => {
+    expect(formatLocalLlmDirectoryHelper(null, '/custom')).toContain(
+      '/custom/local-llm.env'
+    )
   })
 
   it('hints when Ollama ok but core is down', () => {

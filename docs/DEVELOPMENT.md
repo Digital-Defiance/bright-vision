@@ -2,6 +2,8 @@
 
 Product backlog and priorities: [ROADMAP.md](./ROADMAP.md) — agents maintain and follow it until the open backlog is complete.
 
+**Engine:** [Cecli](https://cecli.dev) ([dwash96/cecli](https://github.com/dwash96/cecli)) plus BrightVision’s `bright_vision_core` HTTP layer, bundled in the **`BrightVision-core/`** submodule (PyPI `bright-vision-core`).
+
 **Project site:** [bright-vision.digitaldefiance.org](https://bright-vision.digitaldefiance.org) — static landing page in `docs/index.html`, deployed via [GitHub Pages](../.github/workflows/pages.yml) on pushes to `main` under `docs/`.
 
 ## Prerequisites

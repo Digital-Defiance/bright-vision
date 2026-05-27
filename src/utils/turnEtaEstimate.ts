@@ -103,6 +103,9 @@ export function estimateTurnEta(input: TurnEtaInput): TurnEtaEstimate {
   }
 
   lines.push(`Typical range: ${formatDurationMs(remaining)} – ${formatDurationMs(p90Remaining)} remaining`)
+  lines.push(
+    'GPU % (when logged) is not used for this estimate — correlation with time-left needs dogfood data (#34).'
+  )
 
   if (remaining <= 0 && input.elapsedMs > estimatedTotal * 1.2) {
     remaining = Math.max(0, p90Remaining)

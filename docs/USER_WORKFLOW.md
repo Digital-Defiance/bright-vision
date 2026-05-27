@@ -2,7 +2,7 @@
 
 ## What you install
 
-**BrightVision** is the desktop app. **BrightVision Core** ships inside it (submodule at `bright-vision-core/`: cecli + HTTP API). You do not add core to every project you code on.
+**BrightVision** is the desktop app. **Cecli** ships inside it (submodule at `bright-vision-core/`: cecli + HTTP API). You do not add core to every project you code on.
 
 ## First-time setup (developers)
 

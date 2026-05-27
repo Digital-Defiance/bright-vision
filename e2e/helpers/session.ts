@@ -18,7 +18,7 @@ export async function startMockSession(page: Page, opts: MockSessionOptions = {}
     tauriMock = await installMockTauri(page, tauriOpts)
   }
   await installMockCoreApi(page, coreOpts)
-  await gotoVision(page)
+  await gotoVision(page, { skipCoreMock: true })
   await page.getByTestId('nav-terminal').click()
   await page.getByTestId('terminal-start').click()
   await expect(page.getByTestId('session-status')).toContainText('Session active', {

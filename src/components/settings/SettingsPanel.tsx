@@ -14,7 +14,9 @@ import {
 import { isTauriRuntime } from '../../ipc/isTauri'
 import {
   applyLocalLlmToConfig,
-  formatLocalLlmSources,
+  formatLocalLlmDirectoryHelper,
+  formatLocalLlmEnvPanel,
+  isOllamaVisionModel,
   type LocalLlmSnapshot,
   type OllamaModelsSnapshot,
   resolveLocalLlmForConfig,
@@ -25,7 +27,9 @@ import { AppearanceSection } from './AppearanceSection'
 import { ThinkingTimingSection } from './ThinkingTimingSection'
 import { ResourceOverlaySection } from './ResourceOverlaySection'
 import type { ResourceOverlayPrefs } from '../../theme/resourceOverlayPrefs'
+import { LocalLlmActionButtons } from '../local-llm/LocalLlmActionButtons'
 import { LocalLlmPanel } from '../local-llm/LocalLlmPanel'
+import { useLocalLlmControls } from '../../hooks/useLocalLlmControls'
 import type { ThinkingTimingPrefs } from '../../theme/thinkingTimingPrefs'
 import type { SuggestedFilesPrefs } from '../../theme/suggestedFilesPrefs'
 import { SuggestedFilesSection } from './SuggestedFilesSection'
@@ -35,7 +39,9 @@ import { ModelRouterSection } from './ModelRouterSection'
 import type { ModelRouterPrefs } from '../../theme/modelRouterPrefs'
 import type { ThinkingStatsStore } from '../../utils/thinkingStats'
 import { AppVersionSection } from './AppVersionSection'
+import { AgentsSection } from './AgentsSection'
 import type { AppVersions } from '../../hooks/useAppVersions'
+import type { SubAgentInfo } from '../../ipc/agentCommands'
 
 interface SettingsPanelProps {
   config: VisionConfig
@@ -62,6 +68,9 @@ interface SettingsPanelProps {
   onSave: () => void
   onReset: () => void
   appVersions: AppVersions
+  subagents: SubAgentInfo[]
+  agentModeAvailable: boolean
+  sessionActive: boolean
 }
 
 export function SettingsPanel({
@@ -89,10 +98,14 @@ export function SettingsPanel({
   onSave,
   onReset,
   appVersions,
+  subagents,
+  agentModeAvailable,
+  sessionActive,
 }: SettingsPanelProps) {
   const [bundledEnginePath, setBundledEnginePath] = useState<string>('')
   const [localLlmSnap, setLocalLlmSnap] = useState<LocalLlmSnapshot | null>(null)
   const [ollamaTagsSnap, setOllamaTagsSnap] = useState<OllamaModelsSnapshot | null>(null)
+  const localLlmControls = useLocalLlmControls(config)
 
   const refreshLocalLlm = useCallback(() => {
     if (!isTauriRuntime()) return
@@ -127,7 +140,7 @@ export function SettingsPanel({
         Model & system
       </Typography>
       <Typography variant="body2" color="text.secondary">
-        Choose a <strong>project</strong> for git edits. The {CORE_ENGINE_DIR} engine is bundled with
+        Choose a <strong>project</strong> for git edits. Cecli + Vision API are bundled with
         the app — you only set the project path, not a copy of core per repo.
       </Typography>
 
@@ -157,14 +170,15 @@ export function SettingsPanel({
                 : 'Sets OLLAMA_API_BASE when spawning the engine (desktop). Leave empty for default Ollama.'
             }
           />
-          <LocalLlmPanel
-            config={config}
-            onManageChange={(manageLocalLlm) => onChange({ ...config, manageLocalLlm })}
-          />
           {isTauriRuntime() && (
             <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'action.hover' }}>
               <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                local-llm.env
+                Ollama env files
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                BrightVision reads <code>local-llm.env</code> or the XDG file{' '}
+                <code>~/.config/local-llm/env</code> (literally named <code>env</code>). Same
+                variables; different paths.
               </Typography>
               <Typography
                 variant="caption"
@@ -172,24 +186,23 @@ export function SettingsPanel({
                 component="pre"
                 sx={{ m: 0, mb: 1, fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}
               >
-                {localLlmSnap ? formatLocalLlmSources(localLlmSnap) : 'Loading…'}
+                {localLlmSnap ? formatLocalLlmEnvPanel(localLlmSnap) : 'Loading…'}
               </Typography>
               <TextField
-                label="local-llm directory (optional)"
+                label="Extra config directory (optional)"
                 fullWidth
                 size="small"
                 value={config.localLlmRoot}
                 onChange={(e) => onChange({ ...config, localLlmRoot: e.target.value })}
-                placeholder="optional override directory"
+                placeholder="directory that contains local-llm.env"
                 slotProps={{ input: { sx: { fontFamily: 'monospace', fontSize: '0.8rem' } } }}
-                helperText={
-                  localLlmSnap?.repoLocalLlmRoot
-                    ? `Found ${localLlmSnap.repoLocalLlmRoot}/local-llm.env`
-                    : 'Default: ./local-llm.env at repo root (gitignored), or ~/.config/local-llm/env'
-                }
+                helperText={formatLocalLlmDirectoryHelper(localLlmSnap, config.localLlmRoot)}
                 onBlur={refreshLocalLlm}
               />
-              <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1, mb: 0.5 }}>
+                <strong>Step 1 — Load disk into Settings:</strong> sync after editing an env file.
+              </Typography>
+              <Stack direction="row" spacing={1} sx={{ mb: 1.5 }}>
                 <Button
                   size="small"
                   variant="outlined"
@@ -200,14 +213,34 @@ export function SettingsPanel({
                     onChange(applyLocalLlmToConfig(config, localLlmSnap, false))
                   }}
                 >
-                  Sync settings from .env
+                  Sync from env files
                 </Button>
                 <Button size="small" onClick={refreshLocalLlm}>
-                  Refresh
+                  Refresh paths
                 </Button>
               </Stack>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                <strong>Step 2 — Start Ollama:</strong> after step 1 (or setting{' '}
+                <code>ollama_chat/…</code> above), use Start then Ping. Same controls as{' '}
+                <strong>Terminal → Local LLM</strong>. Ping checks inference; use{' '}
+                <strong>Terminal → Start</strong> for the coding session (Vision Core).
+              </Typography>
+              {isOllamaVisionModel(config.model) ? (
+                <LocalLlmActionButtons controls={localLlmControls} showSecondary={false} />
+              ) : (
+                <Typography variant="caption" color="warning.main" display="block">
+                  Set <strong>LLM model</strong> to <code>ollama_chat/&lt;tag&gt;</code> or click{' '}
+                  <strong>Sync from env files</strong> to enable Start and Ping.
+                </Typography>
+              )}
             </Paper>
           )}
+          <LocalLlmPanel
+            config={config}
+            controls={localLlmControls}
+            hideActions={isTauriRuntime()}
+            onManageChange={(manageLocalLlm) => onChange({ ...config, manageLocalLlm })}
+          />
           <TextField
             label="LiteLLM extra params (JSON)"
             fullWidth
@@ -341,6 +374,12 @@ export function SettingsPanel({
       </Paper>
 
       <AppearanceSection appearance={appearance} onChange={onAppearanceChange} />
+
+      <AgentsSection
+        subagents={subagents}
+        agentModeAvailable={agentModeAvailable}
+        sessionActive={sessionActive}
+      />
 
       <SuggestedFilesSection
         prefs={suggestedFilesPrefs}

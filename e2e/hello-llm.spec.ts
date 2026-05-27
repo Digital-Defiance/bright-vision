@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test'
-import { expectOptimisticSend } from './helpers/chatSend'
+import { expectOptimisticSend, expectTurnIdle } from './helpers/chatSend'
 import {
   assertOllamaForLlmE2e,
   buildLlmE2eConfig,
+  ensureLlmE2eWorkspace,
   isLlmE2eEnabled,
   resolveOllamaTagWithFallback,
   resolveVisionModel,
@@ -18,12 +19,15 @@ test.describe('Hello LLM (real Ollama + Vision core)', () => {
 
   test.beforeAll(async () => {
     await assertOllamaForLlmE2e()
+    ensureLlmE2eWorkspace()
   })
 
   test('hello turn completes with assistant text (no stall)', async ({ page }) => {
     const cfg = {
       ...buildLlmE2eConfig(),
-      model: visionModelFromTag(await resolveOllamaTagWithFallback()),
+      model:
+        resolveVisionModel() ||
+        visionModelFromTag(await resolveOllamaTagWithFallback()),
     }
     await page.addInitScript(
       ([key, config]) => {
@@ -47,15 +51,25 @@ test.describe('Hello LLM (real Ollama + Vision core)', () => {
     await expectOptimisticSend(page, prompt)
 
     const assistant = page.getByTestId('chat-message-assistant').first()
-    await expect(assistant).toBeVisible({ timeout: 240_000 })
+    const activity = page.getByTestId('vision-activity')
+    try {
+      await expect(assistant).toBeVisible({ timeout: 240_000 })
+    } catch {
+      const activityText = (await activity.innerText().catch(() => '')).trim()
+      throw new Error(
+        `No assistant message within 240s. Activity: ${activityText || '(none)'}\n` +
+          `If you see "network error", check Ollama (${cfg.ollamaApiBase}) and core on :8741.`
+      )
+    }
     const reply = (await assistant.innerText()).trim()
     expect(reply.length, 'assistant reply should not be empty').toBeGreaterThan(3)
 
     await expect(page.getByText(/Turn stalled/i)).toHaveCount(0)
     await expect(page.getByText(/likely stuck/i)).toHaveCount(0)
 
-    await expect(page.getByTestId('vision-activity')).toHaveCount(0, { timeout: 60_000 })
-    await expect(page.getByTestId('chat-send')).toBeEnabled({ timeout: 30_000 })
+    await expectTurnIdle(page)
+    await page.getByTestId('chat-input').fill('follow-up probe')
+    await expect(page.getByTestId('chat-send')).toBeEnabled()
   })
 })
 

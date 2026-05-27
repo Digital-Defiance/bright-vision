@@ -5,6 +5,8 @@ import packageJson from '../../package.json'
 import type { CoreHttpClient } from '../ipc/httpClient'
 import { isTauriRuntime } from '../ipc/isTauri'
 
+const isE2eBuild = import.meta.env.E2E === 'true'
+
 export interface AppVersions {
   /** Installed app / DMG version (Tauri bundle). */
   app: string | null
@@ -66,7 +68,7 @@ export function useAppVersions(
       let coreVer: string | null = null
       let cecliVer: string | null = null
 
-      if (coreClient) {
+      if (coreClient && !isE2eBuild) {
         try {
           const health = await coreClient.health()
           coreVer = health.versions?.bright_vision_core ?? null

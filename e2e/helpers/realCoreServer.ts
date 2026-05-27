@@ -1,21 +1,48 @@
-import { spawn, type ChildProcess } from 'node:child_process'
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { coreHealthUrl, REPO_ROOT } from './llmEnv'
+import { buildVisionCoreEnv, coreHealthUrl, ollamaEnvForCore, REPO_ROOT } from './llmEnv'
 
 const PID_FILE = path.join(REPO_ROOT, '.e2e-llm-core.pid')
 const CORE_PORT = 8741
 
-function resolvePython(): string {
+/**
+ * Venv `bin/python3` is often a symlink to Homebrew. Do not realpath it — spawning the
+ * base interpreter skips pyvenv.cfg and site-packages (uvicorn, bright_vision_core).
+ */
+function resolvePython(repoRoot: string): string {
+  const root = fs.realpathSync(repoRoot)
   const candidates = [
     process.env.E2E_PYTHON,
-    path.join(REPO_ROOT, '.venv', 'bin', 'python'),
-    path.join(REPO_ROOT, 'BrightVision-core', '.venv', 'bin', 'python'),
+    path.join(root, '.venv', 'bin', 'python3'),
+    path.join(root, '.venv', 'bin', 'python'),
+    process.env.VIRTUAL_ENV
+      ? path.join(process.env.VIRTUAL_ENV, 'bin', 'python3')
+      : '',
+    process.env.VIRTUAL_ENV
+      ? path.join(process.env.VIRTUAL_ENV, 'bin', 'python')
+      : '',
   ].filter(Boolean) as string[]
   for (const p of candidates) {
     if (fs.existsSync(p)) return p
   }
   return 'python3'
+}
+
+function assertPythonReady(python: string, repoRoot: string): void {
+  try {
+    execFileSync(
+      python,
+      ['-c', 'import uvicorn, bright_vision_core'],
+      { cwd: repoRoot, env: buildVisionCoreEnv(), stdio: 'pipe' }
+    )
+  } catch {
+    throw new Error(
+      `E2E python cannot import uvicorn/bright_vision_core (${python}).\n` +
+        `  source activate.sh   # from ${repoRoot}\n` +
+        `  export E2E_PYTHON="${path.join(repoRoot, '.venv', 'bin', 'python3')}"`
+    )
+  }
 }
 
 async function waitForHealth(timeoutMs: number): Promise<void> {
@@ -51,38 +78,50 @@ export async function startRealCoreServer(): Promise<void> {
     }
   }
 
-  const python = resolvePython()
-  const env = {
-    ...process.env,
-    BRIGHT_VISION_HEADLESS: '1',
-    AIDER_VISION_HEADLESS: '1',
+  const repoRoot = fs.realpathSync(REPO_ROOT)
+  const python = resolvePython(repoRoot)
+  if (!fs.existsSync(python)) {
+    throw new Error(
+      `E2E python not found (${python}). From repo root run: source activate.sh\n` +
+        `  (same path for shell and tests — avoid mixing /Users/... and /Volumes/... clones)`
+    )
   }
-  if (process.env.E2E_OLLAMA_HOST) {
-    env.OLLAMA_API_BASE = process.env.E2E_OLLAMA_HOST
-  }
+  assertPythonReady(python, repoRoot)
 
+  const env = buildVisionCoreEnv(ollamaEnvForCore())
+
+  const serveCli = path.join(repoRoot, '.venv', 'bin', 'bright-vision-core-serve')
+  const useServeCli = fs.existsSync(serveCli)
   const child: ChildProcess = spawn(
-    python,
-    [
-      '-m',
-      'uvicorn',
-      'bright_vision_core.http_api:app',
-      '--host',
-      '127.0.0.1',
-      '--port',
-      String(CORE_PORT),
-      '--log-level',
-      'warning',
-    ],
+    useServeCli ? serveCli : python,
+    useServeCli
+      ? ['--host', '127.0.0.1', '--port', String(CORE_PORT)]
+      : [
+          '-m',
+          'uvicorn',
+          'bright_vision_core.http_api:app',
+          '--host',
+          '127.0.0.1',
+          '--port',
+          String(CORE_PORT),
+          '--log-level',
+          'warning',
+        ],
     {
-      cwd: path.join(REPO_ROOT, 'BrightVision-core'),
+      cwd: repoRoot,
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
     }
   )
 
+  child.on('error', (err) => {
+    console.error(`[e2e-core] spawn failed: ${err.message}`)
+  })
+
   if (!child.pid) {
-    throw new Error('Failed to spawn Vision core (uvicorn)')
+    throw new Error(
+      `Failed to spawn Vision core (uvicorn) with ${python}. Run: source activate.sh`
+    )
   }
 
   fs.writeFileSync(PID_FILE, String(child.pid))

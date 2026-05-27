@@ -92,7 +92,18 @@ yarn playwright test e2e/session-lifecycle.spec.ts
 yarn playwright test --ui                        # debug interactively
 ```
 
-Preview reuses an existing server when not in CI (`reuseExistingServer` in `playwright.config.ts`), so a second run can be faster after the first build.
+Playwright uses **`vite.config.ts`** only (do not commit a stale `vite.config.js` — Vite prefers `.js` over `.ts` and will skip the E2E health stub + enable the `:8741` proxy).
+
+Playwright starts a fresh `E2E=1` preview via `scripts/e2e-preview.sh` (kills anything listening on port **4173** first). If preview still fails:
+
+```bash
+lsof -ti tcp:4173 | xargs kill -9   # macOS/Linux
+yarn test:e2e
+```
+
+If you see `[vite] http proxy error: /health`, an old preview without `E2E=1` was reused — re-run (do not use `reuseExistingServer` for default e2e).
+
+`gotoVision()` installs Playwright API mocks **before** `page.goto()` so health checks never hit a real core.
 
 ### Real LLM e2e (Ollama + Vision core)
 
@@ -102,7 +113,8 @@ Exercises a **live** `bright-vision-core` on `:8741` and your **Ollama** model (
 
 1. [Ollama](https://ollama.com/) running (`ollama serve` or the desktop app).
 2. A pulled model, e.g. `ollama pull llama3.2:3b` (or set `DATA_MODEL` in `./local-llm.env`).
-3. Python env: `source activate.sh` (installs `bright-vision-core` + uvicorn).
+3. Python env: `source activate.sh` from **one** repo path (installs cecli, `bright_vision_core`, uvicorn, pytest). If the repo is reachable as both `/Users/.../BrightVision` and `/Volumes/.../BrightVision`, use the same path for the shell and Playwright (`cd "$(pwd -P)"`).
+4. Port **8741** free (or stop a leftover core: `kill $(lsof -ti tcp:8741)`).
 
 **Run**
 
@@ -120,7 +132,11 @@ Optional env:
 |----------|---------|
 | `E2E_OLLAMA_MODEL` | LiteLLM id or bare tag (default `llama3.2:3b` or `DATA_MODEL` from `local-llm.env`) |
 | `E2E_OLLAMA_HOST` | Ollama base URL (default `http://127.0.0.1:11434`) |
-| `E2E_PYTHON` | Python binary for spawning core (default `.venv/bin/python`) |
+| `E2E_PYTHON` | Venv shim for spawning core (default `.venv/bin/python3`; `test:e2e:llm` sets this — do not point at Homebrew `python3.14` alone) |
+
+E2E clears **`PYTHONPATH`**. Do not export `PYTHONPATH=$PWD` — the repo’s `cecli/` folder is not the Python package and will break `import cecli` (`unknown location`).
+
+LLM UI e2e uses workspace `e2e/fixtures/hello-workspace` (minimal git repo), not the BrightVision superproject tree.
 
 Default `yarn test:e2e` **does not** run `hello-llm.spec.ts`.
 

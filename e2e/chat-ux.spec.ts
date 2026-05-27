@@ -61,4 +61,45 @@ test.describe('Chat UX (roadmap #1–2, #9–10, #13)', () => {
       .click()
     await expect(page.getByText('hello-e2e-dismiss')).toHaveCount(0)
   })
+
+  test('clear history removes transcript after confirm', async ({ page }) => {
+    await page.getByTestId('chat-input').fill('hello-e2e-clear-all')
+    await page.getByTestId('chat-send').click()
+    await expectOptimisticSend(page, 'hello-e2e-clear-all')
+    await expect(page.getByText('hello-e2e-clear-all')).toBeVisible()
+
+    const clearBtn = page.getByTestId('chat-clear-history')
+    await expect(clearBtn).toBeEnabled()
+
+    const clearCore = page.waitForRequest(
+      (req) =>
+        req.method() === 'POST' &&
+        req.url().includes('/messages') &&
+        (req.postDataJSON() as { content?: string })?.content === '/clear'
+    )
+
+    page.once('dialog', async (dialog) => {
+      expect(dialog.type()).toBe('confirm')
+      expect(dialog.message()).toMatch(/send \/clear/i)
+      await dialog.accept()
+    })
+    await clearBtn.click()
+    await clearCore
+
+    await expect(page.getByText('hello-e2e-clear-all')).toHaveCount(0)
+    await expect(clearBtn).toBeDisabled()
+  })
+
+  test('clear history cancel keeps transcript', async ({ page }) => {
+    await page.getByTestId('chat-input').fill('hello-e2e-clear-cancel')
+    await page.getByTestId('chat-send').click()
+    await expectOptimisticSend(page, 'hello-e2e-clear-cancel')
+    await expect(page.getByText('hello-e2e-clear-cancel')).toBeVisible()
+
+    page.once('dialog', (dialog) => dialog.dismiss())
+    await page.getByTestId('chat-clear-history').click()
+
+    await expect(page.getByText('hello-e2e-clear-cancel')).toBeVisible()
+    await expect(page.getByTestId('chat-clear-history')).toBeEnabled()
+  })
 })

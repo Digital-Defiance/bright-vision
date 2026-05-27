@@ -10,6 +10,7 @@ import {
   Paper,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useRef } from 'react'
@@ -33,6 +34,8 @@ import type { TurnThinkingTiming } from '../../utils/thinkingTiming'
 import type { ThinkingTimingPrefs } from '../../theme/thinkingTimingPrefs'
 import type { SuggestedFilesPrefs } from '../../theme/suggestedFilesPrefs'
 import { ModelRouterBar, type RouterEscalateOffer } from './ModelRouterBar'
+import { ChatAgentBar } from './ChatAgentBar'
+import type { SubAgentInfo } from '../../ipc/agentCommands'
 import type { ModelRouteSnapshot } from '../../ipc/modelRouterLlm'
 
 export interface ChatMessage {
@@ -78,6 +81,7 @@ interface ChatPanelProps {
   onConfirmAnswer: (accepted: boolean) => void
   onDismissMessage: (id: number) => void
   onDismissToolEvent: (id: number) => void
+  onClearHistory?: () => void
   commands: VisionCommand[]
   onPickCommand: (command: string) => void
   useNativeImagePicker?: boolean
@@ -109,6 +113,8 @@ interface ChatPanelProps {
   onEscalateRouter?: () => void
   onForceRouterTier?: (tier: 'fast' | 'heavy') => void
   onDismissRouterEscalate?: () => void
+  subagents?: SubAgentInfo[]
+  agentModeAvailable?: boolean
 }
 
 export function ChatPanel({
@@ -129,6 +135,7 @@ export function ChatPanel({
   onConfirmAnswer,
   onDismissMessage,
   onDismissToolEvent,
+  onClearHistory,
   commands,
   onPickCommand,
   useNativeImagePicker,
@@ -160,6 +167,8 @@ export function ChatPanel({
   onEscalateRouter,
   onForceRouterTier,
   onDismissRouterEscalate,
+  subagents = [],
+  agentModeAvailable = false,
 }: ChatPanelProps) {
   const pathTabIndex = useRef(0)
   const pathPrefix = parseFileCommandInput(inputValue)?.pathPrefix ?? ''
@@ -176,6 +185,9 @@ export function ChatPanel({
     () => mergeChatTimeline(messages, meaningfulToolEvents),
     [messages, meaningfulToolEvents]
   )
+
+  const canClearHistory =
+    Boolean(onClearHistory) && (messages.length > 0 || meaningfulToolEvents.length > 0)
 
   return (
     <Box
@@ -197,7 +209,7 @@ export function ChatPanel({
           </Typography>
         </Alert>
       )}
-      <Box sx={{ flex: 1, overflow: 'auto', mb: 1, px: 1 }}>
+      <Box sx={{ flex: 1, overflow: 'auto', mb: 1, px: 1, minHeight: 0 }}>
         {messages.length === 0 && meaningfulToolEvents.length === 0 && (
           <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
             <Typography color="text.secondary">
@@ -336,6 +348,47 @@ export function ChatPanel({
             )
           )}
         </Stack>
+        {onClearHistory && (
+          <Box
+            sx={{
+              position: 'sticky',
+              bottom: 0,
+              zIndex: 1,
+              display: 'flex',
+              justifyContent: 'flex-end',
+              pt: 0.5,
+              pb: 0.25,
+              mt: -0.5,
+              pointerEvents: 'none',
+              '& > *': { pointerEvents: 'auto' },
+            }}
+          >
+            <Tooltip title="Clear chat history">
+              <span>
+                <IconButton
+                  size="small"
+                  aria-label="Clear chat history"
+                  data-testid="chat-clear-history"
+                  disabled={!canClearHistory || isBusy}
+                  onClick={onClearHistory}
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 1,
+                    border: 1,
+                    borderColor: 'divider',
+                    bgcolor: 'background.paper',
+                    opacity: canClearHistory ? 0.75 : 0.35,
+                    '&:hover':
+                      canClearHistory ? { opacity: 1, bgcolor: 'action.hover' } : undefined,
+                  }}
+                >
+                  <CloseIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Box>
+        )}
         <div ref={chatEndRef} />
       </Box>
 
@@ -362,6 +415,13 @@ export function ChatPanel({
             onOpenInEditor={onOpenInEditor}
           />
         )}
+
+      <ChatAgentBar
+        subagents={subagents}
+        agentModeAvailable={agentModeAvailable}
+        disabled={!isRunning}
+        onPickCommand={onPickCommand}
+      />
 
       <CommandAssist
         commands={commands}

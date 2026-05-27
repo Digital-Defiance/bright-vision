@@ -3,11 +3,14 @@
 import { isTauriRuntime } from './isTauri'
 
 /** Embedded engine tree relative to workspace (submodule / translocated body). */
-/** Default engine submodule; override via Settings or `VITE_CORE_ENGINE_DIR`. */
+/**
+ * Directory containing `scripts/vision_serve.py` (repo root `.` after engine split).
+ * Cecli agent code lives in submodule `cecli/`; Vision HTTP in `bright_vision_core/`.
+ */
 export const CORE_ENGINE_DIR =
   (typeof import.meta !== 'undefined' &&
     import.meta.env?.VITE_CORE_ENGINE_DIR) ||
-  'BrightVision-core'
+  '.'
 
 export interface VisionConfig {
   model: string

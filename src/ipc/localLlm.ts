@@ -130,7 +130,56 @@ export function applyLocalLlmToConfig(
   return next
 }
 
+/** Short note when the on-disk filename is not `local-llm.env`. */
+export function localLlmEnvFileNote(path: string): string | null {
+  const base = path.replace(/[/\\]+$/, '').split(/[/\\]/).pop() ?? path
+  if (base === 'env') return 'filename: env (XDG / legacy local-llm)'
+  return null
+}
+
 export function formatLocalLlmSources(snap: LocalLlmSnapshot): string {
   if (!snap.sources.length) return 'No local-llm config files found'
   return snap.sources.join('\n')
+}
+
+/** Settings panel: paths, load order, and merged keys from disk. */
+export function formatLocalLlmEnvPanel(snap: LocalLlmSnapshot): string {
+  if (!snap.sources.length) {
+    return [
+      'No env files found on disk.',
+      '',
+      'Recommended: cp local-llm.env.example → local-llm.env at the BrightVision repo root.',
+      'Optional XDG: ~/.config/local-llm/env — the file is named env (no .env extension).',
+    ].join('\n')
+  }
+  const lines = snap.sources.map((p, i) => {
+    const note = localLlmEnvFileNote(p)
+    return note ? `${i + 1}. ${p}\n   (${note})` : `${i + 1}. ${p}`
+  })
+  const winner = snap.sources[snap.sources.length - 1]!
+  const effective: string[] = []
+  if (snap.dataModel?.trim()) effective.push(`DATA_MODEL=${snap.dataModel.trim()}`)
+  if (snap.ollamaHost?.trim()) effective.push(`OLLAMA_HOST=${snap.ollamaHost.trim()}`)
+  const parts = [
+    'Read order — later files override earlier:',
+    ...lines,
+    '',
+    `→ Values taken from: ${winner}`,
+  ]
+  if (effective.length) parts.push(`   ${effective.join(' · ')}`)
+  return parts.join('\n')
+}
+
+export function formatLocalLlmDirectoryHelper(
+  snap: LocalLlmSnapshot | null,
+  localLlmRoot: string
+): string {
+  const override = localLlmRoot.trim()
+  if (override) {
+    return `Also reads ${override}/local-llm.env (applied last, overrides paths above).`
+  }
+  if (snap?.repoLocalLlmRoot) {
+    return `Repo file: ${snap.repoLocalLlmRoot}/local-llm.env · XDG: ~/.config/local-llm/env (different filename).`
+  }
+  return 'Repo: ./local-llm.env (recommended). XDG: ~/.config/local-llm/env — file is named env, not local-llm.env.'
 }

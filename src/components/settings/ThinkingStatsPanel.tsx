@@ -22,7 +22,8 @@ import {
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
-import { formatAvgPeakPct } from '../../ipc/resourceSnapshot'
+import { formatResourcePct } from '../../ipc/resourceSnapshot'
+import type { TimingResourceDisplay } from '../../theme/thinkingTimingPrefs'
 import { isTauriRuntime } from '../../ipc/isTauri'
 import {
   downloadThinkingStatsCsv,
@@ -177,6 +178,13 @@ export function ThinkingStatsPanel({
   const storedCount = filterModel
     ? store.history.filter((r) => r.model === filterModel).length
     : store.history.length
+
+  const resourceMode: TimingResourceDisplay = timingPrefs.resourceDisplay ?? 'avgPeak'
+  const resourceColLabel = (name: string) => {
+    if (resourceMode === 'peak') return `${name} peak`
+    if (resourceMode === 'avg') return `${name} avg`
+    return `${name} avg/max`
+  }
 
   return (
     <Box sx={{ mt: 2, width: '100%', minWidth: 0 }} data-testid="timing-stats-panel">
@@ -357,7 +365,7 @@ export function ThinkingStatsPanel({
         {storedCount > TIMING_STATS_DISPLAY_ROWS ? ` · ${storedCount} stored` : ''}
         )
         {isTauriRuntime()
-          ? ' · CPU/RAM/GPU: avg / peak % while the turn runs (system-wide polls)'
+          ? ` · CPU/RAM/GPU: ${resourceMode === 'avgPeak' ? 'avg / peak' : resourceMode} % while the turn runs (system-wide; not used for ETA)`
           : ''}
         {' · TPS when core emits a usage line (↑↓ or Tokens:) on the turn'}
       </Typography>
@@ -377,9 +385,9 @@ export function ThinkingStatsPanel({
               <TableCell align="right">Think %</TableCell>
               {isTauriRuntime() && (
                 <>
-                  <TableCell align="right">CPU avg/max</TableCell>
-                  <TableCell align="right">RAM avg/max</TableCell>
-                  <TableCell align="right">GPU avg/max</TableCell>
+                  <TableCell align="right">{resourceColLabel('CPU')}</TableCell>
+                  <TableCell align="right">{resourceColLabel('RAM')}</TableCell>
+                  <TableCell align="right">{resourceColLabel('GPU')}</TableCell>
                 </>
               )}
               <TableCell align="right">Prompt</TableCell>
@@ -421,19 +429,19 @@ export function ThinkingStatsPanel({
                           : undefined
                       }
                     >
-                      {formatAvgPeakPct(row.avgCpuPct, row.peakCpuPct)}
+                      {formatResourcePct(row.avgCpuPct, row.peakCpuPct, resourceMode)}
                     </TableCell>
                     <TableCell
                       align="right"
                       sx={{ fontFamily: 'var(--vision-font-chat, monospace)', fontSize: '0.75rem' }}
                     >
-                      {formatAvgPeakPct(row.avgMemPct, row.peakMemPct)}
+                      {formatResourcePct(row.avgMemPct, row.peakMemPct, resourceMode)}
                     </TableCell>
                     <TableCell
                       align="right"
                       sx={{ fontFamily: 'var(--vision-font-chat, monospace)', fontSize: '0.75rem' }}
                     >
-                      {formatAvgPeakPct(row.avgGpuPct, row.peakGpuPct)}
+                      {formatResourcePct(row.avgGpuPct, row.peakGpuPct, resourceMode)}
                     </TableCell>
                   </>
                 )}

@@ -9,7 +9,7 @@ export const PRODUCT_VISION = 'bright-vision'
 export const PRODUCT_CORE = 'bright-vision-core'
 
 export const DISPLAY_VISION = 'BrightVision'
-export const DISPLAY_CORE = 'BrightVision Core'
+export const DISPLAY_CORE = 'Cecli'
 /** Sidebar rail fallback if logo fails to load */
 export const DISPLAY_MONOGRAM = 'BV'
 

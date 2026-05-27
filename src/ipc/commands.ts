@@ -1,4 +1,5 @@
 import type { CoreHttpClient } from './httpClient'
+import { mergeAgentCommandFallbacks } from './agentCommands'
 import { mergeCommandCatalog } from './visionClientCommands'
 
 export interface VisionCommand {
@@ -37,7 +38,8 @@ export async function fetchSessionCommands(
   sessionId: string
 ): Promise<VisionCommand[]> {
   const core = await client.listCommands(sessionId)
-  return mergeCommandCatalog(core.length > 0 ? core : DEFAULT_COMMANDS)
+  const merged = mergeCommandCatalog(core.length > 0 ? core : DEFAULT_COMMANDS)
+  return mergeAgentCommandFallbacks(merged)
 }
 
 export { mergeCommandCatalog, VISION_CLIENT_COMMANDS } from './visionClientCommands'

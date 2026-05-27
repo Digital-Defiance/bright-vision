@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import { installMockCoreApi } from './mockCoreApi'
 
 /** Minimal config for web e2e (core API mocked at /api/core). */
 export const E2E_CONFIG = {
@@ -11,7 +12,7 @@ export const E2E_CONFIG = {
   autoApproveLimit: 0,
   promptBeforeCommit: false,
   autoStageOnDone: true,
-  coreEnginePath: 'BrightVision-core',
+  coreEnginePath: '.',
   pythonPath: '',
   coreApiUrl: '/api/core',
   coreApiToken: '',
@@ -27,7 +28,11 @@ export async function primeVisionApp(page: Page) {
   }, E2E_CONFIG)
 }
 
-export async function gotoVision(page: Page) {
+/** Open app with e2e config; install core API mocks before navigation (avoids Vite → :8741 proxy noise). */
+export async function gotoVision(page: Page, opts?: { skipCoreMock?: boolean }) {
   await primeVisionApp(page)
+  if (!opts?.skipCoreMock) {
+    await installMockCoreApi(page)
+  }
   await page.goto('/')
 }

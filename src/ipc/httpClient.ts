@@ -96,6 +96,17 @@ export class CoreHttpClient {
     return data.commands
   }
 
+  async listSubagents(sessionId: string): Promise<{
+    subagents: { name: string; model: string | null; prompt_preview: string }[]
+    agent_mode_available: boolean
+  }> {
+    const res = await fetch(`${this.baseUrl}/sessions/${sessionId}/subagents`, {
+      headers: this.headers(false),
+    })
+    if (!res.ok) throw new Error(`subagents: ${res.status}`)
+    return res.json()
+  }
+
   async getSession(sessionId: string): Promise<CoreSessionInfo> {
     const res = await fetch(`${this.baseUrl}/sessions/${sessionId}`, {
       headers: this.headers(false),

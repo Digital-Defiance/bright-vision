@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Roadmap #19: verify superproject workspace + engine submodule (bright-vision-core default).
+Verify superproject workspace + cecli submodule + parent bright_vision_core.
 
 Run from repo root (after activate.sh):
 
@@ -8,43 +8,38 @@ Run from repo root (after activate.sh):
 """
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-
-ENGINE_NAME = os.environ.get("BRIGHT_VISION_ENGINE", "BrightVision-core")
-if ENGINE_NAME in ("bright-vision-core", "BrightVision-core"):
-    CORE = ROOT / "BrightVision-core"
-    SUB_REL = "BrightVision-core/bright_vision_core/session.py"
-    PKG = "bright_vision_core"
-elif ENGINE_NAME == "aider-vision-core":
-    CORE = ROOT / "aider-vision-core"
-    SUB_REL = "aider-vision-core/aider_vision_core/session.py"
-    PKG = "aider_vision_core"
-else:
-    CORE = ROOT / ENGINE_NAME
-    SUB_REL = f"{ENGINE_NAME}/bright_vision_core/session.py"
-    PKG = "bright_vision_core"
+PKG = "bright_vision_core"
+VISION_REL = "bright_vision_core/session.py"
 
 
-def _python_hint() -> str:
-    return (
-        f"Install deps: source activate.sh (installs editable {ENGINE_NAME})"
-    )
+def _cecli_submodule_name() -> str | None:
+    if (ROOT / "cecli").is_dir():
+        return "cecli"
+    if (ROOT / "BrightVision-core").is_dir():
+        return "BrightVision-core"
+    return None
 
 
 def main() -> int:
-    if not CORE.is_dir():
-        print(f"FAIL: missing submodule checkout at {CORE}")
+    if not (ROOT / VISION_REL).is_file():
+        print(f"FAIL: missing {VISION_REL} (run from BrightVision repo root)")
         return 1
 
-    sys.path.insert(0, str(CORE))
+    cecli_name = _cecli_submodule_name()
+    if not cecli_name:
+        print("FAIL: no cecli submodule (cecli/ or BrightVision-core/)")
+        return 1
 
     try:
         event_io = __import__(f"{PKG}.event_io", fromlist=["EventIO"])
-        git_ws = __import__(f"{PKG}.git_workspace", fromlist=["RepoSet", "create_git_workspace", "discover_submodule_paths"])
+        git_ws = __import__(
+            f"{PKG}.git_workspace",
+            fromlist=["RepoSet", "create_git_workspace", "discover_submodule_paths"],
+        )
         session_mod = __import__(f"{PKG}.session", fromlist=["Session"])
         EventIO = event_io.EventIO
         RepoSet = git_ws.RepoSet
@@ -53,48 +48,39 @@ def main() -> int:
         Session = session_mod.Session
     except ModuleNotFoundError as err:
         print(f"FAIL: cannot import {PKG} ({err})")
-        print(_python_hint())
+        print("Install: source activate.sh")
         return 1
 
     checks: list[tuple[str, bool]] = []
 
     paths = discover_submodule_paths(str(ROOT))
-    checks.append(
-        (
-            f"git discovers {ENGINE_NAME} submodule",
-            ENGINE_NAME in paths,
-        )
-    )
+    checks.append((f"git discovers {cecli_name} submodule", cecli_name in paths))
 
     io = EventIO(yes=True, echo_to_console=False)
     ws = create_git_workspace(io, [], str(ROOT))
     checks.append(("create_git_workspace is RepoSet", isinstance(ws, RepoSet)))
-    checks.append(
-        (
-            f"path_in_repo({SUB_REL})",
-            bool(ws.path_in_repo(SUB_REL)),
+    vision_path = ROOT / VISION_REL
+    checks.append((f"{VISION_REL} on disk", vision_path.is_file()))
+    in_repo = bool(ws.path_in_repo(VISION_REL)) if vision_path.is_file() else False
+    if vision_path.is_file() and not in_repo:
+        print(
+            f"NOTE: {VISION_REL} is not git-tracked; "
+            "run `git add bright_vision_core/` for /add on Vision layer files."
         )
-    )
-
-    sub_root = ws.repo_for_rel_path(SUB_REL).root if isinstance(ws, RepoSet) else ""
-    checks.append(
-        (
-            f"submodule repo root is {ENGINE_NAME}",
-            sub_root.endswith(ENGINE_NAME),
-        )
-    )
+    else:
+        checks.append((f"path_in_repo({VISION_REL})", in_repo))
 
     session = Session.create(
         str(ROOT),
-        files=[str(ROOT / SUB_REL)],
+        files=[str(ROOT / VISION_REL)],
         yes=True,
         dry_run=True,
     )
     inchat = session.coder.get_inchat_relative_files()
     checks.append(
         (
-            "Session adds submodule file to chat",
-            SUB_REL.replace("\\", "/") in [p.replace("\\", "/") for p in inchat],
+            "Session adds bright_vision_core file to chat",
+            VISION_REL.replace("\\", "/") in [p.replace("\\", "/") for p in inchat],
         )
     )
     checks.append(
@@ -110,7 +96,7 @@ def main() -> int:
     if failed:
         print(f"\n{failed} check(s) failed.")
         return 1
-    print(f"\nAll submodule workspace checks passed ({ENGINE_NAME}).")
+    print("\nAll workspace checks passed (parent bright_vision_core + cecli submodule).")
     return 0
 
 

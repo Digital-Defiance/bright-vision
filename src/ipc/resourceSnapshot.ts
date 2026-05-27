@@ -112,6 +112,19 @@ export function formatAvgPeakPct(
   return `${a} / ${p}%`
 }
 
+export type ResourcePctDisplay = 'avgPeak' | 'peak' | 'avg'
+
+/** Format CPU/RAM/GPU cell per Settings display mode. */
+export function formatResourcePct(
+  avg: number | null | undefined,
+  peak: number | null | undefined,
+  mode: ResourcePctDisplay
+): string {
+  if (mode === 'avgPeak') return formatAvgPeakPct(avg, peak)
+  if (mode === 'peak') return formatPeakPct(peak)
+  return formatPeakPct(avg)
+}
+
 export interface ResourceOverlayRow {
   id: 'cpu' | 'ram' | 'gpu'
   label: string

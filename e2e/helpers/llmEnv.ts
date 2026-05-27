@@ -1,9 +1,13 @@
+import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const E2E_DIR = path.dirname(fileURLToPath(import.meta.url))
 export const REPO_ROOT = path.resolve(E2E_DIR, '../..')
+
+/** Minimal git repo — same idea as `tests/core/test_hello_llm.py` (GitTemporaryDirectory). */
+export const LLM_E2E_WORKSPACE = path.join(REPO_ROOT, 'e2e/fixtures/hello-workspace')
 
 const CORE_API_URL = 'http://127.0.0.1:8741'
 const DEFAULT_OLLAMA_HOST = 'http://127.0.0.1:11434'
@@ -103,6 +107,35 @@ export function resolveVisionModel(): string {
   return ''
 }
 
+/** Create/init minimal workspace (committed README; `.git` created on first LLM e2e run). */
+export function ensureLlmE2eWorkspace(): string {
+  fs.mkdirSync(LLM_E2E_WORKSPACE, { recursive: true })
+  const readme = path.join(LLM_E2E_WORKSPACE, 'README.md')
+  if (!fs.existsSync(readme)) {
+    fs.writeFileSync(readme, '# E2E hello workspace\n', 'utf8')
+  }
+  if (!fs.existsSync(path.join(LLM_E2E_WORKSPACE, '.git'))) {
+    execSync(
+      'git init -b main && git add README.md && git -c user.email=e2e@test -c user.name=e2e commit -m "e2e init"',
+      { cwd: LLM_E2E_WORKSPACE, stdio: 'pipe' }
+    )
+  }
+  return LLM_E2E_WORKSPACE
+}
+
+/** Env vars the headless core needs for LiteLLM → Ollama (UI config does not reach the server process). */
+export function ollamaEnvForCore(): Record<string, string> {
+  const out: Record<string, string> = {}
+  const host = resolveOllamaHost()
+  if (host) out.OLLAMA_API_BASE = host
+  const file = loadLocalLlmEnv()
+  if (file.OLLAMA_API_KEY?.trim()) out.OLLAMA_API_KEY = file.OLLAMA_API_KEY.trim()
+  if (file.OLLAMA_HOST?.trim() && !out.OLLAMA_API_BASE) {
+    out.OLLAMA_API_BASE = file.OLLAMA_HOST.trim()
+  }
+  return out
+}
+
 export function buildLlmE2eConfig() {
   const host = resolveOllamaHost()
   return {
@@ -111,11 +144,11 @@ export function buildLlmE2eConfig() {
     localLlmRoot: '',
     manageLocalLlm: false,
     extraParams: '{}',
-    workingDir: REPO_ROOT,
+    workingDir: ensureLlmE2eWorkspace(),
     autoApproveLimit: 0,
     promptBeforeCommit: true,
     autoStageOnDone: false,
-    coreEnginePath: 'BrightVision-core',
+    coreEnginePath: '.',
     pythonPath: '',
     coreApiUrl: '/api/core',
     coreApiToken: '',
@@ -152,4 +185,16 @@ export async function assertOllamaForLlmE2e(): Promise<void> {
 
 export function coreHealthUrl(): string {
   return `${CORE_API_URL}/health`
+}
+
+/** Env for spawning Vision core — must not put repo root on PYTHONPATH (shadows `cecli`). */
+export function buildVisionCoreEnv(
+  extra: Record<string, string> = {}
+): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env, ...extra }
+  env.PYTHONSAFEPATH = '1'
+  env.BRIGHT_VISION_HEADLESS = '1'
+  env.AIDER_VISION_HEADLESS = '1'
+  delete env.PYTHONPATH
+  return env
 }

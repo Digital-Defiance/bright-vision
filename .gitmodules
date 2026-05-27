@@ -1,3 +1,3 @@
-[submodule "bright-vision-core"]
-	path = BrightVision-core
-	url = https://github.com/Digital-Defiance/BrightVision-core.git
+[submodule "cecli"]
+	path = cecli
+	url = https://github.com/Digital-Defiance/cecli.git

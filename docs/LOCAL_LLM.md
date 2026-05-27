@@ -61,7 +61,7 @@ DATA_MODEL=qwen3.6:27b-q4_K_M
 | `OLLAMA_HOST` | **Ollama API base** → injected as `OLLAMA_API_BASE` when spawning the core |
 | `DATA_MODEL` / `LLM_MODEL` / `CHAT_MODEL` | **LLM model** as `ollama_chat/<tag>` |
 
-On launch, Vision **fills empty** fields from those files. Use **Settings → Sync settings from .env** to overwrite model and Ollama base from disk. **Save**, then **Terminal → Local LLM → Start** and **Terminal → Start** (session).
+On launch, Vision **fills empty** fields from those files. Use **Settings → Ollama env files → Sync from env files** to overwrite model and Ollama base from disk, then **Start Local LLM** and **Ping LLM** in the same section (same as **Terminal → Local LLM**). **Save**, then **Terminal → Start** (session).
 
 ## Quick path (macOS)
 
