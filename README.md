@@ -8,7 +8,7 @@
 
 A **local-LLM-first** desktop IDE (Tauri + React) for AI-assisted coding — spec-driven tasks, superproject git, and a headless engine you control. **Two days of focused product work** (May 2026) shipped a full chat loop, tasks, git, editor, timing intelligence, and cecli agent hooks — not a thin wrapper.
 
-**Powered by [Cecli](https://cecli.dev)** — the coding agent from [dwash96/cecli](https://github.com/dwash96/cecli) (coders, slash commands, agents, MCP, LiteLLM). BrightVision adds a thin **`bright_vision_core`** HTTP/SSE layer so the React shell never drives the terminal CLI. Vision HTTP layer: **`bright_vision_core/`** in this repo (optional PyPI `bright-vision-core`). Cecli agent: git submodule **`cecli/`** → [Digital-Defiance/cecli](https://github.com/Digital-Defiance/cecli).
+**Built in partnership with the [Cecli](https://cecli.dev) team** — coding agent from [dwash96/cecli](https://github.com/dwash96/cecli) (coders, slash commands, agents, MCP, LiteLLM). BrightVision adds **`bright_vision_core`** HTTP/SSE so the React shell never drives the terminal CLI. Vision API: **`bright_vision_core/`** in this repo (PyPI `bright-vision-core`). Agent: submodule **`cecli/`** → [Digital-Defiance/cecli](https://github.com/Digital-Defiance/cecli).
 
 <img width="1392" height="832" alt="BrightVision screenshot" src="https://github.com/user-attachments/assets/646e3140-72c5-4760-84ae-24b4b9015434" />
 
@@ -69,8 +69,8 @@ yarn tauri dev
 |-----|--------|
 | [FEATURES.md](docs/FEATURES.md) | Product feature catalog |
 | [ROADMAP.md](docs/ROADMAP.md) | Status & fix order |
-| [ENGINE_TRANSITION.md](docs/ENGINE_TRANSITION.md) | Split `BrightVision-core` → `cecli/` submodule + parent `bright_vision_core` |
-| [UPSTREAM_CECLI.md](docs/UPSTREAM_CECLI.md) | Cecli upstream + slim-down strategy |
+| [UPSTREAM_CECLI.md](docs/UPSTREAM_CECLI.md) | Cecli submodule + Vision API layout |
+| [ENGINE_TRANSITION.md](docs/ENGINE_TRANSITION.md) | Integration checklist (PyPI, CI) |
 | [CECLI_MIGRATION_ROADMAP.md](docs/CECLI_MIGRATION_ROADMAP.md) | Engine port to cecli |
 | [LOCAL_LLM.md](docs/LOCAL_LLM.md) | Ollama & local panel |
 | [SPEC_DRIVEN_DEV.md](docs/SPEC_DRIVEN_DEV.md) | Tasks workflow |

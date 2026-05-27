@@ -187,7 +187,7 @@ export function coreHealthUrl(): string {
   return `${CORE_API_URL}/health`
 }
 
-/** Env for spawning Vision core — must not put repo root on PYTHONPATH (shadows `cecli`). */
+/** Env for spawning Vision API — must not put repo root on PYTHONPATH (shadows `cecli`). */
 export function buildVisionCoreEnv(
   extra: Record<string, string> = {}
 ): NodeJS.ProcessEnv {

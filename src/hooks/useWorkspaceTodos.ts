@@ -284,7 +284,7 @@ export function useWorkspaceTodos(
         await reload()
         return
       }
-      throw new Error('Sync from disk requires the desktop app or core API')
+      throw new Error('Sync from disk requires the desktop app or a running Vision API session')
     },
     [httpReady, api, tauriLocal, workingDir, reload]
   )

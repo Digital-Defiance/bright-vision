@@ -1,4 +1,4 @@
-/** Slash commands handled in the shell (not sent to Vision core). */
+/** Slash commands handled in the shell (not sent to the Vision API / Cecli turn). */
 
 export type VisionClientCommandId = 'ps' | 'tags' | 'models'
 

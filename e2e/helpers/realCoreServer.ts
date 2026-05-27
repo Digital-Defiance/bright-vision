@@ -63,7 +63,7 @@ async function waitForHealth(timeoutMs: number): Promise<void> {
     }
     await new Promise((r) => setTimeout(r, 500))
   }
-  throw new Error(`Vision core did not become healthy within ${timeoutMs}ms (${lastErr})`)
+  throw new Error(`Vision API did not become healthy within ${timeoutMs}ms (${lastErr})`)
 }
 
 export async function startRealCoreServer(): Promise<void> {
@@ -120,7 +120,7 @@ export async function startRealCoreServer(): Promise<void> {
 
   if (!child.pid) {
     throw new Error(
-      `Failed to spawn Vision core (uvicorn) with ${python}. Run: source activate.sh`
+      `Failed to spawn Vision API (uvicorn) with ${python}. Run: source activate.sh`
     )
   }
 

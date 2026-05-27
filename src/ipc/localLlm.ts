@@ -1,3 +1,4 @@
+import { DISPLAY_VISION_API } from '../brand'
 import { DEFAULT_CONFIG, type VisionConfig } from './config'
 
 export interface OllamaModelRow {
@@ -54,17 +55,17 @@ export function formatLlmPingSummary(r: LlmPingResult): string {
   if (r.coreReachable != null) {
     parts.push(
       r.coreReachable
-        ? `Core OK${r.coreLatencyMs != null ? ` (${r.coreLatencyMs}ms)` : ''}`
-        : 'Core not running'
+        ? `${DISPLAY_VISION_API} OK${r.coreLatencyMs != null ? ` (${r.coreLatencyMs}ms)` : ''}`
+        : `${DISPLAY_VISION_API} not running`
     )
   }
   return parts.join(' · ')
 }
 
-/** Hint when ping succeeds against Ollama but Vision Core HTTP is down. */
+/** Hint when ping succeeds against Ollama but the Vision API HTTP server is down. */
 export function formatLlmPingHint(r: LlmPingResult): string | null {
   if (!r.generateOk || r.coreReachable !== false) return null
-  return 'Ollama inference works. Start the coding session (Terminal → Start) to run Vision Core on :8741.'
+  return `Ollama inference works. Start the coding session (Terminal → Start) so ${DISPLAY_VISION_API} listens on :8741.`
 }
 
 export interface LocalLlmSnapshot {

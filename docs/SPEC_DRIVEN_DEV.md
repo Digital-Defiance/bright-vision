@@ -39,7 +39,7 @@ Legacy single `spec` is migrated into `requirements` on load when layers are emp
 
 ## v4b (shipped)
 
-1. **Generate spec** / **Refine spec** — Tasks tab buttons; requires active session + core API.  
+1. **Generate spec** / **Refine spec** — Tasks tab buttons; requires active session + Vision API.  
    `POST /sessions/{id}/todos/{todo_id}/generate-spec` or workspace route with `session_id` query.  
    Body: `{ "prompt", "mode": "generate"|"refine", "apply": true }`.
 2. **Steered implementation** — parsed numbered lines in `tasks_md`; **Implement** per step prefills chat.

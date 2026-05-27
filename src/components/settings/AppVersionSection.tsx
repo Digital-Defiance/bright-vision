@@ -1,4 +1,12 @@
+import Link from '@mui/material/Link'
 import { Paper, Stack, Typography } from '@mui/material'
+import {
+  CECLI_GITHUB_URL,
+  CECLI_HOME_URL,
+  DISPLAY_CORE,
+  DISPLAY_VISION,
+  DISPLAY_VISION_API,
+} from '../../brand'
 import type { AppVersions } from '../../hooks/useAppVersions'
 
 function VersionRow({ label, value }: { label: string; value: string | null }) {
@@ -31,19 +39,31 @@ export function AppVersionSection({ versions }: AppVersionSectionProps) {
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
         {versions.loading
           ? 'Loading versions…'
-          : 'App version is the installed BrightVision build. Engine versions come from the running core API.'}
+          : `App version is the installed ${DISPLAY_VISION} build. Engine versions come from the running ${DISPLAY_VISION_API}.`}
       </Typography>
       <Stack spacing={1}>
         <VersionRow label="BrightVision app" value={versions.app} />
-        <VersionRow label="bright-vision-core" value={versions.brightVisionCore} />
-        <VersionRow label="cecli" value={versions.cecli} />
+        <VersionRow label={`${DISPLAY_VISION_API} (package)`} value={versions.brightVisionCore} />
+        <VersionRow label={DISPLAY_CORE} value={versions.cecli} />
       </Stack>
       {!versions.loading && !versions.brightVisionCore && !versions.cecli && (
         <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-          Engine versions load from the running core API or your configured Python engine path.
-          Start Vision on the Terminal tab, or check Core engine path / Python in Settings below.
+          Engine versions load from the running {DISPLAY_VISION_API} or your configured Python engine path.
+          Start a session on the Terminal tab, or check engine folder / Python in Settings below.
         </Typography>
       )}
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+        {DISPLAY_VISION} is built in partnership with the{' '}
+        <Link href={CECLI_HOME_URL} target="_blank" rel="noopener noreferrer">
+          {DISPLAY_CORE}
+        </Link>{' '}
+        team (
+        <Link href={CECLI_GITHUB_URL} target="_blank" rel="noopener noreferrer">
+          dwash96/cecli
+        </Link>
+        ). Every coding turn runs on {DISPLAY_CORE}; {DISPLAY_VISION} adds the desktop shell and{' '}
+        {DISPLAY_VISION_API}.
+      </Typography>
     </Paper>
   )
 }

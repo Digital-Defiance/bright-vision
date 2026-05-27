@@ -65,7 +65,7 @@ describe('localLlm', () => {
         error: null,
         logs: [],
       })
-    ).toBe('LLM OK (120ms) · Core OK (8ms)')
+    ).toBe('LLM OK (120ms) · Vision API OK (8ms)')
   })
 
   it('labels XDG env path and shows merge winner', () => {
@@ -101,7 +101,7 @@ describe('localLlm', () => {
       error: null,
       logs: [],
     }
-    expect(formatLlmPingSummary(r)).toBe('LLM OK (545ms) · Core not running')
+    expect(formatLlmPingSummary(r)).toBe('LLM OK (545ms) · Vision API not running')
     expect(formatLlmPingHint(r)).toContain('Terminal → Start')
   })
 })

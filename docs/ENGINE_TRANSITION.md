@@ -1,14 +1,12 @@
-# Engine transition: BrightVision-core → Cecli fork + `bright_vision_core`
+# Engine integration checklist
 
-**Goal:** Retire the **BrightVision-core** product name and monolithic submodule. Day-to-day dev uses:
+> **Day-to-day layout:** [UPSTREAM_CECLI.md](./UPSTREAM_CECLI.md). **Regression gate:** [FUNCTIONALITY_CHECKLIST.md](./FUNCTIONALITY_CHECKLIST.md).
 
 | Piece | Where | GitHub |
 |-------|--------|--------|
-| **Cecli** (agent) | Submodule `cecli/` | [Digital-Defiance/cecli](https://github.com/Digital-Defiance/cecli) — **PR fork only**; track [dwash96/cecli](https://github.com/dwash96/cecli) |
-| **Vision HTTP layer** | `bright_vision_core/` in **this repo** (parent) | Same repo as BrightVision desktop |
+| **Cecli** (agent) | Submodule `cecli/` | [Digital-Defiance/cecli](https://github.com/Digital-Defiance/cecli); track [dwash96/cecli](https://github.com/dwash96/cecli) |
+| **Vision HTTP layer** | `bright_vision_core/` in **this repo** | Same repo as BrightVision desktop |
 | **Desktop shell** | `src/`, `src-tauri/` | [Digital-Defiance/BrightVision](https://github.com/Digital-Defiance/BrightVision) |
-
-**Do not lose:** Everything in [BrightVision-core/docs/FUNCTIONALITY_CHECKLIST.md](../BrightVision-core/docs/FUNCTIONALITY_CHECKLIST.md) — especially `bright_vision_core/` and the two cecli hunks until upstream merges them.
 
 ---
 

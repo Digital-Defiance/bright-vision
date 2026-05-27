@@ -1,6 +1,6 @@
 # bright_vision_core
 
-HTTP/SSE integration layer for **BrightVision** on top of [cecli](https://github.com/dwash96/cecli). Ported from `aider_vision_core` — see [docs/LINEAGE.md](../docs/LINEAGE.md).
+HTTP/SSE integration layer for **BrightVision** on top of **[Cecli](https://cecli.dev)** — built in partnership with the Cecli team ([dwash96/cecli](https://github.com/dwash96/cecli)).
 
 - `http_api.py` — FastAPI + SSE (`:8741`)
 - `session.py` — headless async sessions

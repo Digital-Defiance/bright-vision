@@ -13,17 +13,15 @@ Prioritize dogfoodable workflows: Ollama/local models, superproject/submodule gi
 | Path | Role |
 |------|------|
 | **`src/`** | **Head** — React UI, hooks, `src/ipc/` (`CoreHttpClient`, `events.ts`, config) |
-| **`src-tauri/`** | Tauri v2 shell — spawn core API, git, local LLM (Ollama), file dialogs |
+| **`src-tauri/`** | Tauri v2 shell — spawn Vision API, git, local LLM (Ollama), file dialogs |
 | **`bright_vision_core/`** | **Vision API** (parent repo) — `http_api`, `Session`, `git_workspace`, todos, SSE |
-| **`cecli/`** or **`BrightVision-core/`** | **Cecli** submodule — [Digital-Defiance/cecli](https://github.com/Digital-Defiance/cecli) or legacy bundle |
+| **`cecli/`** | **Cecli** submodule — [Digital-Defiance/cecli](https://github.com/Digital-Defiance/cecli) |
 | **`scripts/vision_serve.py`** | Tauri spawn → `bright-vision-core-serve` on `:8741` |
-| **`docs/`** | Architecture, ROADMAP, LOCAL_LLM, migration notes |
+| **`docs/`** | Architecture, ROADMAP, LOCAL_LLM |
 | **`e2e/`** | Playwright (mocked `/api/core` + optional mocked Tauri) |
-| **`scripts/`** | Superproject helpers (`compare-cores.py`, build); engine spawn script is `BrightVision-core/scripts/vision_serve.py` |
+| **`scripts/`** | Superproject helpers (`compare-cores.py`, build) |
 
-**Legacy (optional):** `aider-vision-core/` submodule — only if still present; select with `BRIGHT_VISION_ENGINE=aider-vision-core` / `activate.sh` engine dir. Do **not** extend legacy engine unless the user asks.
-
-**User project vs engine:** Settings **project** (`workingDir`) is any git repo the agent edits. The engine tree lives in the app install (`BrightVision-core`), not inside the user’s project.
+**User project vs engine:** Settings **project** (`workingDir`) is any git repo the agent edits. Cecli + Vision API live beside the app install, not inside the user’s project.
 
 ## Cecli + Vision API (beheaded body)
 
@@ -35,7 +33,7 @@ React (src/)
   → cecli (coders, llm, repo) — see [cecli.dev](https://cecli.dev)
 ```
 
-- **Credit Cecli** in user-facing docs: the agent engine is [dwash96/cecli](https://github.com/dwash96/cecli); `bright-vision-core` is our packaging + HTTP layer only.
+- **Credit the Cecli team** in user-facing copy: agent is [Cecli](https://cecli.dev) ([dwash96/cecli](https://github.com/dwash96/cecli)); BrightVision is built in partnership — our layer is `bright_vision_core` Vision HTTP only.
 - **Do not** shell out to cecli’s interactive CLI for product flows.
 - **Do not** break `src/ipc/events.ts` without updating the shell in the same change — payloads must match `bright_vision_core` SSE (see `docs/IPC.md`).
 - **Desktop:** Tauri `start_core_api` runs `scripts/vision_serve.py` (repo root) → `bright-vision-core-serve` on `127.0.0.1:8741`.
@@ -44,7 +42,7 @@ React (src/)
 
 Deeper detail: `docs/ARCHITECTURE.md`, `docs/IPC.md`, `docs/DEVELOPMENT.md`, `docs/LOCAL_LLM.md`.
 
-**Engine strategy (May 2026):** Default is **upstream cecli + `bright_vision_core`** (Vision HTTP only). We are **slimming** the `BrightVision-core` submodule to code-only — no long-lived cecli fork; no edits under `cecli/website/`. Active plan: `docs/UPSTREAM_CECLI.md`. Port history: `docs/CECLI_MIGRATION_ROADMAP.md`. Tier rules: `docs/CORE_FILE_MERGE.md`.
+**Engine strategy (May 2026):** **Cecli** submodule + **`bright_vision_core`** Vision HTTP in this repo. Do not edit `cecli/website/`. Layout: `docs/UPSTREAM_CECLI.md`. Pin policy: `docs/CECLI_PIN.md`. Tier rules: `docs/CORE_FILE_MERGE.md`.
 
 ## Technical constraints
 
@@ -63,7 +61,7 @@ Deeper detail: `docs/ARCHITECTURE.md`, `docs/IPC.md`, `docs/DEVELOPMENT.md`, `do
 
 ## Configuration & environment
 
-- **`VisionConfig`** (`src/ipc/config.ts`): model, `workingDir`, `coreEnginePath` (default `BrightVision-core`), Ollama base, optional `local-llm.env` / XDG `~/.config/local-llm/env`.
+- **`VisionConfig`** (`src/ipc/config.ts`): model, `workingDir`, Ollama base, optional `local-llm.env` / XDG `~/.config/local-llm/env`.
 - **Local LLM:** Rust (`src-tauri` + Settings) starts Ollama; Python core runs chat via LiteLLM (`ollama_chat/…`). See `docs/LOCAL_LLM.md`.
 - **`LITELLM_EXTRA_PARAMS`**, API keys via environment when using cloud models.
 
@@ -90,7 +88,7 @@ See `.cursor/rules/roadmap.mdc`.
 | TS + types | `yarn test:fast` |
 | + Rust | `yarn test:local` |
 | + E2E | `yarn test:full` (needs `npx playwright install chromium` once) |
-| Core Python | `yarn test:bright-core` (in `BrightVision-core/`) |
+| Core Python | `yarn test:bright-core` |
 
 See `docs/TESTING.md`.
 

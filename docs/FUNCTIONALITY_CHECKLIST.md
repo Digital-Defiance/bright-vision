@@ -1,6 +1,6 @@
-# BrightVision functionality checklist (do not lose)
+# BrightVision functionality checklist
 
-Use this before slimming to upstream `cecli`, opening PRs, or changing the parent submodule SHA.
+Use before changing the `cecli/` submodule pin or opening upstream PRs.
 
 ## Two layers (both required for the desktop app)
 
@@ -11,7 +11,7 @@ Use this before slimming to upstream `cecli`, opening PRs, or changing the paren
 
 **Upstream cecli PR branch `pr/brightvision-cecli-only` contains only two cecli files.** It does **not** include `bright_vision_core/`. Never point daily dev or the parent submodule at that SHA.
 
-**Layout (current):** `bright_vision_core/` in **BrightVision parent**; cecli in submodule `cecli/` (or legacy `BrightVision-core/` until renamed).
+**Layout:** `bright_vision_core/` in the BrightVision parent repo; agent in submodule `cecli/`.
 
 ## Tier 1 — must ship in `bright_vision_core/` (shell breaks without these)
 
@@ -50,47 +50,27 @@ After upstream merges, drop vendored copies of these hunks and pin `cecli` versi
 
 No additional `cecli/coders/base_coder.py` fork patches are required on current `main` unless pytest or dogfood shows a gap.
 
-## Verify before claiming “safe to slim”
+## Verify before pin bump
 
 ```bash
-cd BrightVision-core
-git checkout main   # NOT pr/brightvision-cecli-only
-pip install -e .
+source activate.sh
 
 # No legacy imports
 rg 'from aider_vision_core|import aider_vision_core' bright_vision_core/ \
   && echo FAIL || echo OK
 
-# Core gate (parent package.json: test:bright-core)
-python -m pytest tests/basic/test_http_api.py \
-  tests/basic/test_git_workspace.py \
-  tests/basic/test_workspace_todos.py \
-  tests/basic/test_http_session_todos.py \
-  tests/basic/test_superproject_integration.py -q
-
-# Parent shell
-cd .. && yarn test:local
+yarn test:bright-core
+yarn test:local
 ```
 
-Optional (if `aider-vision-core` submodule is present):
+Optional LLM smoke: `E2E_LLM=1 yarn test:e2e:llm` — [TESTING.md](./TESTING.md).
+
+## `cecli/` submodule pin
 
 ```bash
-python3 scripts/compare-cores.py --list vision-only
-python3 scripts/compare-cores.py --list differ
+git submodule update --init cecli
+cd cecli && git log -1 --oneline && cd ..
+git add cecli
 ```
 
-## Parent repo submodule pin
-
-In **BrightVision** (outer repo):
-
-```bash
-cd BrightVision-core && git checkout main && cd ..
-git add BrightVision-core
-# commit when ready — SHA must be main, not pr/brightvision-cecli-only
-```
-
-`git submodule status` should **not** show `+` on a PR-only SHA without `bright_vision_core/` on disk.
-
-## Fallback until dogfood is confident
-
-Keep `BRIGHT_VISION_ENGINE=aider-vision-core` and the legacy submodule until compare-cores + pytest + manual chat streaming pass on `BrightVision-core` `main`.
+Document the SHA in [CECLI_PIN.md](./CECLI_PIN.md) when you change the pin.

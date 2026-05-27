@@ -5,14 +5,12 @@
 | Layer | Role | Location |
 |-------|------|----------|
 | **Head** | UI, prompts, user intent, product wiring | `src/` (React) + `src-tauri/` (desktop shell) |
-| **Body** | **[Cecli](https://cecli.dev)** agent + Vision HTTP/SSE | `BrightVision-core/` submodule (PyPI/git: `bright-vision-core`) |
+| **Body** | **[Cecli](https://cecli.dev)** agent + Vision HTTP/SSE | `cecli/` submodule + `bright_vision_core/` in this repo |
 
-Inside the engine submodule:
-
-| Package | Role |
-|---------|------|
-| **`cecli/`** | **[Cecli](https://github.com/dwash96/cecli)** — coders, LiteLLM, `repo`, `commands/` (upstream terminal agent; BrightVision does not expose its TUI) |
-| **`bright_vision_core/`** | BrightVision-only — HTTP API, `Session`, SSE events, `git_workspace`, workspace todos |
+| Package | Location | Role |
+|---------|----------|------|
+| **`cecli`** | Submodule `cecli/` | Coders, LiteLLM, `repo`, `commands/` (terminal agent; not exposed in the app UI) |
+| **`bright_vision_core`** | Parent repo | HTTP API, `Session`, SSE, `git_workspace`, workspace todos |
 
 BrightVision **beheads** the old standalone aider/cecli terminal UX. Users never type into the engine CLI in the app. Every turn is:
 
@@ -24,14 +22,12 @@ React (CoreHttpClient)
   → events → React (src/ipc/events.ts)
 ```
 
-**Legacy engine (optional):** `aider-vision-core/` with `BRIGHT_VISION_ENGINE=aider-vision-core`. Default is `BrightVision-core/`. Do not document or build against legacy unless explicitly migrating.
-
 ## User project vs engine install
 
 | Concept | What it is |
 |---------|------------|
 | **Project** (`VisionConfig.workingDir`) | Git repo the agent edits — any path the user chooses |
-| **Engine** (`coreEnginePath`, default `BrightVision-core`) | Bundled submodule next to the app; spawned by Tauri or used via `source activate.sh` |
+| **Engine** | `cecli/` + `bright_vision_core/` beside the app; `source activate.sh` or Tauri spawn of `scripts/vision_serve.py` |
 
 The user’s project does **not** need a copy of the engine inside it. Nested submodules **inside** the project are handled by core `RepoSet`.
 
@@ -53,7 +49,7 @@ Additional routes (todos, files, confirm, agents): see `docs/IPC.md`.
 
 **Web:** Run `bright-vision-core-serve` or use Vite proxy `/api/core` → `:8741`.
 
-**Dev:** `source activate.sh` → editable `pip install -e BrightVision-core/`.
+**Dev:** `source activate.sh` → editable `cecli` + `bright_vision_core`.
 
 ## Multi-repo workspaces
 
@@ -65,7 +61,7 @@ Additional routes (todos, files, confirm, agents): see `docs/IPC.md`.
 
 React only passes the workspace string; it does not implement submodule logic.
 
-For dogfooding BrightVision itself: set project to the **parent** repo (this tree), not `BrightVision-core/` alone.
+For dogfooding BrightVision itself: set project to the **parent** repo (this tree).
 
 ## Local LLM vs session
 

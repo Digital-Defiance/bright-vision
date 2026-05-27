@@ -1,6 +1,8 @@
 # BrightVision pivot plan
 
-Rebrand in place in **this repo** (stay at `aider-vision` on disk until GitHub rename is convenient), and do the **giant lift-and-shift on `bright-vision-core` only** ([cecli](https://github.com/dwash96/cecli) fork + ported Vision HTTP/session layer).
+> **Current layout:** [UPSTREAM_CECLI.md](./UPSTREAM_CECLI.md). This file is a rebrand/port checklist, not the active architecture doc.
+
+Rebrand in place in **this repo** and port the Vision HTTP/session layer onto [cecli](https://github.com/dwash96/cecli).
 
 ## Strategy: outer repo stays put
 

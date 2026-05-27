@@ -8,6 +8,7 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import LinkIcon from '@mui/icons-material/Link'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import { DISPLAY_VISION_API } from '../../brand'
 import {
   Box,
   Button,
@@ -309,10 +310,10 @@ export function TodoPanel({
         Stored in <Box component="code">.aider-vision/todos.json</Box>; three-layer specs also sync to{' '}
         <Box component="code">.aider-vision/specs/&lt;id&gt;/</Box>.
         {tauriLocal && !httpReady
-          ? ' Desktop: tasks saved locally via Tauri (core API optional).'
+          ? ` Desktop: tasks saved locally via Tauri (${DISPLAY_VISION_API} optional).`
           : httpReady
-            ? ' Synced via core API (no chat session required).'
-            : ' Start the core API or use the desktop app for file-backed tasks.'}{' '}
+            ? ` Synced via ${DISPLAY_VISION_API} (no chat session required).`
+            : ` Start ${DISPLAY_VISION_API} (Terminal → Start) or use the desktop app for file-backed tasks.`}{' '}
         Checking all checklist items marks a task done automatically.
       </Typography>
 

@@ -9,9 +9,15 @@ export const PRODUCT_VISION = 'bright-vision'
 export const PRODUCT_CORE = 'bright-vision-core'
 
 export const DISPLAY_VISION = 'BrightVision'
+/** HTTP/SSE layer (`bright_vision_core` on :8741) — not the Cecli agent loop. */
+export const DISPLAY_VISION_API = 'Vision API'
 export const DISPLAY_CORE = 'Cecli'
 /** Sidebar rail fallback if logo fails to load */
 export const DISPLAY_MONOGRAM = 'BV'
+
+/** Public credit for the Cecli maintainers — keep in sync with bright_vision_core/brand.py */
+export const CECLI_HOME_URL = 'https://cecli.dev'
+export const CECLI_GITHUB_URL = 'https://github.com/dwash96/cecli'
 
 /**
  * `vector` — inline SVG + Glass TTY VT220 from `src/assets/fonts/Glass_TTY_VT220.woff2`.

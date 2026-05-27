@@ -103,9 +103,9 @@ yarn test:e2e
 
 If you see `[vite] http proxy error: /health`, an old preview without `E2E=1` was reused — re-run (do not use `reuseExistingServer` for default e2e).
 
-`gotoVision()` installs Playwright API mocks **before** `page.goto()` so health checks never hit a real core.
+`gotoVision()` installs Playwright API mocks **before** `page.goto()` so health checks never hit a real Vision API.
 
-### Real LLM e2e (Ollama + Vision core)
+### Real LLM e2e (Ollama + Vision API)
 
 Exercises a **live** `bright-vision-core` on `:8741` and your **Ollama** model (not mocked SSE). Use this to catch “hello” stalls and SSE timeouts.
 
@@ -114,7 +114,7 @@ Exercises a **live** `bright-vision-core` on `:8741` and your **Ollama** model (
 1. [Ollama](https://ollama.com/) running (`ollama serve` or the desktop app).
 2. A pulled model, e.g. `ollama pull llama3.2:3b` (or set `DATA_MODEL` in `./local-llm.env`).
 3. Python env: `source activate.sh` from **one** repo path (installs cecli, `bright_vision_core`, uvicorn, pytest). If the repo is reachable as both `/Users/.../BrightVision` and `/Volumes/.../BrightVision`, use the same path for the shell and Playwright (`cd "$(pwd -P)"`).
-4. Port **8741** free (or stop a leftover core: `kill $(lsof -ti tcp:8741)`).
+4. Port **8741** free (or stop a leftover server: `kill $(lsof -ti tcp:8741)`).
 
 **Run**
 
@@ -132,7 +132,7 @@ Optional env:
 |----------|---------|
 | `E2E_OLLAMA_MODEL` | LiteLLM id or bare tag (default `llama3.2:3b` or `DATA_MODEL` from `local-llm.env`) |
 | `E2E_OLLAMA_HOST` | Ollama base URL (default `http://127.0.0.1:11434`) |
-| `E2E_PYTHON` | Venv shim for spawning core (default `.venv/bin/python3`; `test:e2e:llm` sets this — do not point at Homebrew `python3.14` alone) |
+| `E2E_PYTHON` | Venv shim for spawning Vision API (default `.venv/bin/python3`; `test:e2e:llm` sets this — do not point at Homebrew `python3.14` alone) |
 
 E2E clears **`PYTHONPATH`**. Do not export `PYTHONPATH=$PWD` — the repo’s `cecli/` folder is not the Python package and will break `import cecli` (`unknown location`).
 

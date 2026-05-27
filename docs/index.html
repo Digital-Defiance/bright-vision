@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="BrightVision — a lightweight, cross-platform desktop app for AI-assisted coding. Native Tauri + React, powered by Cecli."
+      content="BrightVision — a lightweight, cross-platform desktop app for AI-assisted coding. Native Tauri + React, built in partnership with the Cecli team."
     />
     <link rel="canonical" href="https://bright-vision.digitaldefiance.org/" />
     <meta
@@ -14,7 +14,7 @@
     />
     <meta
       property="og:description"
-      content="Cursor-like AI coding in a lightweight Tauri desktop app. Powered by Cecli."
+      content="Cursor-like AI coding in a lightweight Tauri desktop app. Built in partnership with the Cecli team."
     />
     <meta
       property="og:url"
@@ -1228,6 +1228,7 @@
           <p class="section-label">Lineage</p>
           <h2 class="section-title">Lineage — Aider → Cecli → BrightVision</h2>
           <p class="section-desc">
+            <strong>BrightVision is built in partnership with the Cecli team.</strong>
             The coding agent is
             <a href="https://cecli.dev" target="_blank" rel="noopener noreferrer"
               ><strong>Cecli</strong></a
@@ -1237,10 +1238,9 @@
               target="_blank"
               rel="noopener noreferrer"
               >dwash96/cecli</a
-            >), evolved from <strong>Aider</strong>. BrightVision is a desktop shell on top:
-            we ship Cecli plus a headless <code>bright_vision_core/</code> HTTP layer (ported
-            from our earlier <code>aider-vision-core</code> product — file merge, not replayed
-            git history).
+            >), evolved from <strong>Aider</strong>. BrightVision adds a desktop shell and
+            headless <code>bright_vision_core/</code> HTTP/SSE in this repo — users never drive
+            the Cecli terminal UI inside the app.
           </p>
           <div class="arch-flow" role="img" aria-label="Aider forks to Cecli; BrightVision bundles cecli with bright_vision_core HTTP API">
             <div class="arch-node">
@@ -1262,14 +1262,14 @@
             Docs:
             <a href="https://bright-vision.digitaldefiance.org">BrightVision</a> (this site) ·
             <a href="https://cecli.dev" target="_blank" rel="noopener noreferrer">Cecli</a>
-            (upstream agent docs) ·
+            (agent docs at cecli.dev) ·
             <a
-              href="https://github.com/Digital-Defiance/BrightVision-core"
+              href="https://github.com/Digital-Defiance/BrightVision"
               target="_blank"
               rel="noopener noreferrer"
-              >bright-vision-core</a
+              >BrightVision on GitHub</a
             >
-            (PyPI bundle: vendored <code>cecli/</code> + <code>bright_vision_core/</code>).
+            (<code>bright_vision_core/</code> + <code>cecli/</code> submodule).
           </p>
         </div>
       </section>
@@ -1359,8 +1359,7 @@
 
           <p class="callout" style="margin-top: 0; margin-bottom: 2rem">
             <strong>Current focus:</strong> Dogfooding — workspace =
-            superproject root (<code>bright-vision/</code>), not
-            <code>bright-vision-core/</code> alone. Quick test:
+            superproject root (<code>BrightVision/</code>), not a submodule folder alone. Quick test:
             <code>yarn test:local</code>; before bigger changes:
             <code>yarn test:full</code>.
             <a
@@ -1614,8 +1613,8 @@ DATA_MODEL=qwen3.6:27b-q4_K_M</code></pre>
               <div>
                 <h3>Clone and init submodules</h3>
                 <p>
-                  Fetch the superproject, init <code>BrightVision-core</code> (Cecli +
-                  <code>bright_vision_core</code>), then <code>source activate.sh</code>.
+                  Fetch the superproject, init <code>cecli/</code>, then
+                  <code>source activate.sh</code> (editable Cecli + <code>bright_vision_core</code>).
                 </p>
                 <pre><code>git clone https://github.com/Digital-Defiance/BrightVision.git
 cd bright-vision
@@ -1793,7 +1792,10 @@ source activate.sh</code></pre>
 
     <footer>
       <div class="wrap footer-inner">
-        <p>© 2026 Digital Defiance, Jessica Mulein · MIT License</p>
+        <p>
+          © 2026 Digital Defiance, Jessica Mulein · MIT License · Built in partnership with the
+          <a href="https://cecli.dev" target="_blank" rel="noopener noreferrer">Cecli</a> team
+        </p>
         <div class="footer-links">
           <a
             href="https://github.com/Digital-Defiance/BrightVision"
@@ -1817,18 +1819,7 @@ source activate.sh</code></pre>
             rel="noopener noreferrer"
             >Cecli (GitHub)</a
           >
-          <a
-            href="https://github.com/Digital-Defiance/BrightVision-core"
-            target="_blank"
-            rel="noopener noreferrer"
-            >bright-vision-core</a
-          >
-          <a
-            href="https://github.com/Digital-Defiance/BrightVision-core/blob/main/docs/LINEAGE.md"
-            target="_blank"
-            rel="noopener noreferrer"
-            >Lineage docs</a
-          >
+          <a href="#architecture">Architecture</a>
         </div>
       </div>
     </footer>

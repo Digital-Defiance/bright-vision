@@ -8,8 +8,8 @@ export class SseIdleTimeoutError extends Error {
   constructor(phase: SseIdlePhase) {
     super(
       phase === 'before_first_event'
-        ? 'No response from Vision core for 5 minutes. Check that the core API is running and Ollama is up.'
-        : 'Turn stalled — no events from core for 15 minutes. The model may still be working; check Terminal and Ollama (/api/ps). Use Stop and retry if needed.'
+        ? 'No response from the Vision API for 5 minutes. Check that bright-vision-core-serve is running on :8741 and Ollama is up.'
+        : 'Turn stalled — no events from the Vision API for 15 minutes. The model may still be working; check Terminal and Ollama (/api/ps). Use Stop and retry if needed.'
     )
     this.name = 'SseIdleTimeoutError'
     this.phase = phase

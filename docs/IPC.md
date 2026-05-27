@@ -1,20 +1,20 @@
 # BrightVision IPC
 
-React is the **head**. All prompting goes through the **Vision HTTP API** (same contract in desktop and browser). The engine in `BrightVision-core/` is headless — no interactive cecli CLI in the product.
+React is the **head**. All prompting goes through the **Vision HTTP API** (same contract in desktop and browser). Cecli runs headless behind `bright_vision_core` — no interactive CLI in the product.
 
 See `docs/ARCHITECTURE.md`.
 
 ## Vision HTTP API (canonical)
 
-For browser-only clients, run the core API server:
+For browser-only clients, run the Vision API server:
 
 ```bash
 bright-vision-core-serve --host 127.0.0.1 --port 8741
 ```
 
-(Installed via `pip install -e BrightVision-core/` or `source activate.sh`.)
+(Installed via `source activate.sh` or `pip install -e .` in this repo.)
 
-Implementation: `BrightVision-core/bright_vision_core/http_api.py` — create session, `POST /sessions/{id}/messages` returns Server-Sent Events with event dicts consumed by `src/ipc/events.ts`.
+Implementation: `bright_vision_core/http_api.py` — create session, `POST /sessions/{id}/messages` returns Server-Sent Events with event dicts consumed by `src/ipc/events.ts`.
 
 Answer blocking confirms while a message is in flight:
 
@@ -72,7 +72,7 @@ The `done` event may include `active_todo_id`; edited files and commits are appe
 
 ### Workspace tasks (no session)
 
-Same todo file; use when the core API is running but you have not opened a chat session:
+Same todo file; use when the Vision API is running but you have not opened a chat session:
 
 ```http
 GET    /workspaces/todos?workspace=/abs/path/to/repo
@@ -93,7 +93,7 @@ Optional auth: set `AIDER_VISION_TOKEN` (or `BRIGHT_VISION_TOKEN` where supporte
 
 ## Multi-repo workspaces (including nested submodules)
 
-Point `workspace` at the **git superproject root** (e.g. this repo, which contains the `BrightVision-core` submodule).
+Point `workspace` at the **git superproject root** (e.g. this repo, which may contain nested submodules).
 
 Core uses `create_git_workspace()` / `RepoSet` in `bright_vision_core`:
 
@@ -102,15 +102,15 @@ Core uses `create_git_workspace()` / `RepoSet` in `bright_vision_core`:
 - Excludes submodule **gitlink** paths (mode `160000`) from repo-map file lists — only real files are indexed.
 - Commits run innermost repos first, then update parent gitlinks.
 
-For self-dev on BrightVision: set working directory to the parent repo, not `BrightVision-core/` alone.
+For self-dev on BrightVision: set working directory to the parent repo root.
 
 ## Web dev proxy
 
-Vite proxies `/api/core` → `http://127.0.0.1:8741`. In browser mode, set **Core API URL** to `/api/core` (relative) or the full serve URL.
+Vite proxies `/api/core` → `http://127.0.0.1:8741`. In browser mode, set **Vision API URL** to `/api/core` (relative) or the full serve URL.
 
 ## Desktop
 
-Tauri spawns `BrightVision-core/scripts/vision_serve.py` (wrapper around `bright-vision-core-serve`). React uses `CoreHttpClient` against `http://127.0.0.1:8741` (URL from `start_core_api`).
+Tauri spawns `scripts/vision_serve.py` (wrapper around `bright-vision-core-serve`). React uses `CoreHttpClient` against `http://127.0.0.1:8741` (URL from `start_core_api`).
 
 TypeScript client: `src/ipc/httpClient.ts`, session factory in `src/ipc/commands.ts` / hooks.
 
@@ -128,4 +128,4 @@ Each `data:` line in the message stream is a JSON object (must stay aligned with
 {"type": "error", "text": "..."}
 ```
 
-Python sources: `BrightVision-core/bright_vision_core/event_io.py`, `session.py`.
+Python sources: `bright_vision_core/event_io.py`, `session.py`.

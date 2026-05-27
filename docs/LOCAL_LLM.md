@@ -84,16 +84,16 @@ Or leave **Auto before session** on and use **Terminal → Start** once.
 **Ping LLM** runs two checks (no repo edits):
 
 1. **Ollama** — `/api/tags`, `/api/ps`, then a 1-token `/api/generate` probe.
-2. **Vision Core** — `GET {coreApiUrl}/health` (default `http://127.0.0.1:8741`).
+2. **Vision API** — `GET {coreApiUrl}/health` (default `http://127.0.0.1:8741`).
 
-### Ping status: LLM OK and Core not running
+### Ping status: LLM OK and Vision API not running
 
 | Part | Meaning |
 |------|---------|
 | **LLM OK (Nms)** | Ollama is up, your model is pulled, and a tiny generate succeeded — local inference works. |
-| **Core not running** | The Python HTTP API is not listening on `:8741` yet. That is normal when the session is **Stopped**. |
+| **Vision API not running** | `bright-vision-core-serve` is not listening on `:8741` yet. That is normal when the session is **Stopped**. |
 
-Fix: **Terminal → Start** (starts `bright-vision-core-serve` and the session). **Ping LLM** again; you should see **Core OK**. Local LLM (**Start Local LLM**) and the session (**Start**) are separate steps unless **Auto before session** is on.
+Fix: **Terminal → Start** (starts `bright-vision-core-serve` and the session). **Ping LLM** again; you should see **Vision API OK**. Local LLM (**Start Local LLM**) and the session (**Start**) are separate steps unless **Auto before session** is on.
 
 **Not in /api/ps** only means the model is not loaded in RAM; ping can still pass if the tag is pulled.
 

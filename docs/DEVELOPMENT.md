@@ -2,7 +2,7 @@
 
 Product backlog and priorities: [ROADMAP.md](./ROADMAP.md) — agents maintain and follow it until the open backlog is complete.
 
-**Engine:** [Cecli](https://cecli.dev) ([dwash96/cecli](https://github.com/dwash96/cecli)) plus BrightVision’s `bright_vision_core` HTTP layer, bundled in the **`BrightVision-core/`** submodule (PyPI `bright-vision-core`).
+**Engine:** [Cecli](https://cecli.dev) in submodule **`cecli/`**, plus **`bright_vision_core/`** in this repo (Vision HTTP; PyPI package `bright-vision-core`). See [UPSTREAM_CECLI.md](./UPSTREAM_CECLI.md).
 
 **Project site:** [bright-vision.digitaldefiance.org](https://bright-vision.digitaldefiance.org) — static landing page in `docs/index.html`, deployed via [GitHub Pages](../.github/workflows/pages.yml) on pushes to `main` under `docs/`.
 
@@ -10,30 +10,20 @@ Product backlog and priorities: [ROADMAP.md](./ROADMAP.md) — agents maintain a
 
 - Node 18+ and Yarn
 - Rust toolchain (for Tauri)
-- Python 3.10+ with `bright-vision-core` installed editable (`source activate.sh`)
+- Python 3.10+ (`source activate.sh` installs editable `cecli` + `bright_vision_core`)
 - **LLM:** local [Ollama](https://ollama.com/) recommended — see [LOCAL_LLM.md](./LOCAL_LLM.md)
 
 ## First-time setup
 
 ```bash
-git submodule update --init --recursive bright-vision-core
-source activate.sh   # venv + pip install -e bright-vision-core + uvicorn
+git submodule update --init cecli
+source activate.sh   # venv + editable cecli + bright_vision_core
 yarn install
 ```
 
-**Optional `local-llm.env`:** `cp local-llm.env.example local-llm.env` at repo root (`DATA_MODEL`, `OLLAMA_HOST`). In-app **Local LLM** uses Rust; sessions use Python core — not `local-llm.sh`. See [LOCAL_LLM.md](./LOCAL_LLM.md). Core PyPI release: [bright-vision-core/docs/PUBLISHING.md](../bright-vision-core/docs/PUBLISHING.md).
+**Optional `local-llm.env`:** `cp local-llm.env.example local-llm.env` at repo root (`DATA_MODEL`, `OLLAMA_HOST`). In-app **Local LLM** uses Rust; chat uses the Vision API — not `local-llm.sh`. See [LOCAL_LLM.md](./LOCAL_LLM.md).
 
-## After a core PyPI release
-
-See [bright-vision-core/docs/PUBLISHING.md](../bright-vision-core/docs/PUBLISHING.md). Pin the parent BrightVision app:
-
-```bash
-cd bright-vision-core
-./build.sh v0.100.1 --sync-vision
-./scripts/sync_bright_vision.sh v0.100.1 --commit
-```
-
-Updates `requirements-core.txt`, checks out the submodule tag, and installs into the parent `.venv`. PyPI mode: `AIDER_VISION_CORE_INSTALL=pypi source activate.sh`
+PyPI / release workflow for the Vision wheel: track in [UPSTREAM_CECLI.md](./UPSTREAM_CECLI.md) milestone U3. PyPI-only install: `AIDER_VISION_CORE_INSTALL=pypi source activate.sh`
 
 ## Run the desktop app
 

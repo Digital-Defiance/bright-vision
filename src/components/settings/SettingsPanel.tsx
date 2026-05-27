@@ -4,7 +4,7 @@ import SyncIcon from '@mui/icons-material/Sync'
 import { useCallback, useEffect, useState } from 'react'
 import { Box, Button, Paper, Stack, TextField, Typography } from '@mui/material'
 import { invoke } from '@tauri-apps/api/core'
-import { DISPLAY_VISION } from '../../brand'
+import { DISPLAY_VISION, DISPLAY_VISION_API } from '../../brand'
 import {
   CORE_ENGINE_DIR,
   formatContextFilesInput,
@@ -141,7 +141,7 @@ export function SettingsPanel({
       </Typography>
       <Typography variant="body2" color="text.secondary">
         Choose a <strong>project</strong> for git edits. Cecli + Vision API are bundled with
-        the app — you only set the project path, not a copy of core per repo.
+        the app — you only set the project path, not a separate engine install per repo.
       </Typography>
 
       <Paper variant="outlined" sx={{ p: 2 }}>
@@ -223,7 +223,7 @@ export function SettingsPanel({
                 <strong>Step 2 — Start Ollama:</strong> after step 1 (or setting{' '}
                 <code>ollama_chat/…</code> above), use Start then Ping. Same controls as{' '}
                 <strong>Terminal → Local LLM</strong>. Ping checks inference; use{' '}
-                <strong>Terminal → Start</strong> for the coding session (Vision Core).
+                <strong>Terminal → Start</strong> for the coding session ({DISPLAY_VISION_API}).
               </Typography>
               {isOllamaVisionModel(config.model) ? (
                 <LocalLlmActionButtons controls={localLlmControls} showSecondary={false} />
@@ -317,7 +317,7 @@ export function SettingsPanel({
             helperText="Leave empty to use the repo .venv (run source activate.sh once)."
           />
           <TextField
-            label="Core API token (optional)"
+            label="Vision API token (optional)"
             fullWidth
             size="small"
             type="password"

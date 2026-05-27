@@ -89,7 +89,7 @@ export function createVisionApiSession(
         if (isTauriRuntime()) {
           onPhase?.({
             phase: 'booting_api',
-            label: 'Spawning core API',
+            label: 'Spawning Vision API',
             detail: cfg.coreEnginePath,
             progress: 0.2,
           })

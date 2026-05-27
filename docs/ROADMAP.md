@@ -6,17 +6,17 @@ Living backlog for chat UX, engine behavior, spec-driven work, and charter-level
 
 **Agents:** Read this file before substantive work; follow **Suggested fix order** until open items are **Done**; update statuses in the same session when you ship or learn something new. Instructions: `AGENTS.md` (Product roadmap) and `.cursor/rules/roadmap.mdc`.
 
-## Current focus — upstream cecli + thin `bright_vision_core` (Priority)
+## Current focus — Cecli + Vision API (Priority)
 
-**Status:** Vision HTTP layer ported (Gate A4/A8). **Next:** [ENGINE_TRANSITION.md](./ENGINE_TRANSITION.md) — submodule `cecli/` → `Digital-Defiance/cecli` (PR fork), `bright_vision_core/` in parent repo, retire `BrightVision-core` submodule; upstream PR for two cecli hunks per [UPSTREAM_CECLI.md](./UPSTREAM_CECLI.md).
+**Status:** `bright_vision_core/` in this repo; agent via `cecli/` submodule ([UPSTREAM_CECLI.md](./UPSTREAM_CECLI.md)). **Next:** upstream cecli pin after [#530](https://github.com/cecli-dev/cecli/pull/530); `pyproject.toml` depends on `cecli` (U3).
 
 | Doc | Use when |
 |-----|----------|
-| [UPSTREAM_CECLI.md](./UPSTREAM_CECLI.md) | **Active strategy** — slim fork, upstream dep, no website in engine repo |
-| [CECLI_PIN.md](./CECLI_PIN.md) | **Pin policy** — submodule SHA, integration branches, ship before PyPI |
-| [CECLI_MIGRATION_ROADMAP.md](./CECLI_MIGRATION_ROADMAP.md) | Historical port execution (phases A–B); archive when U6 done |
-| [CORE_FILE_MERGE.md](./CORE_FILE_MERGE.md) | Per-file PORT_NEW / MERGE_HUNKS (still valid for Vision layer) |
-| [BRIGHT_VISION_PIVOT.md](./BRIGHT_VISION_PIVOT.md) | Product rebrand; **product** website = parent `docs/index.html` only |
+| [UPSTREAM_CECLI.md](./UPSTREAM_CECLI.md) | **Layout & strategy** — Cecli submodule + Vision HTTP in parent |
+| [CECLI_PIN.md](./CECLI_PIN.md) | **Pin policy** — submodule SHA, integration branches |
+| [CORE_FILE_MERGE.md](./CORE_FILE_MERGE.md) | Per-file PORT_NEW / MERGE_HUNKS for Vision layer |
+| [CECLI_MIGRATION_ROADMAP.md](./CECLI_MIGRATION_ROADMAP.md) | Port gate checklist (phases A–B) |
+| [ENGINE_TRANSITION.md](./ENGINE_TRANSITION.md) | Optional integration tasks (PyPI, CI) |
 
 ---
 
@@ -86,7 +86,7 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 | 7 | **Done** | Confirm flow: `yes=False` default, `POST /sessions/{id}/confirm`, UI Yes/No + auto-approve countdown |
 | 14 | **Done** | No longer pass workspace dir as chat file (`Session.create` empty `fnames`) |
 | 17 | **Done** | Settings: prompt before commit → `auto_commits: false` on session create |
-| — | **Done** | Terminate `:8741` core API on app quit (Tauri) |
+| — | **Done** | Terminate `:8741` Vision API on app quit (Tauri) |
 | — | **Done** | **Core API lifecycle** — Start/Stop tied to activity-bar phases (`sessionLifecycle`), cancel in-flight start, `start_core_api` timeout, health fetch timeouts, port cleanup on stop/launch, SSE reader release ([TROUBLESHOOTING.md](./TROUBLESHOOTING.md)) |
 
 ## Multi-modal & platform

@@ -682,15 +682,15 @@ pub async fn llm_ping(
 
     let (core_reachable, core_latency_ms) = match core_api_url {
         Some(ref url) if !url.trim().is_empty() => {
-            logs.push(format!("Pinging core {url}…"));
+            logs.push(format!("Pinging Vision API {url}…"));
             let (ok, ms) = ping_core_health(url).await;
             logs.push(if ok {
                 format!(
-                    "Core health OK{}",
+                    "Vision API health OK{}",
                     ms.map(|m| format!(" in {m}ms")).unwrap_or_default()
                 )
             } else {
-                "Core health failed or timed out".to_string()
+                "Vision API health check failed or timed out".to_string()
             });
             (Some(ok), ms)
         }

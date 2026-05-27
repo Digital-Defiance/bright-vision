@@ -19,6 +19,6 @@ test.describe('Local LLM ping (#36)', () => {
     const result = page.getByTestId('local-llm-ping-result')
     await expect(result).toBeVisible({ timeout: 10_000 })
     await expect(result).toContainText('LLM OK')
-    await expect(result).toContainText('Core OK')
+    await expect(result).toContainText('Vision API OK')
   })
 })

@@ -14,7 +14,7 @@ import { E2E_CONFIG_STORAGE_KEY } from './helpers/testConfig'
 
 test.describe.configure({ mode: 'serial' })
 
-test.describe('Hello LLM (real Ollama + Vision core)', () => {
+test.describe('Hello LLM (real Ollama + Vision API)', () => {
   test.skip(!isLlmE2eEnabled(), 'Set E2E_LLM=1 and run: yarn test:e2e:llm')
 
   test.beforeAll(async () => {

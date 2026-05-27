@@ -74,7 +74,7 @@ export function useAppVersions(
           coreVer = health.versions?.bright_vision_core ?? null
           cecliVer = health.versions?.cecli ?? null
         } catch {
-          /* core API not up yet */
+          /* Vision API not up yet */
         }
       }
 

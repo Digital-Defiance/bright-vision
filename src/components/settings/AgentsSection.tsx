@@ -60,7 +60,7 @@ You are a code review specialist…`}
 
       {!sessionActive && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          Start a session on the Terminal tab to load the sub-agent registry from core.
+          Start a session on the Terminal tab to load the sub-agent registry from the engine.
         </Alert>
       )}
 

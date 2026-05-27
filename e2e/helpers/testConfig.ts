@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import { installMockCoreApi } from './mockCoreApi'
 
-/** Minimal config for web e2e (core API mocked at /api/core). */
+/** Minimal config for web e2e (Vision API mocked at /api/core). */
 export const E2E_CONFIG = {
   model: 'ollama_chat/test/model',
   ollamaApiBase: '',
@@ -28,7 +28,7 @@ export async function primeVisionApp(page: Page) {
   }, E2E_CONFIG)
 }
 
-/** Open app with e2e config; install core API mocks before navigation (avoids Vite → :8741 proxy noise). */
+/** Open app with e2e config; install Vision API mocks before navigation (avoids Vite → :8741 proxy noise). */
 export async function gotoVision(page: Page, opts?: { skipCoreMock?: boolean }) {
   await primeVisionApp(page)
   if (!opts?.skipCoreMock) {

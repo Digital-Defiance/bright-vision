@@ -25,7 +25,7 @@ BrightVision/
     cecli/                ← Python package (import cecli)
 ```
 
-**`cecli/bright_vision_core/` must not exist** — leftover from the old `BrightVision-core` bundle (untracked junk after pin bump). Remove it:
+**`cecli/bright_vision_core/` must not exist** — stray copy of the Vision layer inside the submodule. Remove if present:
 
 ```bash
 rm -rf cecli/bright_vision_core cecli/bright_vision_core.egg-info
