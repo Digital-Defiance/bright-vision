@@ -4,8 +4,12 @@ import { THINKING_STATS_STORAGE_KEY } from '../storageKeys'
 
 export { THINKING_STATS_STORAGE_KEY }
 export const MAX_TIMING_HISTORY = 300
+/** Cap for browser dashboard (localStorage); app keeps 300 in-session. */
+export const DASHBOARD_MAX_TIMING_HISTORY = 5000
 /** Rows shown in Settings timing history table (newest first). */
 export const TIMING_STATS_DISPLAY_ROWS = 7
+/** Rows shown on the public timing dashboard table. */
+export const TIMING_STATS_DASHBOARD_DISPLAY_ROWS = 25
 
 /** @deprecated v1 aggregate — used only for migration */
 interface ModelThinkingAggregateV1 {

@@ -1,0 +1,86 @@
+name: Bench leaderboard
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "bench-submissions/**"
+      - "scripts/build-bench-leaderboard.mjs"
+      - "scripts/stamp-bench-pr-submissions.mjs"
+      - ".github/workflows/bench-leaderboard.yml"
+  pull_request:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  stamp-merged-pr:
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: List changed bench JSON files
+        id: files
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FILES=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --jq '.[].filename' | grep '^bench-submissions/.*\.json$' || true)
+          echo "changed<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$FILES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Stamp submittedBy from PR author
+        if: steps.files.outputs.changed != ''
+        env:
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          CHANGED_FILES: ${{ steps.files.outputs.changed }}
+        run: node scripts/stamp-bench-pr-submissions.mjs
+
+      - name: Commit stamps
+        if: steps.files.outputs.changed != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bench-submissions/
+          git diff --staged --quiet || git commit -m "bench: stamp submitter from PR #${{ github.event.pull_request.number }}"
+          git push
+
+  build:
+    needs: [stamp-merged-pr]
+    if: >-
+      always() &&
+      (needs.stamp-merged-pr.result == 'skipped' || needs.stamp-merged-pr.result == 'success') &&
+      (
+        github.event_name == 'push' ||
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Pull latest main
+        run: git pull origin main
+
+      - name: Build public leaderboard
+        run: node scripts/build-bench-leaderboard.mjs
+
+      - name: Commit leaderboard
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/data/leaderboard.v1.json
+          git diff --staged --quiet && echo "No leaderboard changes" && exit 0
+          git commit -m "bench: rebuild public leaderboard"
+          git push

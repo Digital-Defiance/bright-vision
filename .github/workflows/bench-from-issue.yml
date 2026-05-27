@@ -1,0 +1,43 @@
+name: Bench card from issue
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  create-submission:
+    if: contains(github.event.issue.labels.*.name, 'bench-card')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Create submission JSON
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+        run: node scripts/bench-from-issue.mjs
+
+      - name: Rebuild leaderboard
+        run: node scripts/build-bench-leaderboard.mjs
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bench-submissions/ docs/data/leaderboard.v1.json
+          git commit -m "bench: card from issue #${{ github.event.issue.number }} by @${{ github.event.issue.user.login }}"
+          git push
+
+      - name: Comment and close
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment "${{ github.event.issue.number }}" --body "Thanks — your card was added from GitHub user \`@${{ github.event.issue.user.login }}\`. Public leaderboard: https://brightvision.digitaldefiance.org/bench/#leaderboard"
+          gh issue close "${{ github.event.issue.number }}"

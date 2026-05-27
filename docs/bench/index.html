@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Local LLM bench — share BrightVision timing stats without prompts or project paths. GitHub-backed, privacy-first."
+    />
+    <title>Local LLM bench — BrightVision</title>
+    <link rel="icon" href="../favicon.ico" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="bench.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap inner">
+        <a href="../" aria-label="BrightVision home">
+          <img src="../bright-vision-horiz-white.svg" alt="BrightVision" />
+        </a>
+        <nav>
+          <a href="../">Home</a>
+          <a href="#build">Build card</a>
+          <a href="#leaderboard">Leaderboard</a>
+          <a
+            href="https://github.com/Digital-Defiance/BrightVision/blob/main/bench-submissions/README.md"
+            >Submit</a
+          >
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero wrap">
+        <h1>Local LLM <em>bench</em></h1>
+        <p class="hero-lead">
+          Show off your setup — throughput and latency only. Export timing CSV from
+          BrightVision Settings, preview a card here, and submit via GitHub. We never see
+          your prompts, paths, or per-turn logs.
+        </p>
+        <div class="privacy-banner">
+          <span aria-hidden="true">🔒</span>
+          <div>
+            <strong>Privacy-first.</strong> CSV stays in your browser until you choose to
+            submit. Public leaderboard is built from small JSON files in git — aggregates
+            only. Your <code>@github</code> login is added automatically when a PR merges
+            (or from an issue), unless you hide it.
+          </div>
+        </div>
+      </section>
+
+      <section id="build" class="wrap">
+        <div class="grid-2">
+          <div class="panel">
+            <h2>1. Upload timing CSV</h2>
+            <div class="dropzone" id="dropzone">
+              <input type="file" id="csv-file" accept=".csv,text/csv" />
+              <p>Drop <strong>BrightVision timing CSV</strong> here or click to browse</p>
+              <p class="mono">Settings → Timing → export / workspace .bright-vision/timing-history.csv</p>
+            </div>
+            <p id="status" class="status" role="status"></p>
+
+            <h2 style="margin-top: 1.5rem">2. Card details</h2>
+            <div class="field">
+              <label for="display-name">Display name</label>
+              <input
+                id="display-name"
+                type="text"
+                maxlength="32"
+                pattern="[a-zA-Z0-9_-]+"
+                placeholder="metal-box-7b"
+                autocomplete="off"
+              />
+            </div>
+            <div class="field">
+              <label for="hardware">Hardware</label>
+              <select id="hardware"></select>
+            </div>
+            <label class="checkbox-row">
+              <input type="checkbox" id="hide-github" />
+              Hide my GitHub login on the public leaderboard
+            </label>
+
+            <div class="btn-row">
+              <button type="button" class="btn btn-primary" id="btn-copy" disabled>
+                Copy card JSON
+              </button>
+              <a
+                class="btn btn-ghost"
+                id="btn-pr"
+                href="#"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Open GitHub new file</a
+              >
+              <a
+                class="btn btn-ghost"
+                id="btn-issue"
+                href="#"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Submit via issue</a
+              >
+            </div>
+            <p class="status" style="margin-top: 0.75rem">
+              PR flow: copy JSON → paste into the new file → open PR → after merge, CI stamps
+              <code>submittedBy</code> and rebuilds the leaderboard.
+            </p>
+          </div>
+
+          <div class="panel">
+            <h2>Preview</h2>
+            <div id="preview-card" class="preview-card empty">
+              Upload timing CSV to preview your card
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="leaderboard" class="leaderboard wrap">
+        <h2>Leaderboard</h2>
+        <p style="color: var(--muted); margin: 0">
+          Built from
+          <a href="https://github.com/Digital-Defiance/BrightVision/blob/main/docs/data/leaderboard.v1.json"
+            >leaderboard.v1.json</a
+          >
+          on each merge to <code>bench-submissions/</code>.
+        </p>
+        <div id="leaderboard-grid" class="leaderboard-grid">
+          <p class="empty-leaderboard">Loading…</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">
+        © 2026 Digital Defiance ·
+        <a href="../">BrightVision</a>
+        · Timing CSV format matches
+        <a
+          href="https://github.com/Digital-Defiance/BrightVision/blob/main/src/utils/thinkingStats.ts"
+          >thinkingStats.ts</a
+        >
+      </div>
+    </footer>
+
+    <script type="module" src="bench.js"></script>
+  </body>
+</html>

@@ -6,7 +6,9 @@ on:
       - main
     paths:
       - "docs/**"
+      - "bench-submissions/**"
       - ".github/workflows/pages.yml"
+      - ".github/workflows/bench-leaderboard.yml"
   workflow_dispatch:
 
 permissions:

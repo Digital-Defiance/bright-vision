@@ -1,0 +1,81 @@
+name: Submit bench card
+description: Share local LLM timing stats (aggregates only — no prompts or project paths).
+title: "[Bench] "
+labels: ["bench-card"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Prefer the **[bench page](https://brightvision.digitaldefiance.org/bench/)** to build a card from BrightVision timing CSV, then open a PR.
+
+        This form stores **aggregate stats only**. Your GitHub login is recorded as submitter unless you opt out below.
+  - type: input
+    id: display_name
+    attributes:
+      label: Display name
+      description: Public nickname (1–32 characters, letters, numbers, `_`, `-`)
+      placeholder: metal-box-7b
+    validations:
+      required: true
+  - type: checkboxes
+    id: hide_github
+    attributes:
+      label: Privacy
+      options:
+        - label: Hide my GitHub login on the public leaderboard
+  - type: dropdown
+    id: hardware
+    attributes:
+      label: Hardware
+      options:
+        - apple-silicon
+        - nvidia-desktop
+        - nvidia-laptop
+        - amd-desktop
+        - cpu-only
+        - other
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      description: e.g. qwen2.5:7b-instruct-q4_K_M or ollama_chat/llama3.2:3b
+    validations:
+      required: true
+  - type: input
+    id: turn_count
+    attributes:
+      label: Turn count
+      description: Number of turns aggregated
+      placeholder: "42"
+    validations:
+      required: true
+  - type: input
+    id: median_tps
+    attributes:
+      label: Median output TPS
+      description: Tokens per second (median over turns with token reports)
+      placeholder: "31.2"
+    validations:
+      required: true
+  - type: input
+    id: p90_response_ms
+    attributes:
+      label: P90 response (ms)
+      description: Optional
+  - type: input
+    id: median_response_ms
+    attributes:
+      label: Median response (ms)
+      description: Optional
+  - type: input
+    id: avg_think_share_pct
+    attributes:
+      label: Avg think share (%)
+      description: Optional
+  - type: input
+    id: median_peak_gpu_pct
+    attributes:
+      label: Median peak GPU (%)
+      description: Optional
