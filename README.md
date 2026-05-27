@@ -15,6 +15,8 @@ A **local-LLM-first** desktop IDE (Tauri + React) for AI-assisted coding — spe
 <img width="1728" height="1084" alt="Screenshot 2026-05-26 at 8 51 20 PM" src="https://github.com/user-attachments/assets/f9ea3523-aa0d-405c-aff8-371d59412c36" />
 <img width="1728" height="1084" alt="Screenshot 2026-05-26 at 8 51 26 PM" src="https://github.com/user-attachments/assets/3e21ed90-362d-49f3-93dd-f0a16d786866" />
 <img width="1728" height="1084" alt="Screenshot 2026-05-26 at 8 51 34 PM" src="https://github.com/user-attachments/assets/ead7a30a-b01b-48ff-be71-e15689eeeba7" />
+<img width="1728" height="1084" alt="Screenshot 2026-05-26 at 8 59 38 PM" src="https://github.com/user-attachments/assets/21bfe84c-c134-43c6-82c6-71894133b42e" />
+
 
 ## What BrightVision does
 
