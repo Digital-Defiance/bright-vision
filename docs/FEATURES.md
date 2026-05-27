@@ -79,16 +79,17 @@ BrightVision is a **local-LLM-first** desktop IDE (Tauri + React) with a **headl
 - LSP / extension marketplace  
 - GPU-driven ETA (logged for research only)  
 
-## Screenshots wanted
+## Screenshots
 
-To polish the [marketing site](./index.html) and README, useful captures:
+Wired in [README.md](../README.md) (GitHub user-attachments, May 2026):
 
-1. **Chat** — full turn with Thinking/Answer + proposed edit  
-2. **Activity bar** — ETA + Response/Think during a long Ollama turn  
-3. **Tasks** — spec-driven task with Implement  
-4. **Editor** — tabs + explorer + git badge  
-5. **Settings** — timing history table or model hopper  
-6. **Agents** — agent chip row + registered sub-agent chips  
-7. **Git** — graph + working tree  
+| Capture | URL id |
+|---------|--------|
+| Chat + Mermaid | `09652221-d4bc-4dc3-8f25-56529d04b015` |
+| Activity bar + confirm | `21bfe84c-c134-43c6-82c6-71894133b42e` |
+| Tasks | `f9ea3523-aa0d-405c-aff8-371d59412c36` |
+| Editor | `3e21ed90-362d-49f3-93dd-f0a16d786866` |
+| Git | `ead7a30a-b01b-48ff-be71-e15689eeeba7` |
+| Settings timing + overlay | `dc6a8e0c-302e-4d7a-b455-7e1c7b7f28a0` |
 
-Drop PNGs in `assets/` or GitHub attachments and we can wire them into `docs/index.html`.
+Still useful for a future pass: Agents chip row, proposed-edit accordion close-up.

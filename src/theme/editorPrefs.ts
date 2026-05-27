@@ -4,13 +4,16 @@ export const EDITOR_PREFS_STORAGE_KEY = 'bright-vision-editor-prefs'
 
 export interface EditorPrefs {
   explorerOpen: boolean
-  explorerSizePct: number
+  /** @deprecated kept for migration; explorer uses fixed width now */
+  explorerSizePct?: number
 }
 
 export const DEFAULT_EDITOR_PREFS: EditorPrefs = {
   explorerOpen: true,
-  explorerSizePct: 32,
 }
+
+/** Fixed explorer column — percentage splits were collapsing to icon-only width. */
+export const EXPLORER_WIDTH_PX = 300
 
 export function loadEditorPrefs(): EditorPrefs {
   try {
@@ -19,10 +22,6 @@ export function loadEditorPrefs(): EditorPrefs {
     const parsed = JSON.parse(raw) as Partial<EditorPrefs>
     return {
       explorerOpen: parsed.explorerOpen ?? DEFAULT_EDITOR_PREFS.explorerOpen,
-      explorerSizePct:
-        typeof parsed.explorerSizePct === 'number'
-          ? Math.min(50, Math.max(22, parsed.explorerSizePct))
-          : DEFAULT_EDITOR_PREFS.explorerSizePct,
     }
   } catch {
     return { ...DEFAULT_EDITOR_PREFS }

@@ -15,8 +15,8 @@ interface BrandLogoProps {
 }
 
 /**
- * Vector logos use live SVG text + @font-face (woff2 in src/assets/fonts/).
- * PNG mode uses raster exports — reliable when &lt;img&gt; cannot load fonts.
+ * Vector header wordmark uses live SVG text (Inter-Black / Inter-Thin) loaded via
+ * `global.scss`. Rail variant is icon-only paths. PNG mode uses raster exports.
  */
 export function BrandLogo({ variant }: BrandLogoProps) {
   const isHeader = variant === 'header'

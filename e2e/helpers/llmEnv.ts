@@ -12,6 +12,9 @@ export const LLM_E2E_WORKSPACE = path.join(REPO_ROOT, 'e2e/fixtures/hello-worksp
 const CORE_API_URL = 'http://127.0.0.1:8741'
 const DEFAULT_OLLAMA_HOST = 'http://127.0.0.1:11434'
 
+/** Fast local default for `yarn test:llm:core` / `yarn test:e2e:llm` (also set in package.json). */
+export const DEFAULT_E2E_OLLAMA_MODEL = 'ollama_chat/llama3.2:3b'
+
 export function isLlmE2eEnabled(): boolean {
   return process.env.E2E_LLM === '1'
 }
@@ -79,19 +82,69 @@ export function resolveOllamaTag(): string {
   return ''
 }
 
+/** Bare Ollama tag for DEFAULT_E2E_OLLAMA_MODEL (`llama3.2:3b`). */
+export function defaultE2eOllamaTag(): string {
+  const m = DEFAULT_E2E_OLLAMA_MODEL.trim()
+  if (m.startsWith('ollama_chat/')) return m.slice('ollama_chat/'.length)
+  if (m.startsWith('ollama/')) return m.slice('ollama/'.length)
+  return m
+}
+
+export function isOllamaAutoPullEnabled(): boolean {
+  const v = process.env.E2E_OLLAMA_AUTO_PULL?.trim().toLowerCase()
+  return v !== '0' && v !== 'false' && v !== 'no'
+}
+
+export async function fetchOllamaTagNames(host = resolveOllamaHost()): Promise<string[]> {
+  const res = await fetch(`${host}/api/tags`, { signal: AbortSignal.timeout(15_000) })
+  if (!res.ok) throw new Error(`Ollama /api/tags: HTTP ${res.status}`)
+  const body = (await res.json()) as { models?: { name?: string; model?: string }[] }
+  const names: string[] = []
+  for (const entry of body.models ?? []) {
+    for (const key of ['name', 'model'] as const) {
+      const val = entry[key]
+      if (typeof val === 'string' && val) names.push(val)
+    }
+  }
+  return names
+}
+
+export function isTagPulled(names: string[], tag: string): boolean {
+  return names.some((n) => n === tag || n.startsWith(`${tag}:`))
+}
+
+export function ollamaPullModel(tag: string): void {
+  // eslint-disable-next-line no-console
+  console.log(`[llm e2e] ollama pull ${tag}…`)
+  execSync(`ollama pull ${tag}`, { stdio: 'inherit', env: process.env })
+}
+
+/** Pull when missing; set E2E_OLLAMA_AUTO_PULL=0 to fail fast without downloading. */
+export async function ensureOllamaModelPulled(tag?: string): Promise<string> {
+  const resolved = tag ?? (await resolveOllamaTagWithFallback())
+  const host = resolveOllamaHost()
+  let names = await fetchOllamaTagNames(host)
+  if (isTagPulled(names, resolved)) return resolved
+
+  if (!isOllamaAutoPullEnabled()) {
+    throw new Error(
+      `Model "${resolved}" is not pulled. Run: ollama pull ${resolved}\n` +
+        'Or leave E2E_OLLAMA_AUTO_PULL enabled (default) to pull automatically.'
+    )
+  }
+
+  ollamaPullModel(resolved)
+  names = await fetchOllamaTagNames(host)
+  if (!isTagPulled(names, resolved)) {
+    throw new Error(`ollama pull ${resolved} finished but model still missing from /api/tags`)
+  }
+  return resolved
+}
+
 export async function resolveOllamaTagWithFallback(): Promise<string> {
   const configured = resolveOllamaTag()
   if (configured) return configured
-  const host = resolveOllamaHost()
-  const res = await fetch(`${host}/api/tags`, { signal: AbortSignal.timeout(10_000) })
-  if (!res.ok) throw new Error(`Ollama /api/tags: HTTP ${res.status}`)
-  const body = (await res.json()) as { models?: { name?: string; model?: string }[] }
-  const first = body.models?.[0]
-  const tag = first?.name ?? first?.model
-  if (!tag) {
-    throw new Error('No models in Ollama — run: ollama pull <model>')
-  }
-  return tag
+  return defaultE2eOllamaTag()
 }
 
 export function visionModelFromTag(tag: string): string {
@@ -158,29 +211,14 @@ export function buildLlmE2eConfig() {
 
 export async function assertOllamaForLlmE2e(): Promise<void> {
   const host = resolveOllamaHost()
-  const tag = await resolveOllamaTagWithFallback()
-  let res: Response
   try {
-    res = await fetch(`${host}/api/tags`, { signal: AbortSignal.timeout(10_000) })
+    await fetchOllamaTagNames(host)
   } catch (err) {
     throw new Error(
       `Ollama not reachable at ${host} (${err}). Install Ollama and run: ollama serve`
     )
   }
-  if (!res.ok) {
-    throw new Error(`Ollama /api/tags failed: HTTP ${res.status}`)
-  }
-  const body = (await res.json()) as { models?: { name?: string; model?: string }[] }
-  const names = (body.models ?? []).flatMap((m) =>
-    [m.name, m.model].filter((n): n is string => Boolean(n))
-  )
-  const pulled = names.some((n) => n === tag || n.startsWith(`${tag}:`))
-  if (!pulled) {
-    throw new Error(
-      `Model "${tag}" is not pulled. Run: ollama pull ${tag}\n` +
-        `Or set E2E_OLLAMA_MODEL to a tag from: ollama list`
-    )
-  }
+  await ensureOllamaModelPulled()
 }
 
 export function coreHealthUrl(): string {

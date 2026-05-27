@@ -23,7 +23,7 @@
     <meta property="og:type" content="website" />
     <meta
       property="og:image"
-      content="https://github.com/user-attachments/assets/646e3140-72c5-4760-84ae-24b4b9015434"
+      content="https://github.com/user-attachments/assets/09652221-d4bc-4dc3-8f25-56529d04b015"
     />
     <meta name="twitter:card" content="summary_large_image" />
     <title>BrightVision — Native AI coding, without the IDE baggage</title>
@@ -311,6 +311,36 @@
         padding: 0.65rem 1rem;
         font-family: var(--font-mono);
         font-size: 0.7rem;
+        color: var(--muted-dim);
+        border-top: 1px solid var(--border);
+        background: var(--surface-raised);
+      }
+
+      .shot-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+        gap: 1.25rem;
+      }
+
+      .shot-card {
+        margin: 0;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        background: var(--surface);
+      }
+
+      .shot-card img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .shot-card figcaption {
+        padding: 0.65rem 0.85rem;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        line-height: 1.45;
         color: var(--muted-dim);
         border-top: 1px solid var(--border);
         background: var(--surface-raised);
@@ -839,6 +869,7 @@
         <nav aria-label="Primary">
           <a class="nav-docs" href="#install-mac">Install</a>
           <a class="nav-docs" href="#why-vision">Why Vision</a>
+          <a class="nav-docs" href="#screenshots">Screenshots</a>
           <a class="nav-docs" href="#features">Features</a>
           <a class="nav-docs" href="#architecture">Architecture</a>
           <a
@@ -926,16 +957,86 @@
           <figure class="hero-visual">
             
             <img
-              src="https://github.com/user-attachments/assets/739112bb-4c9b-4ddc-8d6d-ecebd6d9cb5b"
-              alt="BrightVision application screenshot showing chat and terminal panels"
+              src="https://github.com/user-attachments/assets/09652221-d4bc-4dc3-8f25-56529d04b015"
+              alt="BrightVision chat with streaming answer and Mermaid diagram"
               width="1392"
               height="832"
               loading="eager"
             />
             <figcaption class="hero-visual-caption">
-              Chat, terminal, and settings in one native shell
+              Chat with Mermaid, tasks, editor, and git in one native shell
             </figcaption>
           </figure>
+        </div>
+      </section>
+
+      <section id="screenshots">
+        <div class="wrap">
+          <p class="section-label">Product</p>
+          <h2 class="section-title">In the app</h2>
+          <p class="section-desc">
+            Long Ollama turns stay legible in the activity bar; risky shell commands get a
+            Yes/No confirm in the shell. Settings records per-turn response, TPS, and
+            CPU/RAM/GPU with CSV export and a live resource overlay in the rail.
+          </p>
+          <div class="shot-grid">
+            <figure class="shot-card">
+              <img
+                src="https://github.com/user-attachments/assets/21bfe84c-c134-43c6-82c6-71894133b42e"
+                alt="Activity bar with Response and Think timers, Ollama wait, and shell command confirmation"
+                width="1728"
+                height="1084"
+                loading="lazy"
+              />
+              <figcaption>
+                Activity bar — FINISHING TURN, Response/Think, ~ETA, Ollama wait + confirm
+                shell command
+              </figcaption>
+            </figure>
+            <figure class="shot-card">
+              <img
+                src="https://github.com/user-attachments/assets/f9ea3523-aa0d-405c-aff8-371d59412c36"
+                alt="Tasks tab with spec-driven todos"
+                width="1728"
+                height="1084"
+                loading="lazy"
+              />
+              <figcaption>Tasks — EARS/spec workflow, generate, Implement</figcaption>
+            </figure>
+            <figure class="shot-card">
+              <img
+                src="https://github.com/user-attachments/assets/3e21ed90-362d-49f3-93dd-f0a16d786866"
+                alt="Editor with file tabs and explorer"
+                width="1728"
+                height="1084"
+                loading="lazy"
+              />
+              <figcaption>Editor — CodeMirror tabs, explorer, git badges</figcaption>
+            </figure>
+            <figure class="shot-card">
+              <img
+                src="https://github.com/user-attachments/assets/ead7a30a-b01b-48ff-be71-e15689eeeba7"
+                alt="Git panel with commit graph and working tree"
+                width="1728"
+                height="1084"
+                loading="lazy"
+              />
+              <figcaption>Git — graph, stage, commit, undo (desktop)</figcaption>
+            </figure>
+            <figure class="shot-card">
+              <img
+                src="https://github.com/user-attachments/assets/dc6a8e0c-302e-4d7a-b455-7e1c7b7f28a0"
+                alt="Settings with timing history table, TPS and resource columns, CSV export, resource overlay"
+                width="1728"
+                height="1084"
+                loading="lazy"
+              />
+              <figcaption>
+                Settings — timing history (avg/p90, TPS), per-turn CPU/RAM/GPU, CSV, resource
+                overlay
+              </figcaption>
+            </figure>
+          </div>
         </div>
       </section>
 

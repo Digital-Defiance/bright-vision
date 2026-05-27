@@ -2,20 +2,16 @@ import { expect, test } from '@playwright/test'
 import { expectOptimisticSend, expectTurnIdle } from './helpers/chatSend'
 import {
   assertOllamaForLlmE2e,
-  buildLlmE2eConfig,
   ensureLlmE2eWorkspace,
   isLlmE2eEnabled,
-  resolveOllamaTagWithFallback,
   resolveVisionModel,
-  visionModelFromTag,
 } from './helpers/llmEnv'
-import { openChat } from './helpers/session'
-import { E2E_CONFIG_STORAGE_KEY } from './helpers/testConfig'
+import { openLlmChat, primeLlmE2eApp, startLlmE2eSession } from './helpers/llmSession'
 
 test.describe.configure({ mode: 'serial' })
 
 test.describe('Hello LLM (real Ollama + Vision API)', () => {
-  test.skip(!isLlmE2eEnabled(), 'Set E2E_LLM=1 and run: yarn test:e2e:llm')
+  test.skip(!isLlmE2eEnabled(), 'Run: yarn test:e2e:llm (sets E2E_LLM=1 and E2E_OLLAMA_MODEL)')
 
   test.beforeAll(async () => {
     await assertOllamaForLlmE2e()
@@ -23,28 +19,9 @@ test.describe('Hello LLM (real Ollama + Vision API)', () => {
   })
 
   test('hello turn completes with assistant text (no stall)', async ({ page }) => {
-    const cfg = {
-      ...buildLlmE2eConfig(),
-      model:
-        resolveVisionModel() ||
-        visionModelFromTag(await resolveOllamaTagWithFallback()),
-    }
-    await page.addInitScript(
-      ([key, config]) => {
-        localStorage.setItem('vision-welcome-dismissed', '1')
-        localStorage.setItem(key, JSON.stringify(config))
-      },
-      [E2E_CONFIG_STORAGE_KEY, cfg] as const
-    )
-
-    await page.goto('/')
-    await page.getByTestId('nav-terminal').click()
-    await page.getByTestId('terminal-start').click()
-    await expect(page.getByTestId('session-status')).toContainText('Session active', {
-      timeout: 120_000,
-    })
-
-    await openChat(page)
+    const cfg = await primeLlmE2eApp(page)
+    await startLlmE2eSession(page)
+    await openLlmChat(page)
     const prompt = 'Reply with exactly: hello from e2e'
     await page.getByTestId('chat-input').fill(prompt)
     await page.getByTestId('chat-send').click()

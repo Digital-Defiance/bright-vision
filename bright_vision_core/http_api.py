@@ -824,6 +824,7 @@ def post_message(session_id: str, body: MessageRequest):
             yield _sse_pack({"type": "error", "text": str(err)})
             yield _sse_pack({"type": "done", "error": True})
         except GeneratorExit:
+            session.interrupt_turn()
             return
 
     return StreamingResponse(

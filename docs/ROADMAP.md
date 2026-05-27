@@ -336,7 +336,7 @@ Prefer **permissive licenses** and **small bundle** ([AGENTS.md](../AGENTS.md)).
 
 | Phase | Scope |
 |-------|--------|
-| **v1** | **Done:** Left-rail **Editor** tab; multi file tabs; CM6 + Mod-s save; explorer (resize/collapse); `addFiles` from editor; git badges on tree (**#26**); open in editor from suggested tray, context chip, applied-file chips; dirty tab close confirm. Built-in langs: py/rs/go/js/ts/json/md/yaml/toml/shell/css/html. Dogfood: `yarn tauri dev` at repo root. |
+| **v1** | **Done:** Left-rail **Editor** tab; multi file tabs; CM6 + Mod-s save; explorer (toggle + fixed **300px** column); `addFiles` from editor; git badges on tree (**#26**); open in editor from suggested tray, context chip, applied-file chips; dirty tab close confirm. Built-in langs: py/rs/go/js/ts/json/md/yaml/toml/shell/css/html. Dogfood: `yarn tauri dev` at repo root. **2026-05:** dropped `react-resizable-panels` % split (collapsed to icon-only); flex + fixed-width explorer. |
 | **v2** | Filter ignore display in explorer; web read-only API; split editor; markdown preview |
 | **v3** | **Done:** Allowlisted optional CM6 language packs (`src/editor/languageRegistry.ts` + lazy `loadLanguagePlugin.ts`); Settings → Editor languages toggles; persisted in localStorage; chunks load on first use. Packs: C/C++, Java, PHP, SQL, XML, Vue, Sass, Dockerfile, CMake. Distinct from charter **#29** (Rust/core command plugins). |
 | **v4** | Split editor; markdown preview; optional Monaco only if LSP spike wins |
@@ -394,6 +394,7 @@ Prefer **permissive licenses** and **small bundle** ([AGENTS.md](../AGENTS.md)).
 2. **Chat** — **Agents** chip row (`ChatAgentBar`): `/agent`, `/invoke-agent`, `/spawn-agent`, `/reap-agent`; registered sub-agent chips (click → invoke, double-click → spawn).
 3. **Settings → Agents & sub-agents** — docs links + loaded registry when session is live.
 4. **Commands** — agent slash commands merged into palette with fallback summaries.
+5. **Headless guardrails** — `VISION_SLASH_PREPROC_TIMEOUT_S` (default 600s) for `/agent` preproc; `interrupt_turn` on SSE disconnect; default `agent_config` JSON (`command_timeout` 45s).
 
 **Open / v2:**
 

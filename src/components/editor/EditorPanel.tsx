@@ -10,20 +10,20 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
-import { Group, Panel, Separator, usePanelRef } from 'react-resizable-panels'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { isTauriRuntime } from '../../ipc/isTauri'
 import { useEditorSession } from '../../hooks/useEditorSession'
-import { loadEditorPrefs, saveEditorPrefs, type EditorPrefs } from '../../theme/editorPrefs'
+import {
+  EXPLORER_WIDTH_PX,
+  loadEditorPrefs,
+  saveEditorPrefs,
+  type EditorPrefs,
+} from '../../theme/editorPrefs'
 import { CodeEditor } from './CodeEditor'
 import { EditorFileTabs } from './EditorFileTabs'
 import { FileExplorer } from './FileExplorer'
 import type { EditorGitBadge } from '../../utils/editorGitStatus'
 import type { EditorLanguagePrefs } from '../../theme/editorLanguagePrefs'
-
-const PANEL_MAIN = 'editor-main'
-const PANEL_EXPLORER = 'editor-explorer'
-const GROUP_ID = 'bright-vision-editor'
 
 interface EditorPanelProps {
   workingDir: string
@@ -34,14 +34,6 @@ interface EditorPanelProps {
   gitStatusByPath?: Map<string, EditorGitBadge>
   onAddToContext?: (paths: string[]) => void
   onNotify?: (message: string, severity: 'info' | 'warning' | 'error') => void
-}
-
-function buildDefaultLayout(prefs: EditorPrefs): Record<string, number> {
-  const explorer = prefs.explorerOpen ? prefs.explorerSizePct : 0
-  return {
-    [PANEL_MAIN]: 100 - explorer,
-    [PANEL_EXPLORER]: explorer,
-  }
 }
 
 export function EditorPanel({
@@ -55,10 +47,7 @@ export function EditorPanel({
   onNotify,
 }: EditorPanelProps) {
   const [prefs, setPrefs] = useState<EditorPrefs>(() => loadEditorPrefs())
-  const explorerPanelRef = usePanelRef()
   const editor = useEditorSession(workingDir)
-
-  const defaultLayout = useMemo(() => buildDefaultLayout(prefs), [])
 
   useEffect(() => {
     saveEditorPrefs(prefs)
@@ -73,34 +62,6 @@ export function EditorPanel({
     // Open once per pending path from App (avoid re-run when tab state updates).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingOpenPath, desktop])
-
-  useEffect(() => {
-    if (!desktop) return
-    const api = explorerPanelRef.current
-    if (!api) return
-    if (prefs.explorerOpen) {
-      if (api.isCollapsed()) api.expand()
-    } else if (!api.isCollapsed()) {
-      api.collapse()
-    }
-  }, [desktop, prefs.explorerOpen, explorerPanelRef])
-
-  const handleLayoutChanged = useCallback((layout: Record<string, number>) => {
-    const explorerPct = layout[PANEL_EXPLORER]
-    if (typeof explorerPct !== 'number') return
-    setPrefs((p) => {
-      const open = explorerPct > 2
-      const next: EditorPrefs = {
-        ...p,
-        explorerOpen: open,
-        explorerSizePct:
-          open && explorerPct >= 22
-            ? Math.min(50, Math.round(explorerPct))
-            : p.explorerSizePct,
-      }
-      return next
-    })
-  }, [])
 
   const toggleExplorer = useCallback(() => {
     setPrefs((p) => ({ ...p, explorerOpen: !p.explorerOpen }))
@@ -153,10 +114,34 @@ export function EditorPanel({
     </Box>
   )
 
+  const editorMain = (
+    <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      {editor.activeTab?.loading ? (
+        <Typography sx={{ p: 2 }} color="text.secondary">
+          Loading…
+        </Typography>
+      ) : editor.activeTab?.error ? (
+        <Typography sx={{ p: 2 }} color="error.main">
+          {editor.activeTab.error}
+        </Typography>
+      ) : editor.activeTab ? (
+        <CodeEditor
+          path={editor.activeTab.path}
+          value={editor.activeTab.content}
+          onChange={(v) => editor.setTabContent(editor.activeTab!.path, v)}
+          onSave={() => void handleSave()}
+          enabledOptionalPluginIds={editorLanguagePrefs.enabledOptionalPluginIds}
+        />
+      ) : (
+        emptyEditor
+      )}
+    </Box>
+  )
+
   return (
     <Box
       className="vision-editor"
-      sx={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}
+      sx={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 }}
       data-testid="editor-panel"
     >
       <Stack
@@ -215,69 +200,39 @@ export function EditorPanel({
         onClose={handleCloseTab}
       />
 
-      <Box sx={{ flex: 1, minHeight: 0 }}>
+      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', minWidth: 0 }}>
         {!desktop ? (
-          <Paper variant="outlined" sx={{ m: 2, p: 2 }}>
+          <Paper variant="outlined" sx={{ m: 2, p: 2, flex: 1 }}>
             <Typography variant="body2" color="text.secondary">
               The editor reads and writes files through the desktop app. Use{' '}
               <strong>yarn tauri dev</strong> to browse, open, and save project files here.
             </Typography>
           </Paper>
         ) : (
-          <Group
-            id={GROUP_ID}
-            orientation="horizontal"
-            style={{ height: '100%', width: '100%' }}
-            defaultLayout={defaultLayout}
-            onLayoutChanged={handleLayoutChanged}
-          >
-            <Panel id={PANEL_MAIN} minSize={40}>
-              <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                {editor.activeTab?.loading ? (
-                  <Typography sx={{ p: 2 }} color="text.secondary">
-                    Loading…
-                  </Typography>
-                ) : editor.activeTab?.error ? (
-                  <Typography sx={{ p: 2 }} color="error.main">
-                    {editor.activeTab.error}
-                  </Typography>
-                ) : editor.activeTab ? (
-                  <CodeEditor
-                    path={editor.activeTab.path}
-                    value={editor.activeTab.content}
-                    onChange={(v) => editor.setTabContent(editor.activeTab!.path, v)}
-                    onSave={() => void handleSave()}
-                    enabledOptionalPluginIds={editorLanguagePrefs.enabledOptionalPluginIds}
-                  />
-                ) : (
-                  emptyEditor
-                )}
+          <>
+            {editorMain}
+            {prefs.explorerOpen ? (
+              <Box
+                sx={{
+                  width: EXPLORER_WIDTH_PX,
+                  maxWidth: '38vw',
+                  flexShrink: 0,
+                  minHeight: 0,
+                  display: 'flex',
+                  borderLeft: 1,
+                  borderColor: 'divider',
+                }}
+                data-testid="editor-explorer-pane"
+              >
+                <FileExplorer
+                  workingDir={workingDir}
+                  activePath={editor.activePath}
+                  onOpenFile={(path) => void editor.openFile(path)}
+                  gitStatusByPath={gitStatusByPath}
+                />
               </Box>
-            </Panel>
-            <Separator
-              style={{
-                width: 6,
-                background: 'var(--mui-palette-divider, #2d3a4f)',
-                cursor: 'col-resize',
-              }}
-            />
-            <Panel
-              id={PANEL_EXPLORER}
-              panelRef={explorerPanelRef}
-              collapsible
-              collapsedSize={0}
-              minSize={22}
-              maxSize={50}
-              defaultSize={prefs.explorerOpen ? prefs.explorerSizePct : 0}
-            >
-              <FileExplorer
-                workingDir={workingDir}
-                activePath={editor.activePath}
-                onOpenFile={(path) => void editor.openFile(path)}
-                gitStatusByPath={gitStatusByPath}
-              />
-            </Panel>
-          </Group>
+            ) : null}
+          </>
         )}
       </Box>
     </Box>

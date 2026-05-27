@@ -69,7 +69,8 @@ Import from `src/progress` or use `useProcess()` in components.
 |------|---------|
 | `src/assets/brand/*.svg` | Wordmarks (inline in UI when `BRAND_LOGO_MODE === 'vector'`) |
 | `src/assets/brand/*.png` | Raster fallbacks |
-| `src/assets/fonts/Glass_TTY_VT220.woff2` | Glass TTY VT220 for SVG text (commit to repo) |
+| `src/assets/fonts/Inter-Black.woff2`, `Inter-Thin.woff2` | Wordmark text in inline SVG logos |
+| `src/assets/fonts/Glass_TTY_VT220.woff2` | Glass TTY VT220 chat preset (optional) |
 | `src/assets/brand/logo.png` | Source for `yarn tauri icon …` → dock/installer icons |
 
 ## macOS release DMG

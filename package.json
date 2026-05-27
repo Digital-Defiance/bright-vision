@@ -1,6 +1,6 @@
 {
   "name": "bright-vision",
-  "version": "0.1.2-bright1",
+  "version": "0.1.2-bright2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -16,13 +16,13 @@
     "test:fast": "yarn tsc --noEmit && yarn test",
     "test:local": "yarn tsc --noEmit && yarn test && yarn test:rust",
     "test:e2e": "playwright test",
-    "test:e2e:llm": "E2E_LLM=1 E2E_PYTHON=.venv/bin/python3 playwright test -c playwright.llm.config.ts",
-    "test:llm:core": "E2E_LLM=1 python3 -m pytest tests/core/test_hello_llm.py -q",
+    "test:e2e:llm": "E2E_OLLAMA_MODEL=ollama_chat/llama3.2:3b E2E_LLM=1 E2E_PYTHON=.venv/bin/python3 playwright test -c playwright.llm.config.ts",
+    "test:llm:core": "E2E_OLLAMA_MODEL=ollama_chat/llama3.2:3b E2E_LLM=1 python3 -m pytest tests/core/test_hello_llm.py tests/core/test_agent_llm.py -q",
     "test:full": "yarn tsc --noEmit && yarn test && yarn test:rust && yarn test:e2e",
     "test:all": "yarn test:full",
     "test:local:sh": "sh scripts/test-local.sh",
     "test:git-workspace": "python -m pytest tests/core/test_git_workspace.py tests/core/test_http_api.py -q",
-    "test:bright-core": "python -m pytest tests/core/test_git_workspace.py tests/core/test_workspace_todos.py tests/core/test_http_api.py tests/core/test_http_session_todos.py tests/core/test_superproject_integration.py -q",
+    "test:bright-core": "python -m pytest tests/core/test_git_workspace.py tests/core/test_workspace_todos.py tests/core/test_http_api.py tests/core/test_http_session_todos.py tests/core/test_superproject_integration.py tests/core/test_headless_args.py tests/core/test_headless_agent.py tests/core/test_llm_ollama.py -q",
     "verify:submodule": "sh scripts/verify_submodule.sh",
     "sync:core": "bash cecli/scripts/sync_bright_vision.sh"
   },

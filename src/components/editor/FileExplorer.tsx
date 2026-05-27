@@ -7,10 +7,6 @@ import {
   Box,
   CircularProgress,
   IconButton,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
   TextField,
   Tooltip,
   Typography,
@@ -29,6 +25,25 @@ interface FileExplorerProps {
   activePath: string | null
   onOpenFile: (path: string) => void
   gitStatusByPath?: Map<string, EditorGitBadge>
+}
+
+const labelSx = {
+  flex: 1,
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  fontSize: '0.875rem',
+  lineHeight: 1.45,
+  color: 'text.primary',
+} as const
+
+function TreeLabel({ text, title }: { text: string; title?: string }) {
+  return (
+    <Box component="span" title={title ?? text} sx={labelSx} data-testid="explorer-node-label">
+      {text}
+    </Box>
+  )
 }
 
 function TreeRows({
@@ -51,32 +66,53 @@ function TreeRows({
   return (
     <>
       {nodes.map((node) => {
-        const pad = 1 + depth * 1.5
+        const padLeft = 8 + depth * 12
         if (node.isDir) {
           const open = expanded.has(node.path)
           return (
             <Box key={`dir-${node.path}`}>
-              <ListItemButton
-                dense
-                sx={{ pl: pad }}
+              <Box
+                role="button"
+                tabIndex={0}
                 onClick={() => onToggle(node.path)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    onToggle(node.path)
+                  }
+                }}
                 data-testid={`explorer-dir-${node.path}`}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  py: 0.45,
+                  pr: 1,
+                  pl: `${padLeft}px`,
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  cursor: 'pointer',
+                  borderRadius: 1,
+                  '&:hover': { bgcolor: 'action.hover' },
+                }}
               >
-                <ListItemIcon sx={{ minWidth: 28 }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexShrink: 0,
+                    color: 'text.secondary',
+                  }}
+                >
                   {open ? (
-                    <ExpandMoreIcon fontSize="small" />
+                    <ExpandMoreIcon sx={{ fontSize: 18 }} aria-hidden />
                   ) : (
-                    <ChevronRightIcon fontSize="small" />
+                    <ChevronRightIcon sx={{ fontSize: 18 }} aria-hidden />
                   )}
-                </ListItemIcon>
-                <ListItemIcon sx={{ minWidth: 28 }}>
-                  <FolderOutlinedIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText
-                  primary={node.name}
-                  primaryTypographyProps={{ variant: 'body2', noWrap: true }}
-                />
-              </ListItemButton>
+                  <FolderOutlinedIcon sx={{ fontSize: 17, ml: 0.25 }} aria-hidden />
+                </Box>
+                <TreeLabel text={node.name} />
+              </Box>
               {open && node.children?.length ? (
                 <TreeRows
                   nodes={node.children}
@@ -92,22 +128,40 @@ function TreeRows({
           )
         }
         const badge = gitStatusByPath?.get(node.path)
+        const selected = activePath === node.path
         return (
-          <ListItemButton
+          <Box
             key={node.path}
-            dense
-            selected={activePath === node.path}
-            sx={{ pl: pad + 3.5 }}
+            role="button"
+            tabIndex={0}
             onClick={() => onOpenFile(node.path)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onOpenFile(node.path)
+              }
+            }}
             data-testid={`explorer-file-${node.path}`}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.75,
+              py: 0.45,
+              pr: 1,
+              pl: `${padLeft + 16}px`,
+              width: '100%',
+              boxSizing: 'border-box',
+              cursor: 'pointer',
+              borderRadius: 1,
+              bgcolor: selected ? 'action.selected' : 'transparent',
+              '&:hover': { bgcolor: selected ? 'action.selected' : 'action.hover' },
+            }}
           >
-            <ListItemIcon sx={{ minWidth: 28 }}>
-              <InsertDriveFileOutlinedIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText
-              primary={node.name}
-              primaryTypographyProps={{ variant: 'body2', noWrap: true }}
+            <InsertDriveFileOutlinedIcon
+              sx={{ fontSize: 18, flexShrink: 0, color: 'text.secondary' }}
+              aria-hidden
             />
+            <TreeLabel text={node.name} title={node.path} />
             {badge ? (
               <Typography
                 component="span"
@@ -116,7 +170,6 @@ function TreeRows({
                   fontFamily: 'monospace',
                   fontWeight: 700,
                   color: gitBadgeColor(badge),
-                  ml: 0.5,
                   flexShrink: 0,
                 }}
                 title={`Git: ${badge}`}
@@ -125,7 +178,7 @@ function TreeRows({
                 {badge}
               </Typography>
             ) : null}
-          </ListItemButton>
+          </Box>
         )
       })}
     </>
@@ -142,7 +195,7 @@ export function FileExplorer({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['src']))
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
 
   const refresh = useCallback(async () => {
     if (!isTauriRuntime()) {
@@ -169,6 +222,17 @@ export function FileExplorer({
 
   const tree = useMemo(() => filterFileTree(buildFileTree(paths), filter), [paths, filter])
 
+  useEffect(() => {
+    if (!tree.length) return
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      for (const node of tree) {
+        if (node.isDir) next.add(node.path)
+      }
+      return next
+    })
+  }, [paths])
+
   const onToggle = useCallback((dirPath: string) => {
     setExpanded((prev) => {
       const next = new Set(prev)
@@ -178,17 +242,17 @@ export function FileExplorer({
     })
   }, [])
 
+  const fileCount = paths.length
+
   return (
     <Box
+      className="vision-editor-explorer"
       sx={{
         height: '100%',
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
-        minWidth: 200,
         bgcolor: 'background.paper',
-        borderLeft: 1,
-        borderColor: 'divider',
       }}
       data-testid="editor-file-explorer"
     >
@@ -201,10 +265,11 @@ export function FileExplorer({
           gap: 0.5,
           borderBottom: 1,
           borderColor: 'divider',
+          flexShrink: 0,
         }}
       >
         <Typography variant="caption" fontWeight={600} sx={{ flex: 1 }} noWrap>
-          Explorer
+          Files{fileCount > 0 ? ` (${fileCount})` : ''}
         </Typography>
         <Tooltip title="Refresh">
           <span>
@@ -214,7 +279,7 @@ export function FileExplorer({
           </span>
         </Tooltip>
       </Box>
-      <Box sx={{ px: 1, py: 0.75 }}>
+      <Box sx={{ px: 1, py: 0.75, flexShrink: 0 }}>
         <TextField
           size="small"
           fullWidth
@@ -224,7 +289,7 @@ export function FileExplorer({
           inputProps={{ 'data-testid': 'editor-explorer-filter' }}
         />
       </Box>
-      <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+      <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0, width: '100%' }}>
         {loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
             <CircularProgress size={22} />
@@ -237,10 +302,10 @@ export function FileExplorer({
         )}
         {!loading && !error && tree.length === 0 && (
           <Typography variant="body2" color="text.secondary" sx={{ px: 1.5, py: 1 }}>
-            No files listed.
+            {filter.trim() ? 'No matches.' : 'No files listed.'}
           </Typography>
         )}
-        <List dense disablePadding>
+        <Box component="nav" aria-label="Workspace files" sx={{ width: '100%', py: 0.5 }}>
           <TreeRows
             nodes={tree}
             depth={0}
@@ -250,7 +315,7 @@ export function FileExplorer({
             onOpenFile={onOpenFile}
             gitStatusByPath={gitStatusByPath}
           />
-        </List>
+        </Box>
       </Box>
     </Box>
   )

@@ -2403,6 +2403,7 @@ function AppShell({
                 </Typography>
               }
             >
+              <Box sx={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
               <EditorPanel
                 workingDir={savedConfig.workingDir}
                 isRunning={isRunning}
@@ -2415,6 +2416,7 @@ function AppShell({
                 }}
                 onNotify={(message, severity) => setSnackbar({ message, severity })}
               />
+              </Box>
             </Suspense>
           )}
 

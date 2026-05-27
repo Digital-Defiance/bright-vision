@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 import os
 import unittest
-from urllib.error import URLError
-from urllib.request import urlopen
 
 try:
     from fastapi.testclient import TestClient
@@ -21,65 +19,7 @@ except ImportError:
 
 from cecli.utils import GitTemporaryDirectory
 
-
-def _ollama_host() -> str:
-    return (
-        os.environ.get("E2E_OLLAMA_HOST")
-        or os.environ.get("OLLAMA_HOST")
-        or "http://127.0.0.1:11434"
-    ).rstrip("/")
-
-
-def _first_pulled_tag() -> str | None:
-    try:
-        with urlopen(f"{_ollama_host()}/api/tags", timeout=10) as res:
-            body = json.loads(res.read().decode("utf-8"))
-    except (URLError, TimeoutError, OSError, json.JSONDecodeError):
-        return None
-    models = body.get("models") or []
-    if not models:
-        return None
-    entry = models[0]
-    return entry.get("name") or entry.get("model")
-
-
-def _ollama_tag() -> str:
-    explicit = (os.environ.get("E2E_OLLAMA_MODEL") or "").strip()
-    if explicit.startswith("ollama_chat/"):
-        return explicit[len("ollama_chat/") :]
-    if explicit.startswith("ollama/"):
-        return explicit[len("ollama/") :]
-    if explicit:
-        return explicit
-    data = (os.environ.get("DATA_MODEL") or "").strip()
-    if data:
-        if data.startswith("ollama_chat/"):
-            return data[len("ollama_chat/") :]
-        if data.startswith("ollama/"):
-            return data[len("ollama/") :]
-        return data
-    fallback = _first_pulled_tag()
-    if fallback:
-        return fallback
-    return "llama3.2:3b"
-
-
-def _vision_model() -> str:
-    tag = _ollama_tag()
-    if tag.startswith("ollama_chat/"):
-        return tag
-    return f"ollama_chat/{tag}"
-
-
-def _ollama_reachable() -> bool:
-    host = (os.environ.get("E2E_OLLAMA_HOST") or os.environ.get("OLLAMA_HOST") or "http://127.0.0.1:11434").rstrip(
-        "/"
-    )
-    try:
-        with urlopen(f"{host}/api/tags", timeout=10) as res:
-            return res.status == 200
-    except (URLError, TimeoutError, OSError):
-        return False
+from llm_ollama import ensure_ollama_for_llm_e2e, ollama_reachable, resolve_vision_model
 
 
 def _parse_sse_payload(raw: str) -> list[dict]:
@@ -94,8 +34,12 @@ def _parse_sse_payload(raw: str) -> list[dict]:
 
 @unittest.skipIf(TestClient is None, "fastapi not installed")
 @unittest.skipIf(os.environ.get("E2E_LLM") != "1", "set E2E_LLM=1 to run real LLM tests")
-@unittest.skipIf(not _ollama_reachable(), "Ollama not reachable")
+@unittest.skipIf(not ollama_reachable(), "Ollama not reachable")
 class TestHelloLlm(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        ensure_ollama_for_llm_e2e()
+
     def setUp(self):
         _sessions.clear()
         reset_auth_for_tests()
@@ -105,7 +49,7 @@ class TestHelloLlm(unittest.TestCase):
         reset_auth_for_tests()
 
     def test_hello_message_streams_tokens_and_done(self):
-        model = _vision_model()
+        model = resolve_vision_model()
         with GitTemporaryDirectory() as root:
             client = TestClient(app)
             res = client.post("/sessions", json={"workspace": root, "model": model})

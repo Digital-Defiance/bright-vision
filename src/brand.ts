@@ -20,13 +20,19 @@ export const CECLI_HOME_URL = 'https://cecli.dev'
 export const CECLI_GITHUB_URL = 'https://github.com/dwash96/cecli'
 
 /**
- * `vector` — inline SVG + Glass TTY VT220 from `src/assets/fonts/Glass_TTY_VT220.woff2`.
+ * `vector` — inline SVG wordmark; Inter Black/Thin from `src/assets/fonts/`.
  * `png` — raster fallbacks in `src/assets/brand/*.png`.
  */
 export const BRAND_LOGO_MODE: 'png' | 'vector' = 'vector'
 
-/** Expected path (commit the woff2 beside this constant’s folder). */
-export const BRAND_FONT_FILE = 'Glass_TTY_VT220.woff2'
+/** Wordmark faces (see `global.scss` @font-face). */
+export const BRAND_WORDMARK_FONTS = ['Inter-Black.woff2', 'Inter-Thin.woff2'] as const
+
+/** Chat/terminal preset (not the logo). */
+export const BRAND_CHAT_FONT_FILE = 'Glass_TTY_VT220.woff2'
+
+/** @deprecated use BRAND_CHAT_FONT_FILE */
+export const BRAND_FONT_FILE = BRAND_CHAT_FONT_FILE
 
 export const BRAND_HEADER_LOGO_PNG = headerLogoPng
 export const BRAND_RAIL_LOGO_PNG = railLogoPng

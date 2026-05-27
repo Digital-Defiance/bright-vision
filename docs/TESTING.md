@@ -112,17 +112,21 @@ Exercises a **live** `bright-vision-core` on `:8741` and your **Ollama** model (
 **Prerequisites**
 
 1. [Ollama](https://ollama.com/) running (`ollama serve` or the desktop app).
-2. A pulled model, e.g. `ollama pull llama3.2:3b` (or set `DATA_MODEL` in `./local-llm.env`).
+2. Ollama running (`ollama serve`). LLM tests default to `llama3.2:3b` and run **`ollama pull`** automatically if the model is missing (disable with `E2E_OLLAMA_AUTO_PULL=0`).
 3. Python env: `source activate.sh` from **one** repo path (installs cecli, `bright_vision_core`, uvicorn, pytest). If the repo is reachable as both `/Users/.../BrightVision` and `/Volumes/.../BrightVision`, use the same path for the shell and Playwright (`cd "$(pwd -P)"`).
 4. Port **8741** free (or stop a leftover server: `kill $(lsof -ti tcp:8741)`).
 
 **Run**
 
 ```bash
-# Core-only (fastest feedback on SSE + Ollama)
-E2E_LLM=1 yarn test:llm:core
+# Core-only (SSE + Ollama; hello + /agent) — uses llama3.2:3b via package.json
+yarn test:llm:core
 
-# Full UI path: Terminal Start → Chat → hello
+# Full UI path: Terminal Start → Chat → hello + /agent
+yarn test:e2e:llm
+
+# Explicit env (override model or host):
+E2E_OLLAMA_MODEL=ollama_chat/llama3.2:3b E2E_LLM=1 yarn test:llm:core
 E2E_OLLAMA_MODEL=ollama_chat/llama3.2:3b E2E_LLM=1 yarn test:e2e:llm
 ```
 
@@ -130,7 +134,8 @@ Optional env:
 
 | Variable | Purpose |
 |----------|---------|
-| `E2E_OLLAMA_MODEL` | LiteLLM id or bare tag (default `llama3.2:3b` or `DATA_MODEL` from `local-llm.env`) |
+| `E2E_OLLAMA_MODEL` | LiteLLM id or bare tag (`yarn test:llm:core` sets `ollama_chat/llama3.2:3b`) |
+| `E2E_OLLAMA_AUTO_PULL` | `1` (default): run `ollama pull` when the model is missing; `0` to fail fast |
 | `E2E_OLLAMA_HOST` | Ollama base URL (default `http://127.0.0.1:11434`) |
 | `E2E_PYTHON` | Venv shim for spawning Vision API (default `.venv/bin/python3`; `test:e2e:llm` sets this — do not point at Homebrew `python3.14` alone) |
 
@@ -138,7 +143,9 @@ E2E clears **`PYTHONPATH`**. Do not export `PYTHONPATH=$PWD` — the repo’s `c
 
 LLM UI e2e uses workspace `e2e/fixtures/hello-workspace` (minimal git repo), not the BrightVision superproject tree.
 
-Default `yarn test:e2e` **does not** run `hello-llm.spec.ts`.
+Default `yarn test:e2e` **does not** run `hello-llm.spec.ts` or `agent-llm.spec.ts`.
+
+`/agent` LLM tests use a strict no-tools prompt; large models may take several minutes (Playwright timeout 7m per test).
 
 ## Manual smoke (not Playwright)
 
@@ -158,8 +165,14 @@ See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) if the session sticks on **Connec
 ```bash
 yarn test:git-workspace
 yarn verify:submodule          # needs .venv — also in test-local.sh release
-yarn test:bright-core              # bright-vision-core (default engine)
-cd bright-vision-core && python -m pytest tests/basic/ -q
+source activate.sh                 # cecli + bright_vision_core on PYTHONPATH
+yarn test:bright-core              # Vision API + headless /agent regression tests
+```
+
+Includes `test_headless_args.py` and `test_headless_agent.py` (agent mode + `verbose` on headless args).
+
+```bash
+python -m pytest tests/core/test_headless_args.py tests/core/test_headless_agent.py -q
 ```
 
 ## Script aliases

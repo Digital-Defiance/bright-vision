@@ -2,12 +2,12 @@
 @use 'variables' as *;
 @use 'brand';
 
-// Glass TTY VT220 — src/assets/fonts/Glass_TTY_VT220.woff2 (see BRAND_FONT_FILE in brand.ts)
-$brand-font-url: '../assets/fonts/Glass_TTY_VT220.woff2';
+// Glass TTY VT220 — chat/terminal preset (see BRAND_CHAT_FONT_FILE in brand.ts)
+$brand-chat-font-url: '../assets/fonts/Glass_TTY_VT220.woff2';
 
 @font-face {
   font-family: 'Glass TTY VT220';
-  src: url($brand-font-url) format('woff2');
+  src: url($brand-chat-font-url) format('woff2');
   font-weight: normal;
   font-style: normal;
   font-display: block;
@@ -15,8 +15,28 @@ $brand-font-url: '../assets/fonts/Glass_TTY_VT220.woff2';
 
 @font-face {
   font-family: 'Glass_TTY_VT220';
-  src: url($brand-font-url) format('woff2');
+  src: url($brand-chat-font-url) format('woff2');
   font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+
+// Wordmark SVG text (Inter Black / Thin) — inline logos in BrandLogo
+$inter-black-url: '../assets/fonts/Inter-Black.woff2';
+$inter-thin-url: '../assets/fonts/Inter-Thin.woff2';
+
+@font-face {
+  font-family: 'Inter-Black';
+  src: url($inter-black-url) format('woff2');
+  font-weight: 900;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Inter-Thin';
+  src: url($inter-thin-url) format('woff2');
+  font-weight: 100;
   font-style: normal;
   font-display: block;
 }
@@ -63,6 +83,15 @@ body {
   font-size: 0.8rem;
   line-height: 1.45;
   font-variant-ligatures: none;
+}
+
+// Editor file tree — always UI sans, never chat monospace
+.vision-editor-explorer {
+  font-family: var(--vision-font-ui, #{$vision-font-sans});
+
+  .MuiTypography-root {
+    font-family: inherit;
+  }
 }
 
 // Monospace regions outside chat/terminal shells

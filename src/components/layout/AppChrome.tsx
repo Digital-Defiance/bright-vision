@@ -143,9 +143,12 @@ export function AppChrome({
         <Box
           sx={{
             flex: 1,
-            overflow: 'auto',
             minHeight: 0,
+            minWidth: 0,
             p: activeTab === 'editor' ? 0 : 3,
+            overflow: activeTab === 'editor' ? 'hidden' : 'auto',
+            display: activeTab === 'editor' ? 'flex' : 'block',
+            flexDirection: activeTab === 'editor' ? 'column' : undefined,
           }}
         >
           {children}

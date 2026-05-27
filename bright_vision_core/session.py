@@ -8,11 +8,15 @@ import base64
 import os
 import shlex
 import threading
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Iterator, TypeVar
 
 _T = TypeVar("_T")
+
+# Wall-clock cap for slash/preproc (e.g. `/agent` on a local model looping on tools).
+SLASH_PREPROC_TIMEOUT_S = float(os.environ.get("VISION_SLASH_PREPROC_TIMEOUT_S", "600"))
 
 from cecli import models
 from cecli.coders import Coder
@@ -65,8 +69,26 @@ def _done_commit_fields(coder) -> dict[str, Any]:
     return payload
 
 
-def _drain_io_events(io: EventIO) -> Iterator[dict[str, Any]]:
+def _drain_io_events(
+    io: EventIO,
+    *,
+    mirror_assistant_complete: bool = False,
+    assistant_text: list[str] | None = None,
+) -> Iterator[dict[str, Any]]:
+    """
+    Yield pending IO events. Slash/preproc turns (e.g. ``/agent``) finish via
+    ``generate()`` → ``ai_output`` → ``assistant_complete`` without ``token``
+    events; optionally mirror that text to ``token`` for SSE/UI parity.
+    """
     for event in io.drain_events():
+        if mirror_assistant_complete and event.get("type") == "assistant_complete":
+            text = str(event.get("text") or "")
+            if text.strip():
+                if assistant_text is not None:
+                    assistant_text.append(text)
+                yield event
+                yield io.emit("token", text=text)
+                continue
         yield event
 
 
@@ -77,12 +99,17 @@ def _run_blocking_with_sse_pulses(
     label: str = "Vision",
     message: str = "Working…",
     interval_s: float = 8.0,
+    mirror_assistant_complete: bool = False,
+    assistant_text: list[str] | None = None,
+    timeout_s: float | None = None,
+    on_timeout: Callable[[], None] | None = None,
 ) -> Iterator[dict[str, Any] | _T]:
     """Run blocking work in a thread; emit progress and yield so SSE stays alive."""
     wait_s = max(2.0, interval_s)
     done = threading.Event()
     result: list[_T] = []
     error: list[BaseException] = []
+    started = time.monotonic()
 
     def worker() -> None:
         try:
@@ -95,12 +122,29 @@ def _run_blocking_with_sse_pulses(
     threading.Thread(target=worker, daemon=True).start()
     pulse = 0
     while not done.wait(timeout=wait_s):
+        if timeout_s is not None and time.monotonic() - started > timeout_s:
+            if on_timeout:
+                on_timeout()
+            raise TimeoutError(f"{message} timed out after {int(timeout_s)}s")
         pulse += 1
         emit_progress(io, label=label, message=f"{message} ({int(pulse * wait_s)}s)")
-        yield from _drain_io_events(io)
+        yield from _drain_io_events(
+            io,
+            mirror_assistant_complete=mirror_assistant_complete,
+            assistant_text=assistant_text,
+        )
     if error:
+        yield from _drain_io_events(
+            io,
+            mirror_assistant_complete=mirror_assistant_complete,
+            assistant_text=assistant_text,
+        )
         raise error[0]
-    yield from _drain_io_events(io)
+    yield from _drain_io_events(
+        io,
+        mirror_assistant_complete=mirror_assistant_complete,
+        assistant_text=assistant_text,
+    )
     yield result[0]
 
 
@@ -124,6 +168,11 @@ class Session:
         self.coder.pretty = False
         self.coder.commands.io = io
         self.coder.commands.coder = coder
+
+    def interrupt_turn(self) -> None:
+        """Signal the active cecli turn to stop (HTTP disconnect or slash timeout)."""
+        rebind_coder_loop_primitives(self.coder)
+        self.coder.interrupt_event.set()
 
     @classmethod
     def create(
@@ -289,6 +338,7 @@ class Session:
         for event in self.io.drain_events():
             yield event
         assistant_text: list[str] = []
+        self.coder.interrupt_event.clear()
 
         try:
             emit_progress(self.io, label="Vision", message="Preparing workspace…")
@@ -317,21 +367,48 @@ class Session:
 
                     return run(_preproc_coro())
 
-                for item in _run_blocking_with_sse_pulses(
-                    self.io,
-                    _preproc,
-                    label="Vision",
-                    message="Running slash commands",
-                ):
-                    if isinstance(item, dict):
-                        yield item
-                    else:
-                        user_msg = item
+                try:
+                    for item in _run_blocking_with_sse_pulses(
+                        self.io,
+                        _preproc,
+                        label="Vision",
+                        message="Running slash commands",
+                        mirror_assistant_complete=True,
+                        assistant_text=assistant_text,
+                        timeout_s=SLASH_PREPROC_TIMEOUT_S,
+                        on_timeout=self.interrupt_turn,
+                    ):
+                        if isinstance(item, dict):
+                            yield item
+                        else:
+                            user_msg = item
+                except TimeoutError as err:
+                    yield from _drain_io_events(
+                        self.io,
+                        mirror_assistant_complete=True,
+                        assistant_text=assistant_text,
+                    )
+                    yield self.io.emit(
+                        "error",
+                        text=(
+                            f"{err}. Stop the turn or retry with a simpler prompt. "
+                            "Local agent mode may loop on tools (e.g. repeated ls)."
+                        ),
+                    )
+                    yield self.io.emit(
+                        "done",
+                        assistant_text="".join(assistant_text),
+                        error=True,
+                    )
+                    return
 
             if user_msg is None:
-                for event in self.io.drain_events():
-                    yield event
-                yield self.io.emit("done", assistant_text="")
+                yield from _drain_io_events(
+                    self.io,
+                    mirror_assistant_complete=True,
+                    assistant_text=assistant_text,
+                )
+                yield self.io.emit("done", assistant_text="".join(assistant_text))
                 return
 
             for event in self.io.drain_events():
@@ -424,8 +501,11 @@ class Session:
             yield self.io.emit("done", **payload)
         except BaseException as err:
             if is_switch_coder_signal(err):
-                for event in self.io.drain_events():
-                    yield event
+                yield from _drain_io_events(
+                    self.io,
+                    mirror_assistant_complete=True,
+                    assistant_text=assistant_text,
+                )
                 yield self.io.emit("done", assistant_text="".join(assistant_text))
                 return
             if isinstance(err, BrokenPipeError):
