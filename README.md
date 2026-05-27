@@ -3,7 +3,7 @@
 **Website:** [brightvision.digitaldefiance.org](https://brightvision.digitaldefiance.org)
 
 <div align="center">
-  <img width="400" alt="BrightVision" title="BrightVision" src="https://brightvision.digitaldefiance.org/brightvision-white.svg" />
+  <img width="400" alt="BrightVision" title="BrightVision" src="https://brightvision.digitaldefiance.org/bright-vision-white.svg" />
 </div>
 
 A **local-LLM-first** desktop IDE (Tauri + React) for AI-assisted coding — spec-driven tasks, superproject git, built-in editor, and a headless agent you control from the UI (never the terminal TUI).

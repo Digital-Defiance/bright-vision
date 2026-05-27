@@ -44,6 +44,10 @@ export function EditorFileTabs({ tabs, activePath, onSelect, onClose }: EditorFi
                   aria-label={`Close ${tab.path}`}
                   onClick={(e) => {
                     e.stopPropagation()
+                    if (tab.dirty) {
+                      const name = tab.path.split('/').pop() ?? tab.path
+                      if (!window.confirm(`Discard unsaved changes in ${name}?`)) return
+                    }
                     onClose(tab.path)
                   }}
                   sx={{ p: 0.25 }}

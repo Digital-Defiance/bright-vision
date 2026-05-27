@@ -69,14 +69,9 @@ export function EditorPanel({
 
   const handleCloseTab = useCallback(
     (path: string) => {
-      const tab = editor.tabs.find((t) => t.path === path)
-      if (tab?.dirty) {
-        const name = path.split('/').pop() ?? path
-        if (!window.confirm(`Discard unsaved changes in ${name}?`)) return
-      }
       editor.closeTab(path)
     },
-    [editor]
+    [editor.closeTab]
   )
 
   const handleSave = useCallback(async () => {

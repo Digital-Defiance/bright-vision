@@ -332,6 +332,7 @@ function AppShell({
     tokensSent: number
     tokensReceived: number
   } | null>(null)
+  const turnTokenUsageRef = useRef<{ tokensSent: number; tokensReceived: number } | null>(null)
   const refreshSessionInfoRef = useRef<() => Promise<import('./ipc/httpClient').CoreSessionInfo | null>>(
     async () => null
   )
@@ -361,6 +362,7 @@ function AppShell({
     turnWallStartMsRef.current = turnStartMs
     turnAssistantMessageIdRef.current = null
     turnHadAssistantOutputRef.current = false
+    turnTokenUsageRef.current = null
     setTurnTokenUsage(null)
     thinkingTimingRef.current.beginTurn(promptChars, turnStartMs)
     turnTimingActiveRef.current = true
@@ -722,6 +724,10 @@ function AppShell({
           if (report) {
             setContextUsage((prev) => ({ ...prev, lastReport: report }))
             if (turnTimingActiveRef.current) {
+              turnTokenUsageRef.current = {
+                tokensSent: report.tokensSent,
+                tokensReceived: report.tokensReceived,
+              }
               setTurnTokenUsage({
                 tokensSent: report.tokensSent,
                 tokensReceived: report.tokensReceived,
@@ -849,8 +855,9 @@ function AppShell({
               const recorded = thinkingTimingRef.current.recordCompletedTurn(
                 turnTiming,
                 takeTurnResourcePeakRef.current(),
-                turnTokenUsage ?? undefined
+                turnTokenUsageRef.current ?? undefined
               )
+              turnTokenUsageRef.current = null
               setTurnTokenUsage(null)
               if (
                 recorded &&
@@ -1179,6 +1186,7 @@ function AppShell({
   startTurnTimingRef.current = (promptChars: number, turnStartMs: number) => {
     turnWallStartMsRef.current = turnStartMs
     turnAssistantMessageIdRef.current = null
+    turnTokenUsageRef.current = null
     setTurnTokenUsage(null)
     resetTurnResourcePeak()
     setTrackTurnResources(true)

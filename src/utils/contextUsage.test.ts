@@ -27,6 +27,18 @@ describe('contextUsage', () => {
     expect(r?.tokensReceived).toBe(450)
   })
 
+  it('parses cecli usage with token suffix and alternate arrows', () => {
+    const r = parseTokenUsageReport('1.2k tokens ⇡ 450 tok ⇣')
+    expect(r?.tokensSent).toBe(1200)
+    expect(r?.tokensReceived).toBe(450)
+  })
+
+  it('parses usage line with ANSI color escapes', () => {
+    const r = parseTokenUsageReport('\u001b[32m1.2k\u001b[0m ↑ \u001b[33m450\u001b[0m ↓')
+    expect(r?.tokensSent).toBe(1200)
+    expect(r?.tokensReceived).toBe(450)
+  })
+
   it('parses legacy Tokens line inside multiline tool_output', () => {
     const r = parseTokenUsageReport(
       '[Cecli] Tokens: 120 sent, 45 received\nEdited: src/App.tsx'

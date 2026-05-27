@@ -22,7 +22,7 @@ export const EMPTY_CONTEXT_USAGE: SessionContextUsage = {
 }
 
 function parseTokenCount(token: string): number | null {
-  const t = token.trim().toLowerCase().replace(/,/g, '')
+  const t = token.trim().toLowerCase().replace(/,/g, '').replace(/\s+/g, '')
   const m = t.match(/^([\d.]+)\s*(k|m)?$/)
   if (!m) return null
   const n = parseFloat(m[1])
@@ -41,8 +41,9 @@ function parseTokenCount(token: string): number | null {
 export function parseTokenUsageReport(text: string): TokenUsageReport | null {
   const t = text.trim()
   if (!t) return null
+  const clean = t.replace(/\x1b\[[0-9;]*m/g, '')
 
-  const legacy = t.match(/\bTokens:\s*(.+?)\s*sent,\s*(.+?)\s*received/i)
+  const legacy = clean.match(/\bTokens:\s*(.+?)\s*sent,\s*(.+?)\s*received/i)
   if (legacy) {
     const tokensSent = parseTokenCount(legacy[1])
     const tokensReceived = parseTokenCount(legacy[2])
@@ -51,8 +52,12 @@ export function parseTokenUsageReport(text: string): TokenUsageReport | null {
     }
   }
 
-  const cecli = t.match(
-    /(\d+(?:\.\d+)?k?(?:\/\d+(?:\.\d+)?k?)*)\s*↑\s*(\d+(?:\.\d+)?k?)\s*↓/i
+  // cecli usage line, tolerant to minor formatting variants:
+  // - `1.2k ↑ 450 ↓`
+  // - `1.2k/500 ↑ 450 ↓ $0.00 • 2.1k ↑↓ $0.00`
+  // - `1.2k tokens ⇡ 450 tokens ⇣`
+  const cecli = clean.match(
+    /(\d+(?:\.\d+)?\s*[km]?(?:\s*\/\s*\d+(?:\.\d+)?\s*[km]?)*)\s*(?:tokens?|tok)?\s*[↑⇡]\s*(\d+(?:\.\d+)?\s*[km]?)\s*(?:tokens?|tok)?\s*[↓⇣]/i
   )
   if (cecli) {
     const sentPart = cecli[1].split('/')[0]?.trim() ?? ''
