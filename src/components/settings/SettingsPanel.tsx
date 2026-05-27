@@ -36,7 +36,7 @@ import { SuggestedFilesSection } from './SuggestedFilesSection'
 import type { EditorLanguagePrefs } from '../../theme/editorLanguagePrefs'
 import { EditorLanguagesSection } from './EditorLanguagesSection'
 import { ModelRouterSection } from './ModelRouterSection'
-import type { ModelRouterPrefs } from '../../theme/modelRouterPrefs'
+import { applyLocalLlmHopperFromEnv, type ModelRouterPrefs } from '../../theme/modelRouterPrefs'
 import type { ThinkingStatsStore } from '../../utils/thinkingStats'
 import { AppVersionSection } from './AppVersionSection'
 import { SessionPersistenceSection } from './SessionPersistenceSection'
@@ -211,7 +211,16 @@ export function SettingsPanel({
                   disabled={!localLlmSnap?.sources.length}
                   onClick={() => {
                     if (!localLlmSnap) return
-                    onChange(applyLocalLlmToConfig(config, localLlmSnap, false))
+                    const nextCfg = applyLocalLlmToConfig(config, localLlmSnap, false)
+                    onChange(nextCfg)
+                    onModelRouterPrefsChange(
+                      applyLocalLlmHopperFromEnv(
+                        modelRouterPrefs,
+                        localLlmSnap,
+                        nextCfg.model,
+                        false
+                      )
+                    )
                   }}
                 >
                   Sync from env files

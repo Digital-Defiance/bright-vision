@@ -10,6 +10,9 @@ DISPLAY_VISION_API = "Vision API"
 DISPLAY_CORE = "Cecli"
 DISPLAY_MONOGRAM = "BV"
 
+DIGITAL_DEFIANCE_NAME = "Digital Defiance"
+DIGITAL_DEFIANCE_URL = "https://digitaldefiance.org"
+
 CECLI_HOME_URL = "https://cecli.dev"
 CECLI_GITHUB_URL = "https://github.com/dwash96/cecli"
 

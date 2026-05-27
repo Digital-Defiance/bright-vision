@@ -1707,16 +1707,48 @@ DATA_MODEL=qwen3.6:27b-q4_K_M
 EOF</code></pre>
             <p>Example contents (either file):</p>
             <pre><code>OLLAMA_HOST=http://127.0.0.1:11434
-DATA_MODEL=qwen3.6:27b-q4_K_M</code></pre>
+DATA_MODEL=qwen3.6:27b-q4_K_M
+# Optional — fast/heavy model router (Settings → Sync from env files)
+# MODEL_ROUTER=1
+# FAST_MODEL=deepseek-coder:6.7b
+# HEAVY_MODEL=qwen3.6:27b-q4_K_M</code></pre>
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 0.75rem 0">
+              <thead>
+                <tr>
+                  <th style="text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border)">Variable</th>
+                  <th style="text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border)">Maps to</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="padding: 0.35rem 0.5rem"><code>OLLAMA_HOST</code></td>
+                  <td style="padding: 0.35rem 0.5rem">Settings → Ollama API base</td>
+                </tr>
+                <tr>
+                  <td style="padding: 0.35rem 0.5rem"><code>DATA_MODEL</code> (or <code>LLM_MODEL</code> / <code>CHAT_MODEL</code>)</td>
+                  <td style="padding: 0.35rem 0.5rem">Settings → LLM model as <code>ollama_chat/&lt;tag&gt;</code></td>
+                </tr>
+                <tr>
+                  <td style="padding: 0.35rem 0.5rem"><code>FAST_MODEL</code> / <code>HEAVY_MODEL</code></td>
+                  <td style="padding: 0.35rem 0.5rem">Model hopper fast/heavy tiers (bare Ollama tags)</td>
+                </tr>
+                <tr>
+                  <td style="padding: 0.35rem 0.5rem"><code>MODEL_ROUTER</code></td>
+                  <td style="padding: 0.35rem 0.5rem"><code>1</code> / <code>true</code> → enable local model router on sync</td>
+                </tr>
+              </tbody>
+            </table>
             <h4 style="margin: 1.25rem 0 0.5rem; font-size: 1rem">In the app (three steps)</h4>
             <ol style="margin: 0.5rem 0 1rem 1.25rem; padding: 0">
               <li>
                 <strong>Settings → Ollama env files</strong> — confirm paths, click
                 <strong>Sync from env files</strong> (fills <strong>LLM model</strong> as
-                <code>ollama_chat/&lt;DATA_MODEL&gt;</code> and <strong>Ollama API base</strong>).
+                <code>ollama_chat/&lt;DATA_MODEL&gt;</code>, <strong>Ollama API base</strong>, and
+                optional <strong>model router</strong> hopper from <code>FAST_MODEL</code> /
+                <code>HEAVY_MODEL</code> / <code>MODEL_ROUTER</code>).
               </li>
               <li>
-                Same section — <strong>Start Local LLM</strong>, then <strong>Ping LLM</strong>
+                Same section — <strong>Start Local LLM</strong>, then <strong>Ping stack</strong>
                 (or use <strong>Terminal → Local LLM</strong>). Ping checks Ollama inference;
                 it does not start the coding session.
               </li>
@@ -1778,7 +1810,7 @@ source activate.sh</code></pre>
                   the repo root (or use <code>~/.config/local-llm/env</code> — see
                   <a href="#local-llm">Local LLM</a>). In the app:
                   <strong>Settings → Sync from env files</strong>, then
-                  <strong>Start Local LLM</strong> and <strong>Ping LLM</strong>.
+                  <strong>Start Local LLM</strong> and <strong>Ping stack</strong>.
                 </p>
                 <pre><code>cp local-llm.env.example local-llm.env
 # yarn tauri dev → Settings → sync → Start → Ping → Terminal → Start</code></pre>
@@ -1831,7 +1863,7 @@ source activate.sh</code></pre>
               rel="noopener noreferrer"
             >
               <strong>Local LLM</strong>
-              <span>Ollama, built-in Local LLM, local-llm.env, cloud providers</span>
+              <span>Ollama, local-llm.env (incl. FAST/HEAVY router), Ping stack</span>
             </a>
             <a
               class="doc-link"

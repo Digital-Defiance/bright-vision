@@ -3,6 +3,8 @@ import { Box, Paper, Stack, Typography } from '@mui/material'
 import {
   CECLI_GITHUB_URL,
   CECLI_HOME_URL,
+  DIGITAL_DEFIANCE_NAME,
+  DIGITAL_DEFIANCE_URL,
   DISPLAY_CORE,
   DISPLAY_VISION,
   DISPLAY_VISION_API,
@@ -57,7 +59,14 @@ export function AppVersionSection({ versions, embedded = false }: AppVersionSect
         </Typography>
       )}
       <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-        {DISPLAY_VISION} is built in partnership with the{' '}
+        {DISPLAY_VISION} is a project of{' '}
+        <Link href={DIGITAL_DEFIANCE_URL} target="_blank" rel="noopener noreferrer">
+          {DIGITAL_DEFIANCE_NAME}
+        </Link>
+        , a U.S. 501(c)(3) nonprofit.
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+        Built in partnership with the{' '}
         <Link href={CECLI_HOME_URL} target="_blank" rel="noopener noreferrer">
           {DISPLAY_CORE}
         </Link>{' '}

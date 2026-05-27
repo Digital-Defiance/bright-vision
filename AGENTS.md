@@ -61,7 +61,7 @@ Deeper detail: `docs/ARCHITECTURE.md`, `docs/IPC.md`, `docs/DEVELOPMENT.md`, `do
 
 ## Configuration & environment
 
-- **`VisionConfig`** (`src/ipc/config.ts`): model, `workingDir`, Ollama base, optional `local-llm.env` / XDG `~/.config/local-llm/env`.
+- **`VisionConfig`** (`src/ipc/config.ts`): model, `workingDir`, Ollama base, optional `local-llm.env` / XDG `~/.config/local-llm/env` (`DATA_MODEL`, `OLLAMA_HOST`, `FAST_MODEL`, `HEAVY_MODEL`, `MODEL_ROUTER` → Settings + hopper via `read_local_llm_config`).
 - **Local LLM:** Rust (`src-tauri` + Settings) starts Ollama; Python core runs chat via LiteLLM (`ollama_chat/…`). See `docs/LOCAL_LLM.md`.
 - **`LITELLM_EXTRA_PARAMS`**, API keys via environment when using cloud models.
 

@@ -1,5 +1,6 @@
 import { Box, IconButton, Paper, Stack, Toolbar, Tooltip, Typography } from '@mui/material'
 import type { ReactNode } from 'react'
+import { DISPLAY_VISION } from '../../brand'
 import { BrandLogo } from '../brand/BrandLogo'
 import type { ProcessSnapshot } from '../../progress/types'
 import type { TurnEtaEstimate } from '../../utils/turnEtaEstimate'
@@ -24,6 +25,8 @@ interface AppChromeProps {
   children: ReactNode
   /** CPU/RAM/GPU strip anchored in the left nav rail (not over main content). */
   railFooter?: ReactNode
+  /** Opens About (version + credits). */
+  onLogoClick?: () => void
 }
 
 export const VISION_SIDEBAR_W = 92
@@ -39,7 +42,46 @@ export function AppChrome({
   headerExtra,
   children,
   railFooter,
+  onLogoClick,
 }: AppChromeProps) {
+  const logoButtonSx = onLogoClick
+    ? {
+        border: 0,
+        p: 0,
+        m: 0,
+        bgcolor: 'transparent',
+        cursor: 'pointer',
+        display: 'block',
+        lineHeight: 0,
+        '&:hover': { opacity: 0.88 },
+        '&:focus-visible': {
+          outline: '2px solid',
+          outlineColor: 'primary.main',
+          outlineOffset: 2,
+          borderRadius: 1,
+        },
+      }
+    : undefined
+
+  const wrapLogo = (variant: 'header' | 'rail', node: ReactNode) => {
+    if (!onLogoClick) return node
+    const testId = variant === 'header' ? 'brand-logo-header' : 'brand-logo-rail'
+    return (
+      <Tooltip title={`About ${DISPLAY_VISION}`} placement={variant === 'header' ? 'bottom' : 'right'}>
+        <Box
+          component="button"
+          type="button"
+          onClick={onLogoClick}
+          aria-label={`About ${DISPLAY_VISION}`}
+          data-testid={testId}
+          sx={variant === 'header' ? { ...logoButtonSx, minWidth: 0 } : logoButtonSx}
+        >
+          {node}
+        </Box>
+      </Tooltip>
+    )
+  }
+
   return (
     <Box sx={{ display: 'flex', height: '100vh', bgcolor: 'background.default' }}>
       <Paper
@@ -61,7 +103,7 @@ export function AppChrome({
           bgcolor: 'background.paper',
         }}
       >
-        <BrandLogo variant="rail" />
+        {wrapLogo('rail', <BrandLogo variant="rail" />)}
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.5, minHeight: 0 }}>
           {nav.map((item) => {
           const selected = activeTab === item.id
@@ -124,7 +166,7 @@ export function AppChrome({
         >
           <Toolbar variant="dense" sx={{ minHeight: 48, gap: 1.5 }}>
             <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', minWidth: 0 }}>
-              <BrandLogo variant="header" />
+              {wrapLogo('header', <BrandLogo variant="header" />)}
             </Box>
             <Box
               sx={{

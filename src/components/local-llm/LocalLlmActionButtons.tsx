@@ -1,4 +1,5 @@
 import NetworkPingIcon from '@mui/icons-material/NetworkPing'
+import Tooltip from '@mui/material/Tooltip'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import StopIcon from '@mui/icons-material/Stop'
@@ -27,6 +28,7 @@ export function LocalLlmActionButtons({
     clearError,
     formatLlmPingSummary,
     formatLlmPingHint,
+    llmPingAlertSeverity,
   } = controls
 
   return (
@@ -43,16 +45,20 @@ export function LocalLlmActionButtons({
         >
           Start Local LLM
         </Button>
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<NetworkPingIcon />}
-          disabled={busy}
-          data-testid="local-llm-ping"
-          onClick={() => void runPing()}
-        >
-          Ping LLM
-        </Button>
+        <Tooltip title="Checks Ollama (generate probe) and Vision API /health. Does not start the API — use Terminal → Start for that.">
+          <span>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<NetworkPingIcon />}
+              disabled={busy}
+              data-testid="local-llm-ping"
+              onClick={() => void runPing()}
+            >
+              Ping stack
+            </Button>
+          </span>
+        </Tooltip>
         {showSecondary && (
           <>
             <Button
@@ -80,7 +86,7 @@ export function LocalLlmActionButtons({
       </Stack>
       {pingResult && (
         <Alert
-          severity={pingResult.generateOk ? 'success' : 'warning'}
+          severity={llmPingAlertSeverity(pingResult)}
           data-testid="local-llm-ping-result"
           onClose={clearPingResult}
         >

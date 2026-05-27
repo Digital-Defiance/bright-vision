@@ -14,9 +14,6 @@ from typing import Any, Iterator, TypeVar
 
 _T = TypeVar("_T")
 
-# Wall-clock cap for slash/preproc (e.g. `/agent` on a local model looping on tools).
-SLASH_PREPROC_TIMEOUT_S = float(os.environ.get("VISION_SLASH_PREPROC_TIMEOUT_S", "300"))
-
 from cecli import models
 from cecli.coders import Coder
 from cecli.commands import Commands, SwitchCoderSignal
@@ -37,7 +34,13 @@ from bright_vision_core.git_workspace import create_git_workspace
 from bright_vision_core.headless_args import default_headless_args
 from bright_vision_core.headless_persistence import apply_persistence_to_args
 from bright_vision_core.todo_spec_generate import build_generate_message, parse_generated_layers
-from bright_vision_core.slash_helpers import is_switch_coder_signal, run_slash_command_sync
+from bright_vision_core.slash_helpers import (
+    fast_slash_preproc_timeout_s,
+    is_switch_coder_signal,
+    resolve_slash_command_name,
+    run_slash_command_sync,
+    slash_preproc_timeout_s,
+)
 from bright_vision_core.workspace_paths import attachments_dir, attachments_prefix
 from bright_vision_core.model_router import (
     ModelRouterConfig,
@@ -410,6 +413,7 @@ class Session:
 
                     return run(_preproc_coro())
 
+                preproc_timeout = slash_preproc_timeout_s(user_text, self.coder.commands)
                 try:
                     for item in _run_blocking_with_sse_pulses(
                         self.io,
@@ -418,8 +422,8 @@ class Session:
                         message="Running slash commands",
                         mirror_assistant_complete=True,
                         assistant_text=assistant_text,
-                        timeout_s=SLASH_PREPROC_TIMEOUT_S,
-                        on_timeout=self.interrupt_turn,
+                        timeout_s=preproc_timeout,
+                        on_timeout=self.interrupt_turn if preproc_timeout else None,
                     ):
                         if isinstance(item, dict):
                             yield item
@@ -431,12 +435,28 @@ class Session:
                         mirror_assistant_complete=True,
                         assistant_text=assistant_text,
                     )
+                    cmd = resolve_slash_command_name(user_text, self.coder.commands)
+                    if cmd == "agent":
+                        cap_hint = (
+                            "Unset VISION_AGENT_PREPROC_TIMEOUT_S or set it to 0 for no wall-clock cap "
+                            "(default). Use Stop to cancel a long agent run."
+                        )
+                    elif cmd in ("invoke-agent", "ask", "code", "architect", "context", "hashline"):
+                        cap_hint = (
+                            "Long mode commands default to no preproc cap; set "
+                            "VISION_AGENT_PREPROC_TIMEOUT_S to limit. Use Stop to cancel."
+                        )
+                    else:
+                        cap_hint = (
+                            f"Cap: VISION_SLASH_PREPROC_TIMEOUT_S (default "
+                            f"{int(fast_slash_preproc_timeout_s())}s)."
+                        )
                     yield self.io.emit(
                         "error",
                         text=(
-                            f"{err}. Use Stop, then retry without /agent for quick edits. "
-                            "Local agent mode may loop on tools (e.g. repeated ls). "
-                            f"Cap: VISION_SLASH_PREPROC_TIMEOUT_S (default {int(SLASH_PREPROC_TIMEOUT_S)}s)."
+                            f"{err}. Use Stop, then retry. "
+                            "For quick UI tweaks, send your request without /agent. "
+                            f"{cap_hint}"
                         ),
                     )
                     yield self.io.emit(

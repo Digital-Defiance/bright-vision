@@ -15,6 +15,10 @@ export const DISPLAY_CORE = 'Cecli'
 /** Sidebar rail fallback if logo fails to load */
 export const DISPLAY_MONOGRAM = 'BV'
 
+/** Publisher — keep in sync with bright_vision_core/brand.py */
+export const DIGITAL_DEFIANCE_NAME = 'Digital Defiance'
+export const DIGITAL_DEFIANCE_URL = 'https://digitaldefiance.org'
+
 /** Public credit for the Cecli maintainers — keep in sync with bright_vision_core/brand.py */
 export const CECLI_HOME_URL = 'https://cecli.dev'
 export const CECLI_GITHUB_URL = 'https://github.com/dwash96/cecli'

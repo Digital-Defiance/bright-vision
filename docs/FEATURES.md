@@ -56,14 +56,14 @@ BrightVision is a **local-LLM-first** desktop IDE (Tauri + React) with a **headl
 - Start / Stop **Cecli** (spawns API on desktop)  
 - Technical log (stderr + debug) vs user-facing chat  
 - **Local LLM** panel — Ollama tags, load model, ping  
-- **Ping LLM** in Settings — 1-token generate + health  
+- **Ping stack** in Settings — Ollama 1-token probe + Vision API `/health`  
 
 ## Settings
 
 - Model, workspace, context files, engine path, appearance fonts  
 - Thinking timers + **timing history** (avg/peak CPU/RAM/GPU, TPS, CSV export)  
 - Suggested-files prefs (auto-add, auto-proceed)  
-- Model hopper / router  
+- Model hopper / router (UI or `local-llm.env` `FAST_MODEL` / `HEAVY_MODEL` / `MODEL_ROUTER`)  
 - Resource overlay toggles  
 - **Agents** — sub-agent registry + cecli doc links  
 

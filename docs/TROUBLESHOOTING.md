@@ -9,13 +9,30 @@ See **[LOCAL_LLM.md](./LOCAL_LLM.md)** for the full setup (Ollama + built-in Loc
 ```bash
 curl -s http://127.0.0.1:11434/api/tags   # Ollama up?
 
-**Desktop:** Settings or Terminal → Local LLM → **Ping LLM** (1-token generate + Vision API `/health`, no repo edits).
+**Desktop:** Settings or Terminal → Local LLM → **Ping stack** (1-token generate + Vision API `/health`, no repo edits).
 ```
 
 - **Settings → LLM model** must use the LiteLLM form `ollama_chat/<tag>` where `<tag>` matches `ollama list` / `DATA_MODEL` in local-llm.
 - **Settings → Ollama API base** — leave empty for default; set if Ollama is not on the default host (same URL as `OLLAMA_HOST` in local-llm).
+- **Model router from env** — `FAST_MODEL`, `HEAVY_MODEL`, `MODEL_ROUTER` in `local-llm.env` apply after **Settings → Sync from env files** (or fill-empty hopper slots on launch). Tags are bare Ollama names; heavy tier falls back to `DATA_MODEL` when `HEAVY_MODEL` is omitted. See [LOCAL_LLM.md](./LOCAL_LLM.md#dynamic-model-tiering-39).
 - **Ping: “LLM OK · Vision API not running”** — Ollama works; start **Terminal → Start** so the Vision API listens on `:8741` ([LOCAL_LLM.md](./LOCAL_LLM.md#ping-status-llm-ok-and-vision-api-not-running)).
+- **Stuck at “Starting Local LLM” (~10%) with model router on** — older builds pulled every hopper model at once; current builds pull only resolved `FAST_MODEL` / `HEAVY_MODEL` tags. Rebuild the app, **Sync from env files**, ensure both tags are pulled (`ollama list`), then **Start** again.
 - Cloud models: use `openai/…` / `anthropic/…` and set `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` in the environment **before** launching the app.
+
+## `/agent` timed out after 300s
+
+**Cause:** Older builds applied a **5-minute wall-clock cap** to all slash preprocessing, including `/agent`. Agent mode runs its full tool loop inside that phase, so legitimate work on a local model often exceeded 300s.
+
+**Current behavior:** `/agent` (and `/ask`, `/code`, `/architect`, … with a prompt) has **no default preproc cap** — use **Stop** to cancel. Fast commands (`/add`, `/clear`, …) still use `VISION_SLASH_PREPROC_TIMEOUT_S` (default 300s).
+
+**Optional limits** (set before launching the app or in the environment passed to `bright-vision-core-serve`):
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `VISION_AGENT_PREPROC_TIMEOUT_S` | `0` (off) | Max seconds for `/agent` and other long mode slash preproc; `0` = unlimited |
+| `VISION_SLASH_PREPROC_TIMEOUT_S` | `300` | Max seconds for other slash / preproc work |
+
+Restart the Vision API after changing env vars (`Terminal → Stop` / **Start**).
 
 ## Stuck on “Sending” / no assistant reply
 
@@ -23,7 +40,7 @@ The header can show **Sending** while the turn timer runs (**Waiting for model**
 
 1. In a terminal: `ollama ps` — if **UNTIL** is a few minutes (not indefinite), the model will unload and the next turn can hang. Run **Terminal → Local LLM → Start** (preload with `keep_alive: -1`) or **Refresh** (re-applies `-1` without a full restart). For all Ollama clients, you can also set `OLLAMA_KEEP_ALIVE=-1` before starting `ollama serve`.
 2. **Chat → `/ps`** — shows `/api/ps` in a table (models in RAM). Use **`/tags`** for pulled models or **`/models`** for both. Does not start a chat turn (safe while GPU is busy).
-3. **Settings → Ping LLM** — must succeed before chatting.
+3. **Settings → Ping stack** — must succeed before chatting.
 4. **Stop** the turn, fix Ollama, send again.
 
 **Thinking timer:** **Settings → Thinking timers → Live Response / Think timer** must be on. Timers appear in the **top activity bar** (next to **Sending** / **Thinking**): **Response** from **Send** until done; **Think** for Thinking/Reasoning sections only.
@@ -36,8 +53,8 @@ The chat can show a full **Answer** while the header still says **Thinking** or 
 
 **What to do:**
 
-1. **Settings → Local LLM → Refresh** — check **/api/ps**; if your model is missing, run **Start** or `ollama run <tag>` / **Ping LLM**.
-2. **Stop** the current turn, then **Ping LLM**, then retry.
+1. **Settings → Local LLM → Refresh** — check **/api/ps**; if your model is missing, run **Start** or `ollama run <tag>` / **Ping stack**.
+2. **Stop** the current turn, then **Ping stack**, then retry.
 3. Prefer **Add all** on the suggested-files tray (uses the files API and does not wait for the stuck turn). **Queue /add** while a turn is busy now uses the same fast path.
 4. If nothing changes for ~90s after the answer appeared, the app aborts the stalled SSE stream and shows an error; use **Clear queue** if you no longer want queued messages.
 

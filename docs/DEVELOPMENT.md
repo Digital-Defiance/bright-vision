@@ -21,7 +21,7 @@ source activate.sh   # venv + editable cecli + bright_vision_core
 yarn install
 ```
 
-**Optional `local-llm.env`:** `cp local-llm.env.example local-llm.env` at repo root (`DATA_MODEL`, `OLLAMA_HOST`). In-app **Local LLM** uses Rust; chat uses the Vision API — not `local-llm.sh`. See [LOCAL_LLM.md](./LOCAL_LLM.md).
+**Optional `local-llm.env`:** `cp local-llm.env.example local-llm.env` at repo root (`DATA_MODEL`, `OLLAMA_HOST`; optional `MODEL_ROUTER`, `FAST_MODEL`, `HEAVY_MODEL` for the hopper). In-app **Local LLM** uses Rust; chat uses the Vision API — not `local-llm.sh`. See [LOCAL_LLM.md](./LOCAL_LLM.md).
 
 PyPI / release workflow for the Vision wheel: track in [UPSTREAM_CECLI.md](./UPSTREAM_CECLI.md) milestone U3. PyPI-only install: `AIDER_VISION_CORE_INSTALL=pypi source activate.sh`
 

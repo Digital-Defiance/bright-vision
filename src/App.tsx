@@ -92,6 +92,7 @@ import { TodoPanel } from './components/todos/TodoPanel'
 import { GitPanel } from './components/GitPanel'
 import { useWorkspaceTodos } from './hooks/useWorkspaceTodos'
 import { WelcomePanel } from './components/onboarding/WelcomePanel'
+import { AboutDialog } from './components/settings/AboutDialog'
 import { SettingsPanel } from './components/settings/SettingsPanel'
 import type { SubAgentInfo } from './ipc/agentCommands'
 
@@ -149,6 +150,7 @@ import {
 } from './utils/contextUsage'
 import { buildGitStatusByPath } from './utils/editorGitStatus'
 import {
+  applyLocalLlmHopperFromEnv,
   DEFAULT_MODEL_ROUTER_PREFS,
   formatModelRouteEvent,
   loadModelRouterPrefs,
@@ -159,7 +161,7 @@ import {
 import type { ModelRouterApiConfig, SendMessageOptions } from './ipc/httpClient'
 import {
   ensureRoutedOllamaModel,
-  prepareModelRouterHopper,
+  prepareModelRouterForSessionStart,
   type ModelRouteSnapshot,
 } from './ipc/modelRouterLlm'
 import { shouldOfferRouterEscalate } from './utils/modelRouterEscalate'
@@ -287,6 +289,7 @@ function AppShell({
   setModelRouterPrefs: React.Dispatch<React.SetStateAction<ModelRouterPrefs>>
 }) {
   const [activeTab, setActiveTab] = useState<TabId>('chat')
+  const [aboutOpen, setAboutOpen] = useState(false)
   const [editorPendingPath, setEditorPendingPath] = useState<string | null>(null)
   const [config, setConfig] = useState<VisionConfig>(DEFAULT_CONFIG)
   const [savedConfig, setSavedConfig] = useState<VisionConfig>(DEFAULT_CONFIG)
@@ -443,6 +446,9 @@ function AppShell({
             pythonPath: merged.pythonPath.trim() || pythonPath,
           }
           next = applyLocalLlmToConfig(next, localLlm, true)
+          setModelRouterPrefs((prefs) =>
+            applyLocalLlmHopperFromEnv(prefs, localLlm, next.model, true)
+          )
           if (
             dir !== merged.workingDir ||
             next.pythonPath !== merged.pythonPath ||
@@ -1257,7 +1263,7 @@ function AppShell({
       coreEnginePath: savedConfig.coreEnginePath,
       pythonPath: savedConfig.pythonPath,
     },
-    refreshDeps: [isRunning, httpClient, activeTab === 'settings'],
+    refreshDeps: [isRunning, httpClient, activeTab === 'settings', aboutOpen],
   })
 
   const workspaceTodosApi = useMemo(
@@ -1425,15 +1431,35 @@ function AppShell({
     }
     const { ollamaHost, modelTag } = resolveLocalLlmForConfig(savedConfig)
     if (!modelTag) return
-    process.apply({ phase: 'booting_api', label: 'Starting Local LLM', progress: 0.1 })
+    process.apply({
+      phase: 'booting_api',
+      label: 'Starting Local LLM',
+      detail: `${modelTag} @ ${ollamaHost}`,
+      progress: 0.1,
+    })
     try {
       const s = await invoke<LocalLlmRuntimeStatus>('local_llm_start_plain', {
         ollamaHost,
         modelTag,
       })
       appendTerminalLog(s.logs.map((l) => `[local-llm] ${l}`))
+      process.apply({
+        phase: 'booting_api',
+        label: 'Local LLM ready',
+        detail: modelTag,
+        progress: 0.22,
+      })
       if (modelRouterPrefs.enabled) {
-        const hopperLogs = await prepareModelRouterHopper(savedConfig, modelRouterPrefs)
+        process.apply({
+          phase: 'booting_api',
+          label: 'Router models',
+          detail: 'Pull fast/heavy tags only (no extra preload)',
+          progress: 0.28,
+        })
+        const hopperLogs = await prepareModelRouterForSessionStart(
+          savedConfig,
+          modelRouterPrefs
+        )
         if (hopperLogs.length) {
           appendTerminalLog(hopperLogs.map((l) => `[router] ${l}`))
         }
@@ -2200,6 +2226,7 @@ function AppShell({
         liveTiming={thinkingTiming.live}
         turnEta={turnEta}
         headerExtra={headerExtra}
+        onLogoClick={() => setAboutOpen(true)}
         railFooter={
           resourceOverlay.enabled ? (
             <ResourceOverlay
@@ -2479,6 +2506,8 @@ function AppShell({
             </Box>
           )}
       </AppChrome>
+
+      <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} versions={appVersions} />
 
       <Snackbar
         open={snackbar !== null}

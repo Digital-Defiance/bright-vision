@@ -87,6 +87,7 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 | 7 | **Done** | Confirm flow: `yes=False` default, `POST /sessions/{id}/confirm`, UI Yes/No + auto-approve countdown |
 | 14 | **Done** | No longer pass workspace dir as chat file (`Session.create` empty `fnames`) |
 | 17 | **Done** | Settings: prompt before commit → `auto_commits: false` on session create |
+| **41** | **Done** | **About dialog** — header/rail logo → versions + [Digital Defiance](https://digitaldefiance.org) 501(c)(3) + Cecli credit (`AboutDialog`, `AppVersionSection`, e2e `about-dialog.spec.ts`). |
 | — | **Done** | Terminate `:8741` Vision API on app quit (Tauri) |
 | — | **Done** | **Core API lifecycle** — Start/Stop tied to activity-bar phases (`sessionLifecycle`), cancel in-flight start, `start_core_api` timeout, health fetch timeouts, port cleanup on stop/launch, SSE reader release ([TROUBLESHOOTING.md](./TROUBLESHOOTING.md)) |
 
@@ -370,6 +371,8 @@ Prefer **permissive licenses** and **small bundle** ([AGENTS.md](../AGENTS.md)).
 
 **Longer-term:** 1B classifier model; route timing history in Settings stats.
 
+**Env (desktop):** `local-llm.env` — `MODEL_ROUTER=1`, `FAST_MODEL` / `HEAVY_MODEL` (Ollama tags), synced via Settings → **Sync from env files**; see [LOCAL_LLM.md](./LOCAL_LLM.md#dynamic-model-tiering-39).
+
 **Env (headless):** `BRIGHT_VISION_MODEL_ROUTER=1`, `BRIGHT_VISION_FAST_MODEL=ollama_chat/…`, optional `BRIGHT_VISION_HEAVY_MODEL`.
 
 ---
@@ -395,7 +398,7 @@ Prefer **permissive licenses** and **small bundle** ([AGENTS.md](../AGENTS.md)).
 2. **Chat** — **Agents** chip row (`ChatAgentBar`): `/agent`, `/invoke-agent`, `/spawn-agent`, `/reap-agent`; registered sub-agent chips (click → invoke, double-click → spawn).
 3. **Settings → Agents & sub-agents** — docs links + loaded registry when session is live.
 4. **Commands** — agent slash commands merged into palette with fallback summaries.
-5. **Headless guardrails** — `VISION_SLASH_PREPROC_TIMEOUT_S` (default 300s) for `/agent` preproc; `POST /sessions/{id}/interrupt` + SSE disconnect → `interrupt_turn`; default `agent_config` JSON (`command_timeout` 45s).
+5. **Headless guardrails** — `/agent` and other long mode slash preproc: no default cap (`VISION_AGENT_PREPROC_TIMEOUT_S=0`); fast slash still uses `VISION_SLASH_PREPROC_TIMEOUT_S` (300s). `POST /sessions/{id}/interrupt` + SSE disconnect → `interrupt_turn`; default `agent_config` JSON (`command_timeout` 45s).
 
 **Open / v2:**
 

@@ -19,7 +19,7 @@ On launch, **project** defaults to the app repo. Use Chat welcome or Settings to
 
 ## Local LLM (recommended)
 
-For local Ollama: set **`local-llm.env`** (`DATA_MODEL`, optional `OLLAMA_HOST`), match **Settings → LLM model** to `ollama_chat/<tag>`, then **Terminal → Local LLM → Start** (or enable **Auto before session** and use **Terminal → Start**). Details: [LOCAL_LLM.md](./LOCAL_LLM.md).
+For local Ollama: set **`local-llm.env`** (`DATA_MODEL`, optional `OLLAMA_HOST`; optional `MODEL_ROUTER`, `FAST_MODEL`, `HEAVY_MODEL` for fast/heavy routing), **Settings → Sync from env files**, then **Terminal → Local LLM → Start** (or enable **Auto before session** and use **Terminal → Start**). Details: [LOCAL_LLM.md](./LOCAL_LLM.md).
 
 ## Day-to-day use
 

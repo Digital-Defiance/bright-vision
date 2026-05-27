@@ -35,7 +35,7 @@ export function ChatAgentBar({
             key={cmd}
             title={
               cmd === '/agent'
-                ? 'Runs tools before the main reply (up to ~5 min). Use Stop if stuck. For quick UI tweaks, type your request without /agent.'
+                ? 'Runs the full agent tool loop before the main reply (no default time cap — use Stop). For quick UI tweaks, type your request without /agent.'
                 : cmd === '/invoke-agent'
                   ? 'Blocking sub-agent run — add name + prompt after click'
                   : cmd === '/spawn-agent'
