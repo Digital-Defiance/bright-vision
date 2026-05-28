@@ -47,6 +47,11 @@ export interface CoreSessionInfo {
   files_in_chat: string[]
 }
 
+export interface SessionTranscriptRow {
+  role: string
+  content: string
+}
+
 export class CoreHttpClient {
   readonly baseUrl: string
 
@@ -113,6 +118,15 @@ export class CoreHttpClient {
     })
     if (!res.ok) throw new Error(`get session: ${res.status}`)
     return res.json()
+  }
+
+  async getSessionTranscript(sessionId: string): Promise<SessionTranscriptRow[]> {
+    const res = await fetch(`${this.baseUrl}/sessions/${sessionId}/transcript`, {
+      headers: this.headers(false),
+    })
+    if (!res.ok) throw new Error(`get session transcript: ${res.status}`)
+    const data = (await res.json()) as { messages?: SessionTranscriptRow[] }
+    return data.messages ?? []
   }
 
   async deleteSession(sessionId: string): Promise<void> {
@@ -202,6 +216,17 @@ export class CoreHttpClient {
       headers: this.headers(false),
     })
     if (!res.ok) throw new Error(`workspace todos: ${res.status}`)
+    return normalizeStore(await res.json())
+  }
+
+  /** Pull Cecli agent todo.txt into workspace Tasks when present. Returns null if none. */
+  async importAgentTodoPlan(workspace: string): Promise<TodoStore | null> {
+    const res = await fetch(
+      `${this.baseUrl}/workspaces/todos/import-agent-plan?${this.workspaceQs(workspace)}`,
+      { method: 'POST', headers: this.headers(false) }
+    )
+    if (res.status === 404) return null
+    if (!res.ok) throw new Error(`import agent todo plan: ${res.status} ${await res.text()}`)
     return normalizeStore(await res.json())
   }
 

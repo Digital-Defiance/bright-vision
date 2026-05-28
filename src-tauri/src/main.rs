@@ -4,6 +4,7 @@ mod git_ops;
 mod workspace_editor;
 mod local_llm_config;
 mod local_llm_runtime;
+mod ntfy_notify;
 mod resource_monitor;
 mod session_key;
 
@@ -43,12 +44,6 @@ fn resolve_python_executable(configured: &str) -> String {
             return p.to_string_lossy().into_owned();
         }
     }
-    if let Ok(env_py) = std::env::var("AIDER_VISION_PYTHON") {
-        let p = PathBuf::from(env_py.trim());
-        if python_candidate_exists(&p) {
-            return p.to_string_lossy().into_owned();
-        }
-    }
     let root = project_root();
     for rel in [".venv/bin/python3", ".venv/bin/python"] {
         let p = root.join(rel);
@@ -72,7 +67,7 @@ fn vision_serve_script(engine_root: &Path) -> PathBuf {
 fn resolve_app_engine(core_engine_path: &str) -> Result<PathBuf, String> {
     let mut tried: Vec<String> = Vec::new();
 
-    for key in ["BRIGHT_VISION_ENGINE", "AIDER_VISION_ENGINE"] {
+    for key in ["BRIGHT_VISION_ENGINE"] {
         if let Ok(env) = std::env::var(key) {
             let p = PathBuf::from(&env);
             tried.push(p.display().to_string());
@@ -291,7 +286,6 @@ async fn start_core_api(
         .env("PYTHONSAFEPATH", "1")
         .env("NO_COLOR", "1")
         .env("BRIGHT_VISION_HEADLESS", "1")
-        .env("AIDER_VISION_HEADLESS", "1")
         .env("TQDM_DISABLE", "1");
     if !extra_params.trim().is_empty() {
         cmd.env("LITELLM_EXTRA_PARAMS", &extra_params);
@@ -910,7 +904,7 @@ fn todo_specs_dir(working_dir: &str, todo_id: &str) -> PathBuf {
         .join(todo_id)
 }
 
-/// Load requirements/design/tasks markdown from ``.brightvision/specs/{id}/`` into todos.json.
+/// Load requirements/design/tasks markdown from ``.cecli/specs/{id}/`` into todos.json.
 #[tauri::command]
 fn import_todo_spec_files(working_dir: String, todo_id: String) -> Result<TodoItemJson, String> {
     let folder = todo_specs_dir(&working_dir, &todo_id);
@@ -952,7 +946,7 @@ fn import_todo_spec_files(working_dir: String, todo_id: String) -> Result<TodoIt
     Ok(out)
 }
 
-/// Pick image/PDF files and copy into ``.brightvision/attachments/``; returns workspace-relative paths.
+/// Pick image/PDF files and copy into ``.cecli/attachments/``; returns workspace-relative paths.
 #[tauri::command]
 async fn pick_and_stage_chat_images(
     app: tauri::AppHandle,
@@ -1181,6 +1175,7 @@ fn main() {
             import_todo_spec_files,
             estimate_paths_context_chars,
             resource_monitor::get_resource_snapshot,
+            ntfy_notify::ntfy_send_push,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

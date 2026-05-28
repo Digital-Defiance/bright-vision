@@ -307,14 +307,16 @@ export function TodoPanel({
         </Stack>
       </Stack>
       <Typography variant="caption" color="text.secondary" sx={{ px: 1 }}>
-        Stored in <Box component="code">.aider-vision/todos.json</Box>; three-layer specs also sync to{' '}
-        <Box component="code">.aider-vision/specs/&lt;id&gt;/</Box>.
+        Stored in <Box component="code">.cecli/todos.json</Box>; three-layer specs also sync to{' '}
+        <Box component="code">.cecli/specs/&lt;id&gt;/</Box>.
         {tauriLocal && !httpReady
           ? ` Desktop: tasks saved locally via Tauri (${DISPLAY_VISION_API} optional).`
           : httpReady
             ? ` Synced via ${DISPLAY_VISION_API} (no chat session required).`
             : ` Start ${DISPLAY_VISION_API} (Terminal → Start) or use the desktop app for file-backed tasks.`}{' '}
-        Checking all checklist items marks a task done automatically.
+        Checking all checklist items marks a task done automatically. Cecli agent{' '}
+        <Box component="code">UpdateTodoList</Box> syncs into Tasks when a chat turn finishes or when
+        you open this tab.
       </Typography>
 
       <Stack direction="row" sx={{ flex: 1, minHeight: 0, gap: 1 }}>

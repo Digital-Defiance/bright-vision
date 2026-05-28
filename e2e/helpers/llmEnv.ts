@@ -5,9 +5,22 @@ import { fileURLToPath } from 'node:url'
 
 const E2E_DIR = path.dirname(fileURLToPath(import.meta.url))
 export const REPO_ROOT = path.resolve(E2E_DIR, '../..')
+const EXTERNAL_FIXTURE_PACK_ROOT = process.env.E2E_FIXTURE_PACK_ROOT?.trim() || ''
+const SUBMODULE_FIXTURE_PACK_ROOT = path.join(REPO_ROOT, 'e2e/fixture-pack')
+const INREPO_FIXTURE_PACK_ROOT = path.join(REPO_ROOT, 'e2e/fixtures')
+
+export function resolveFixturePackRoot(): string {
+  if (EXTERNAL_FIXTURE_PACK_ROOT) return EXTERNAL_FIXTURE_PACK_ROOT
+  if (fs.existsSync(SUBMODULE_FIXTURE_PACK_ROOT)) return SUBMODULE_FIXTURE_PACK_ROOT
+  return INREPO_FIXTURE_PACK_ROOT
+}
+
+function fixtureWorkspaceRoot(name: string): string {
+  return path.join(resolveFixturePackRoot(), name)
+}
 
 /** Minimal git repo — same idea as `tests/core/test_hello_llm.py` (GitTemporaryDirectory). */
-export const LLM_E2E_WORKSPACE = path.join(REPO_ROOT, 'e2e/fixtures/hello-workspace')
+export const LLM_E2E_WORKSPACE = fixtureWorkspaceRoot('hello-workspace')
 
 const CORE_API_URL = 'http://127.0.0.1:8741'
 const DEFAULT_OLLAMA_HOST = 'http://127.0.0.1:11434'
@@ -17,6 +30,11 @@ export const DEFAULT_E2E_OLLAMA_MODEL = 'ollama_chat/llama3.2:3b'
 
 export function isLlmE2eEnabled(): boolean {
   return process.env.E2E_LLM === '1'
+}
+
+export function isRouterLlmE2eEnabled(): boolean {
+  const v = process.env.E2E_MODEL_ROUTER?.trim().toLowerCase()
+  return v === '1' || v === 'true' || v === 'yes' || v === 'on'
 }
 
 function parseEnvFile(filePath: string): Record<string, string> {
@@ -52,6 +70,70 @@ function loadLocalLlmEnv(): Record<string, string> {
     merged = { ...merged, ...parseEnvFile(p) }
   }
   return merged
+}
+
+function normalizeOllamaTag(raw: string): string {
+  const v = raw.trim()
+  if (!v) return ''
+  if (v.startsWith('ollama_chat/')) return v.slice('ollama_chat/'.length)
+  if (v.startsWith('ollama/')) return v.slice('ollama/'.length)
+  return v
+}
+
+export function resolveRouterModelTags(): { fastTag: string; heavyTag: string } {
+  const envFile = loadLocalLlmEnv()
+  const fastTag = normalizeOllamaTag(
+    process.env.E2E_FAST_MODEL?.trim() ||
+      process.env.FAST_MODEL?.trim() ||
+      envFile.FAST_MODEL?.trim() ||
+      ''
+  )
+  const heavyTag = normalizeOllamaTag(
+    process.env.E2E_HEAVY_MODEL?.trim() ||
+      process.env.HEAVY_MODEL?.trim() ||
+      envFile.HEAVY_MODEL?.trim() ||
+      process.env.E2E_OLLAMA_MODEL?.trim() ||
+      resolveOllamaTag()
+  )
+  return { fastTag, heavyTag }
+}
+
+export function buildRouterPrefsForStorage():
+  | {
+      enabled: true
+      models: { tier: 'fast' | 'heavy'; model: string; enabled: boolean; label: string }[]
+      tokenFastMax: number
+      tokenHeavyMin: number
+      keepAliveFastSec: number
+      keepAliveHeavySec: number
+      escalateOnFailure: boolean
+    }
+  | null {
+  if (!isRouterLlmE2eEnabled()) return null
+  const { fastTag, heavyTag } = resolveRouterModelTags()
+  if (!fastTag) return null
+  return {
+    enabled: true,
+    models: [
+      {
+        tier: 'fast',
+        model: visionModelFromTag(fastTag),
+        enabled: true,
+        label: `E2E FAST_MODEL: ${fastTag}`,
+      },
+      {
+        tier: 'heavy',
+        model: visionModelFromTag(heavyTag || fastTag),
+        enabled: true,
+        label: `E2E HEAVY_MODEL: ${heavyTag || fastTag}`,
+      },
+    ],
+    tokenFastMax: Number(process.env.E2E_ROUTER_TOKEN_FAST_MAX || 4096),
+    tokenHeavyMin: Number(process.env.E2E_ROUTER_TOKEN_HEAVY_MIN || 12000),
+    keepAliveFastSec: 300,
+    keepAliveHeavySec: 0,
+    escalateOnFailure: true,
+  }
 }
 
 export function resolveOllamaHost(): string {
@@ -232,7 +314,7 @@ export function buildVisionCoreEnv(
   const env: NodeJS.ProcessEnv = { ...process.env, ...extra }
   env.PYTHONSAFEPATH = '1'
   env.BRIGHT_VISION_HEADLESS = '1'
-  env.AIDER_VISION_HEADLESS = '1'
+  env.BRIGHT_VISION_HEADLESS = '1'
   delete env.PYTHONPATH
   return env
 }

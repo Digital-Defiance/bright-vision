@@ -22,11 +22,12 @@ Living backlog for chat UX, engine behavior, spec-driven work, and charter-level
 
 ## Dogfooding (after engine swap)
 
-Primary validation mode: **use the desktop app on real repos** (especially hacking on Aider Vision itself), not more automation or CI.
+Primary validation mode: **use the desktop app on real repos** (especially hacking on BrightVision itself), not more automation or CI.
 
 | Doc | Use when |
 |-----|----------|
-| [USER_WORKFLOW.md](./USER_WORKFLOW.md) | Workspace = **superproject root** (repo root), not `bright-vision-core/` alone |
+| [DOGFOOD.md](./DOGFOOD.md) | **Self-dev loop** — local Ollama, `yarn dogfood:check`, daily prompts, friction logging |
+| [USER_WORKFLOW.md](./USER_WORKFLOW.md) | Workspace = **superproject root** (repo root), not `cecli/` alone |
 | [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) | Editing files under `bright-vision-core/` + parent tree in one session |
 | [TESTING.md](./TESTING.md) | Before/after sessions: `yarn test:local` (quick), `yarn test:full` before larger changes |
 | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | Stuck Connecting, orphaned `:8741`, Stop vs Start |
@@ -49,8 +50,8 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 
 | # | Status | Item |
 |---|--------|------|
-| **19** | **Partial** | **Automated:** `yarn verify:submodule`, `test_git_workspace.py`, `test_superproject_integration.py` (RepoSet, `/add` paths, Session). **Dogfooding sign-off:** manual A–D in [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) via `yarn tauri dev` — not yet a roadmap **Done**. |
-| **31** | **Partial** | **Release hygiene** — e2e + `yarn verify:submodule` on `bright-vision-core`; commit/tag core, bump submodule pointer ([RELEASE.md](./RELEASE.md)). |
+| **19** | **Done** | **Automated:** `yarn verify:submodule`, `test_git_workspace.py`, `test_superproject_integration.py`, `yarn test:bright-core`, `yarn test:e2e:integration`. **Release sign-off (manual):** A–D in [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) via `yarn tauri dev` before announcing superproject dogfood. |
+| **31** | **Done** | **Release hygiene** — `release-hygiene.spec.ts`, `yarn verify:submodule`, [RELEASE.md](./RELEASE.md) commit/tag/bump checklist. |
 
 ---
 
@@ -59,7 +60,7 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 | # | Status | Item |
 |---|--------|------|
 | 1 | **Done** | Stream dedupe — core skips stdout when `yield_stream`; UI `appendStreamingToken` for cumulative chunks; timeline interleaves tools (`stream-chat.spec.ts`) |
-| 2 | **Done** | Proposed edits in fenced blocks → collapsed accordions; **Applied** vs **Proposed only** from `done.edited_files` |
+| 2 | **Done** | Proposed edits → accordions + CM6 fence; **Apply to workspace** (desktop, exact SEARCH/REPLACE); dedupe path-only fences + redundant tool_output; **Applied** chip from `done.edited_files` or manual apply. **Tests:** `proposed-edits-apply.spec.ts`, `applyProposedEdit.test.ts`, `chat-ux.spec.ts`. **Open:** fuzzy SEARCH when exact match fails. |
 | 8 | **Done** | Duplicate assistant text (same stdout fix as #1) |
 | 9 | **Done** | Basic section chips for `► **THINKING**` / `► **ANSWER**` (`splitAssistantSections`) |
 | 10 | **Done** | Dismiss (×) on chat bubbles |
@@ -77,8 +78,8 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 | 3 | **Done** | Stop in-flight turn (`cancelSend` + AbortSignal on fetch) |
 | 4 | **Done** | Queue messages while busy (`useVisionSession` queue + Queue button in `ChatPanel`) |
 | 12 | **Done** | `/add` / `/drop` path completion via Tauri `complete_workspace_path` + Tab in chat |
-| **33** | **Partial** | **Cecli session persistence** — `--auto-save` / `--auto-load`, `.cecli/chat.history`, optional AES-256-GCM (`cecli/session_crypto.py`, `CECLI_SESSION_KEY`); BrightVision Settings + keychain (`session_key.rs`). **Tests:** BrightVision `tests/core/test_session_*`, `test_headless_persistence.py`, `test_http_session_persistence.py`, `test_sessions.py`; cecli `tests/basic/test_session_crypto.py`, `test_session_args.py`, `test_sessions_manager.py`; e2e `settings-config.spec.ts`. **Open:** upstream cecli PR; hydrate React chat after `/load-session`; encrypt `chat.history`. |
-| **32** | **Partial** | **Suggested files tray** — parse assistant **Answer** for repo-relative paths (`-` / `*` / `1.` lists + backticks); tray above chat input with **Add all**, **Queue `/add`**, dismiss; uses `addFiles` + message queue (#4). Clearer copy when adds fail (ignore vs wrong workspace): `addFileMessages.ts`, cecli `add.py`. **Open:** e2e polish, tree picker tie-in (#28). See [§ #32 design](#32-suggested-files--queued-add) |
+| **33** | **Partial** | **Cecli session persistence** — `--auto-save` / `--auto-load` (defaults on), `.cecli/chat.history`, optional AES-256-GCM; **UI hydrate** via `GET /sessions/{id}/transcript` after auto-load and `/load-session` (`session_transcript.py`, `App.tsx`). **Tests:** `test_session_transcript.py`, existing session tests. **Open:** encrypt `chat.history`; upstream cecli PR. |
+| **32** | **Done** | **Suggested files tray** — parse assistant **Answer** for repo-relative paths; tray with **Add all**, **Add while busy**, dismiss, open in editor; `addFiles` batch. **Tests:** `suggested-files.spec.ts`, `suggestedFiles.test.ts`. **Open:** structured `suggested_files` SSE from core; tree picker tie-in (#28). See [§ #32 design](#32-suggested-files--queued-add) |
 
 ## Approvals, workspace & engine
 
@@ -96,14 +97,16 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 | # | Status | Item |
 |---|--------|------|
 | 16 | **Done** | Attach images/PDF via chat (Tauri picker + browser upload → `/sessions/{id}/files`) |
-| **33** | **Partial** | **Resource overlay** — bottom-left CPU/RAM/GPU HUD (system-wide; GPU via `nvidia-smi` when present); Settings toggles. Tauri desktop only. See [§ #33](#33-resource-overlay-cpugpu) |
-| **34** | **Partial** | **Thinking timers** — live elapsed on current section; durations on completed Thinking/Reasoning/Answer chips; per-model averages vs prompt length in Settings (`localStorage`). See [§ #34 design](#34-thinking-timers) |
-| **35** | **Partial** | **Context window awareness** — header chip: file count + last `Tokens:` sent / ~added estimate; sync `files_in_chat` after `done` + `/add`; desktop byte estimate on `addFiles`. See [§ #35](#35-context-window--file-counter) |
-| **36** | **Partial** | **LLM ping** — Terminal/Settings **Ping LLM**: Ollama tags + 1-token generate + optional core `/health`; no repo edits. See [§ #36](#36-llm-ping) |
+| **33** | **Done** | **Resource overlay** — bottom-left CPU/RAM/GPU HUD (system-wide; GPU via `nvidia-smi` when present); Settings toggles. Tauri desktop only. **Tests:** `resource-overlay.spec.ts`. **Open:** process-scoped CPU, non-NVIDIA GPU. See [§ #33](#33-resource-overlay-cpugpu) |
+| **34** | **Done** | **Thinking timers** — live elapsed on current section; durations on completed chips; per-model averages in Settings. **Tests:** `thinkingTiming.test.ts`, `chat-ux.spec.ts`. See [§ #34 design](#34-thinking-timers) |
+| **35** | **Done** | **Context window awareness** — header chip: file count + `Tokens:` / ~added estimate; sync after `done` + `/add`. **Tests:** `session-context.spec.ts`, `contextUsage.test.ts`. **Open:** core-reported context % bar. See [§ #35](#35-context-window--file-counter) |
+| **36** | **Done** | **LLM ping** — Settings **Ping LLM**: Ollama tags + 1-token generate + core `/health`. **Tests:** `local-llm-ping.spec.ts`. See [§ #36](#36-llm-ping) |
 | **37** | **Done** | **Empty LLM response** — rewrite legacy “provider account” copy for Ollama; **Retry** (exact resend) + **Retry with hint** (append nudge); remember last user message in `App.tsx`. `emptyLlmResponse.ts`, `EmptyLlmWarning.tsx`. **Upstream:** cecli `base_coder.py` still emits legacy text until core patch. |
 | **38** | **Done** | **Editor** — left-rail tab; file tabs + CM6 + explorer + git badges + open-from-chat; optional language packs (Settings). See [§ #38](#38--editor-rail-tab--file-tabs--explorer) |
-| **39** | **Done** | **Local model router** — hopper, Tauri preload/swap, chat escalate + force tier. See [§ #39](#39--local-model-router) |
-| **40** | **Partial** | **cecli agents in Vision** — chat agent bar, Settings registry, `GET …/subagents`, slash fallbacks (`/agent`, `/invoke-agent`, `/spawn-agent`, `/reap-agent`). See [§ #40](#40--cecli-agents-in-vision) |
+| **39** | **Done** | **Local model router** — hopper, Tauri preload/swap, chat escalate + force tier. **Tests:** `router-llm.spec.ts` (LLM lane), existing unit coverage. See [§ #39](#39--local-model-router) |
+| **40** | **Done** | **cecli agents in Vision (v1)** — chat agent bar, Settings registry, `GET …/subagents`, slash fallbacks. **Tests:** `agents-bar.spec.ts`. **Open (v2):** `POST …/agents/invoke`, header pill. See [§ #40](#40--cecli-agents-in-vision) |
+| **42** | **Done** | **Mobile alerts (ntfy)** — Settings topic + test ping; Tauri POST on turn `done`. **Tests:** `ntfy-alerts.spec.ts`. **Open:** automated turn-`done` notification e2e. See [MOBILE_ALERTS.md](./MOBILE_ALERTS.md) |
+| **43** | **Done** | **LLM fixture packs for e2e** — external curated workspace collection via `E2E_FIXTURE_PACK_ROOT` (submodule-friendly), in-repo fallback, plus `scripts/verify-e2e-fixture-pack.sh` (`yarn test:e2e:fixtures`) for structure + optional pin-status preflight. |
 
 ## Spec-driven development (#18)
 
@@ -111,10 +114,10 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 
 | Phase | Status | Scope |
 |-------|--------|--------|
-| v1 | **Done** | Tasks tab, `.aider-vision/todos.json`, active task chip, spec inject, `/todo` in core |
+| v1 | **Done** | Tasks tab, `.cecli/todos.json`, active task chip, spec inject, `/todo` in core |
 | v2 | **Done** | Session todos HTTP API, `active_todo_id` / `inject_todo_spec`, templates, checklist |
 | v3 | **Done** | Workspace todos HTTP, checklist auto-complete, markdown import/export |
-| v4a | **Done** | Three-layer specs, `depends_on`, `spec-driven` template, `.aider-vision/specs/{id}/` sync |
+| v4a | **Done** | Three-layer specs, `depends_on`, `spec-driven` template, `.cecli/specs/{id}/` sync |
 | v4b | **Done** | AI generate/refine spec, steered **Implement** per implementation task |
 | v5 | **Done** | Background `generate-spec` jobs; ephemeral session; job poll |
 
@@ -128,7 +131,7 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 |---|--------|------|
 | **20** | **Open** | Dedicated spec-agent UX — separate surface/thread for spec work (not only ephemeral jobs + Tasks tab) |
 | **21** | **Open** | EARS / requirements linter — validate WHEN/SHALL structure; beyond LLM “Refine spec” |
-| **22** | **Open** | Repo-wide spec index — discover and sync all `.aider-vision/specs/**`; “Sync Files” style maintenance |
+| **22** | **Open** | Repo-wide spec index — discover and sync all `.cecli/specs/**`; “Sync Files” style maintenance |
 
 ---
 
@@ -143,7 +146,7 @@ Maps the high-level product charter to tracked work. Items **23–24** are large
 | **25** | **Done** | (overlap) Richer chat sections | Same as chat **#25** |
 | **26** | **Partial** | File system watcher | Git status polls on **Git** tab + while session runs (8s); native FS notify still open |
 | **27** | **Done** | Git visualization (charter §3) | Working tree, inline diffs, commit graph + details, stage all/file, auto-stage on `done`, undo + refresh. **Nice-to-have:** syntax-highlighted diffs |
-| **28** | **Partial** | Context awareness (charter §5) | **Done:** images/PDF, `/add` paths, terminal tail, Tauri folder picker, **web folder path** dialog → `addFiles`, **suggested-files tray (#32)**. **Open:** modified-file highlights (**#26**); full tree + open-in-editor → **#38** |
+| **28** | **Done** | Context awareness (charter §5) | Images/PDF, `/add`, folder attach, **suggested-files tray (#32)**, open-in-editor (#38). **Tests:** `chat-context.spec.ts`, `suggested-files.spec.ts`. **Open:** modified-file highlights (**#26**) |
 | **29** | **Longer-term** | Plugin / extension system | Custom Rust commands, third-party LLM providers, packaged extensions |
 | **30** | **Partial** | Web / non-Tauri parity | **Done:** folder path attach, localStorage todos, Vite `/api/core` proxy; `/add` Tab on **desktop** (#12). **Open:** `/add` Tab on web-only dev; full generate-spec UX without desktop (dogfood Tasks tab on desktop first). |
 
@@ -173,7 +176,7 @@ Maps the high-level product charter to tracked work. Items **23–24** are large
 … (one queued message per path)
 ```
 
-**Shipped (Partial):** `SuggestedFilesTray` in `ChatPanel`, session state in `App.tsx` (ingest on `done`, prune when `files_in_chat` updates). **Queue / Add all** use `POST …/files`; core ignores cecli `SwitchCoderSignal` after `/add` (`slash_helpers.py`). **Add all & proceed** when `isAwaitingFilesCta`; Settings + tray toggles for auto-add / auto-`proceed`. Remaining: structured SSE from core; tie-in with edit confirms (not file-add confirms).
+**Shipped (Done):** `SuggestedFilesTray`, **Add all**, **Add while busy**, open in editor, Settings toggles. **Tests:** `e2e/suggested-files.spec.ts`. **Open:** structured `suggested_files` SSE from core.
 
 ### Out of scope (v1)
 
@@ -244,7 +247,7 @@ Maps the high-level product charter to tracked work. Items **23–24** are large
 1. **Live bar** above chat input (`ThinkingTimerBar`) while the agent is busy — current section label + active elapsed + turn elapsed.
 2. **Completed messages** — chip labels like `Thinking · 4.2s`; caption `Turn 12.1s · thought 8.0s` when markers present.
 3. **Settings → Thinking timers** — toggles for live timer, section durations, turn total, model stats panel.
-4. **Persistence** — `aider-vision-thinking-stats` in `localStorage`: rolling samples per `config.model`, avg thought ms and ~ms per 1k prompt chars.
+4. **Persistence** — `bright-vision-thinking-stats` in `localStorage`: rolling samples per `config.model`, avg thought ms and ~ms per 1k prompt chars.
 
 **Detection:** Section boundaries from streamed `► **THINKING**` / `**REASONING**` / `**ANSWER**` markers (`getActiveAssistantSection`); timer runs for the whole turn until `done` (survives tool_output gaps that split assistant bubbles).
 
@@ -367,7 +370,7 @@ Prefer **permissive licenses** and **small bundle** ([AGENTS.md](../AGENTS.md)).
 | Context &lt; `token_fast_max` (4k) and no heavy keywords | Fast (if not a code-task verb) |
 | Fast tier, no edits, code-task verbs | Auto-escalate heavy (one retry) |
 
-**Done:** Classify prompts (tokens + keywords); **model hopper** in Settings; Tauri `local_llm_prepare_hopper` + `ollama_ensure_model_loaded` (swap unload/load, `load_ms` in UI); auto-escalate + manual **Escalate to heavy**; **Force fast/heavy** in chat; `model_pool` on session create.
+**Done:** Classify prompts (tokens + keywords); **model hopper** in Settings; Tauri `local_llm_prepare_hopper` + `ollama_ensure_model_loaded` (swap unload/load, `load_ms` in UI); auto-escalate + manual **Escalate to heavy**; **Force fast/heavy** in chat; `model_pool` on session create. **May 2026:** route on message tokens (not file-in-chat bump), middle-band `default_fast`, UI fast keywords; long Ollama wait stall hints; silent failed auto-load (`io.drain_events`).
 
 **Longer-term:** 1B classifier model; route timing history in Settings stats.
 
@@ -416,23 +419,23 @@ Prefer **permissive licenses** and **small bundle** ([AGENTS.md](../AGENTS.md)).
 
 ## Known context
 
-- **Local testing (no CI required):** `yarn test:fast` / `yarn test:local` / `yarn test:full`; see [TESTING.md](./TESTING.md). Playwright mocks `/api/core` + Tauri `invoke` — does **not** replace `yarn tauri dev` dogfooding ([e2e/ROADMAP_COVERAGE.md](../e2e/ROADMAP_COVERAGE.md)).
-- **#19:** Core/submodule wiring is automated-green; treat **SUBMODULE_VERIFICATION.md** sections A–D as the dogfooding gate for “hack on Vision itself.”
-- **#31:** Release tagging when you want reproducible pins for others — not required for solo dogfood on `main`.
+- **Local testing (no CI required):** `yarn test:fast` / `yarn test:local` / `yarn test:full` / `yarn test:e2e:integration`; see [TESTING.md](./TESTING.md), [TESTING_POLICY.md](./TESTING_POLICY.md). Playwright mocks `/api/core` + Tauri `invoke` — does **not** replace `yarn tauri dev` dogfooding ([e2e/ROADMAP_COVERAGE.md](../e2e/ROADMAP_COVERAGE.md)).
+- **#19:** Automated gate is `yarn test:bright-core` + `yarn test:e2e:integration` + `yarn verify:submodule`. **SUBMODULE_VERIFICATION.md** A–D remains the manual sign-off before release announcements.
+- **#31:** Use [RELEASE.md](./RELEASE.md) when sharing builds; `sh scripts/test-local.sh release` runs the automated release tier.
 - **Stuck “Connecting”:** Terminal **Stop** while activity bar shows boot/connect; quit app to clear orphaned `:8741` ([TROUBLESHOOTING.md](./TROUBLESHOOTING.md)). Covered in mocked e2e only.
 - **`POST /sessions/{id}/confirm`**: body `{ "confirm_id", "answer": true|false }`.
 - **Message queue**: drain on turn end; Stop does not clear queue.
 - **`/add` completion**: Tauri desktop only (#12); type path manually on web-only `yarn dev`.
-- **Tasks:** `.aider-vision/todos.json`; workspace API when session + core up; Tauri file mirror when core is down.
+- **Tasks:** `.cecli/todos.json`; workspace API when session + core up; Tauri file mirror when core is down.
 - **18d:** Task list uses **manual order** (Up/Down); `depends_on` shows **blocked** chip, not auto-sort.
-- **Dogfooding friction to watch:** wrong workspace (submodule-only root), proposed vs applied edits, commit in wrong repo, Tasks generate-spec + Implement on real core.
+- **Dogfooding:** [DOGFOOD.md](./DOGFOOD.md), `yarn dogfood:check`. Friction to watch: wrong workspace (submodule-only root), proposed vs applied edits, commit in wrong repo, Tasks generate-spec + Implement on real core.
 - **Orange `[BrightVision] Task was destroyed…` in chat:** Python asyncio stderr when the core event loop is closed while tasks still wait (common after **Stop** mid-turn or SSE abort during “Waiting for Ollama”; can also appear under heavy Ollama load). Usually harmless noise; recovery = **Stop** → optional **Clear queue** → **Terminal Stop/Start** if still stuck. Manual **`proceed` while a turn is running** is **queued** (bubble appears only when it is actually sent) — it does not preempt the current Ollama wait.
 
 ## Suggested fix order
 
 **While dogfooding** (fix only what blocks daily use; file small roadmap/doc updates when you learn something):
 
-1. **#19 dogfooding** — [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) A–D on `yarn tauri dev` (superproject root); Tasks generate-spec + one **Implement** step on a real task.
+1. **#19 dogfooding** — `yarn dogfood:check` then [DOGFOOD.md](./DOGFOOD.md) + [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) A–D on `yarn tauri dev` (superproject root); Tasks generate-spec + one **Implement** step on a real task.
 2. **Friction from dogfood** — promote to **Open** rows or fix immediately (lifecycle, git tab, context attach, tasks sync).
 3. **#28 / #32** (if context picking hurts) — **#32** suggested-files tray + queued `/add`; file-tree / modified-file highlights over **#26** watcher unless git poll is insufficient.
 4. **#31** — [RELEASE.md](./RELEASE.md) when sharing builds or pinning submodule for collaborators.

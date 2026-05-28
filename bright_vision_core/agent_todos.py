@@ -318,6 +318,20 @@ def session_agent_todo_relpath(session: Session) -> str:
     return session.coder.local_agent_folder("todo.txt")
 
 
+def try_import_agent_plan_for_workspace(
+    workspace_dir: str | Path,
+    *,
+    agent_todo_relpath: str | None = None,
+) -> TodoStore | None:
+    """Import agent todo.txt when present; return None if missing or empty."""
+    try:
+        return import_agent_plan_for_workspace(
+            workspace_dir, agent_todo_relpath=agent_todo_relpath
+        )
+    except (FileNotFoundError, ValueError):
+        return None
+
+
 def sync_session_agent_todos(session: Session, *, pull: bool = True, push_active: bool = True) -> TodoStore:
     """
     Two-way link for the current chat session:

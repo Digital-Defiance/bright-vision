@@ -22,6 +22,36 @@ export function sampleTodoStore(): TodoStore {
   }
 }
 
+/** Cecli agent UpdateTodoList imported into workspace Tasks (dogfood bridge). */
+export function agentPlanTodoStore(): TodoStore {
+  const now = '2026-01-01T00:00:00.000Z'
+  const item = {
+    id: 'agent-plan-e2e',
+    title: 'Draft roadmap items',
+    spec: '',
+    requirements: '',
+    design: '',
+    tasks_md: '## Implementation tasks\n\n- [ ] Explore codebase\n- [ ] Draft roadmap items in docs/ROADMAP.md\n',
+    depends_on: [] as string[],
+    branch: '',
+    pr_url: '',
+    status: 'in_progress' as const,
+    links: ['cecli:agent-todo:.cecli/agents/e2e/todo.txt'],
+    checklist: [
+      { id: 'c1', text: 'Explore codebase', done: false },
+      { id: 'c2', text: 'Draft roadmap items in docs/ROADMAP.md', done: false },
+    ],
+    created_at: now,
+    updated_at: now,
+  }
+  return {
+    version: 1,
+    activeId: item.id,
+    todos: [item],
+    templates: ['feature', 'bugfix', 'refactor', 'spec-driven'],
+  }
+}
+
 function makeTodo(
   id: string,
   title: string,
@@ -45,6 +75,17 @@ function makeTodo(
     created_at: now,
     updated_at: now,
   }
+}
+
+/** Assistant turn with proposed SEARCH/REPLACE but no `edited_files` (manual apply e2e). */
+export function proposedEditTurnEvents() {
+  return [
+    {
+      type: 'token',
+      text: '► **ANSWER**\n\n```src/example.ts\n<<<<<<< SEARCH\nold\n=======\nnew\n>>>>>>> REPLACE\n```\n',
+    },
+    { type: 'done', edited_files: [] as string[] },
+  ]
 }
 
 /** Default assistant turn for mocked SSE. */

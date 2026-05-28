@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import type { TodoItem, TodoStore } from '../../src/todos/types'
 import {
+  agentPlanTodoStore,
   clearTurnEvents,
   confirmTurnEvents,
   defaultTurnEvents,
@@ -11,10 +12,18 @@ import { formatSse } from './sse'
 
 export interface MockCoreOptions {
   sessionId?: string
+  /** Absolute path reported as session workspace (fixture repos). */
+  workspacePath?: string
   healthDelayMs?: number
   healthFail?: boolean
   healthFailCount?: number
   initialTodos?: TodoStore
+  /** GET /sessions/{id}/transcript */
+  sessionTranscript?: { role: string; content: string }[]
+  /** When set, POST import-agent-plan returns 404 (no Cecli todo.txt). */
+  agentPlanMissing?: boolean
+  /** Store applied when import-agent-plan succeeds (default: agentPlanTodoStore()). */
+  agentPlanTodos?: TodoStore
   /** SSE event arrays per user message (cycles). */
   messageTurns?: Record<string, unknown>[][]
   /** Delay before fulfilling POST .../messages (keeps turn busy for queue/stop tests). */
@@ -37,7 +46,8 @@ export async function installMockCoreApi(page: Page, opts: MockCoreOptions = {})
   await page.unrouteAll({ behavior: 'ignoreErrors' })
 
   const sessionId = opts.sessionId ?? E2E_SESSION_ID
-  const workspace = '.'
+  const workspace = opts.workspacePath ?? '.'
+  const transcript = opts.sessionTranscript ?? []
   let healthHits = 0
   let todoStore = cloneStore(opts.initialTodos ?? emptyTodoStore())
   let filesInChat = [...(opts.filesInChat ?? [])]
@@ -113,6 +123,20 @@ export async function installMockCoreApi(page: Page, opts: MockCoreOptions = {})
         status: 200,
         contentType: 'application/json',
         body: sessionJson(),
+      })
+      return
+    }
+    await route.continue()
+  })
+
+  await page.route(`**/api/core/sessions/${sessionId}/transcript`, async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          messages: transcript.map((m) => ({ role: m.role, content: m.content })),
+        }),
       })
       return
     }
@@ -238,10 +262,45 @@ export async function installMockCoreApi(page: Page, opts: MockCoreOptions = {})
     })
   })
 
+  const normWs = (p: string) => p.replace(/\\/g, '/').replace(/\/$/, '')
   const wsMatch = (url: URL) => {
-    const ws = url.searchParams.get('workspace') ?? workspace
-    return ws === workspace || ws === encodeURIComponent(workspace)
+    const raw = url.searchParams.get('workspace') ?? ''
+    const ws = normWs(decodeURIComponent(raw))
+    const root = normWs(workspace)
+    return ws === root
   }
+
+  let agentPlanImportCount = 0
+
+  await page.route(
+    (url) => url.pathname.endsWith('/workspaces/todos/import-agent-plan'),
+    async (route) => {
+      if (route.request().method() !== 'POST') {
+        await route.continue()
+        return
+      }
+      const url = new URL(route.request().url())
+      if (!wsMatch(url)) {
+        await route.continue()
+        return
+      }
+      if (opts.agentPlanMissing) {
+        await route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'No Cecli agent todo.txt in this workspace' }),
+        })
+        return
+      }
+      agentPlanImportCount += 1
+      todoStore = cloneStore(opts.agentPlanTodos ?? agentPlanTodoStore())
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(todoStore),
+      })
+    }
+  )
 
   await page.route(
     (url) => /\/workspaces\/todos$/.test(url.pathname),
@@ -443,5 +502,10 @@ export async function installMockCoreApi(page: Page, opts: MockCoreOptions = {})
     }
   )
 
-  return { sessionId, getAutoCommits: () => sessionAutoCommits, getTodoStore: () => todoStore }
+  return {
+    sessionId,
+    getAutoCommits: () => sessionAutoCommits,
+    getTodoStore: () => todoStore,
+    getAgentPlanImportCount: () => agentPlanImportCount,
+  }
 }

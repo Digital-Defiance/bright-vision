@@ -125,6 +125,7 @@ function defaultHandlers(log: TauriInvokeLog): Record<string, TauriHandler> {
       gpuSource: 'nvidia-smi',
       scope: 'system',
     }),
+    ntfy_send_push: async () => null,
     llm_ping: async () => ({
       ollamaReachable: true,
       modelPulled: true,

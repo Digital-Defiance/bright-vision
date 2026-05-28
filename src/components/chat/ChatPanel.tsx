@@ -37,6 +37,7 @@ import { ModelRouterBar, type RouterEscalateOffer } from './ModelRouterBar'
 import { ChatAgentBar } from './ChatAgentBar'
 import type { SubAgentInfo } from '../../ipc/agentCommands'
 import type { ModelRouteSnapshot } from '../../ipc/modelRouterLlm'
+import type { AssistantContentSegment } from '../../utils/proposedEdits'
 
 export interface ChatMessage {
   id: number
@@ -107,6 +108,11 @@ interface ChatPanelProps {
   lastUserMessageForRetry?: string | null
   onRetryEmptyLlm?: (mode: 'exact' | 'nudge') => void
   onOpenInEditor?: (path: string) => void
+  canApplyEdits?: boolean
+  onApplyProposedEdit?: (
+    messageId: number,
+    segment: Extract<AssistantContentSegment, { type: 'proposed_edit' }>
+  ) => Promise<void>
   modelRouterEnabled?: boolean
   lastModelRoute?: ModelRouteSnapshot | null
   routerEscalateOffer?: RouterEscalateOffer | null
@@ -161,6 +167,8 @@ export function ChatPanel({
   lastUserMessageForRetry = null,
   onRetryEmptyLlm,
   onOpenInEditor,
+  canApplyEdits = false,
+  onApplyProposedEdit,
   modelRouterEnabled = false,
   lastModelRoute = null,
   routerEscalateOffer = null,
@@ -269,6 +277,12 @@ export function ChatPanel({
                       content={entry.item.content}
                       appliedFiles={entry.item.appliedFiles}
                       onOpenInEditor={onOpenInEditor}
+                      canApplyEdits={canApplyEdits}
+                      onApplyProposedEdit={
+                        onApplyProposedEdit
+                          ? (segment) => onApplyProposedEdit(entry.item.id, segment)
+                          : undefined
+                      }
                       turnTiming={entry.item.turnTiming}
                       showSectionDurations={thinkingTimingPrefs?.showSectionDurations ?? true}
                       showTurnTotal={thinkingTimingPrefs?.showMessageTurnTotal ?? true}

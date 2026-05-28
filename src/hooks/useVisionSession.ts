@@ -6,6 +6,7 @@ import type {
   CoreSessionInfo,
   ModelRouterApiConfig,
   SendMessageOptions,
+  SessionTranscriptRow,
 } from '../ipc/httpClient'
 import type { CoreEventBase } from '../ipc/events'
 import { isTauriRuntime } from '../ipc/isTauri'
@@ -86,7 +87,16 @@ export function useVisionSession(
         setApiUrl(session.getApiUrl())
         setHttpClient(session.getHttpClient())
         setIsRunning(true)
-        return { info, workingDir: resolved.workingDir }
+        let transcript: SessionTranscriptRow[] = []
+        const client = session.getHttpClient()
+        if (config.autoLoadSession && client) {
+          try {
+            transcript = await client.getSessionTranscript(info.session_id)
+          } catch {
+            transcript = []
+          }
+        }
+        return { info, workingDir: resolved.workingDir, transcript }
       } catch (err) {
         if (generation === startGenerationRef.current) {
           process.fail(err instanceof Error ? err.message : String(err))

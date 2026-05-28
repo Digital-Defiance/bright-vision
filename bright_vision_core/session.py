@@ -46,6 +46,7 @@ from bright_vision_core.model_router import (
     ModelRouterConfig,
     RouteDecision,
     classify_prompt,
+    estimate_message_tokens,
     estimate_prompt_tokens,
     should_escalate_fast_turn,
 )
@@ -182,6 +183,17 @@ class Session:
         rebind_coder_loop_primitives(self.coder)
         self.coder.interrupt_event.set()
 
+    def sync_agent_todos_with_workspace(self) -> None:
+        """Pull Cecli agent todo.txt into workspace Tasks before turn end."""
+        try:
+            from bright_vision_core.agent_todos import sync_session_agent_todos
+
+            sync_session_agent_todos(self, pull=True, push_active=True)
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).debug("agent todo sync skipped", exc_info=True)
+
     @classmethod
     def create(
         cls,
@@ -301,6 +313,7 @@ class Session:
                     run(manager.load_session(name, switch=False))
                 except Exception:
                     pass
+                io.drain_events()
             return cls(coder, io, model_router=router_cfg if router_cfg and router_cfg.enabled else None)
         finally:
             os.chdir(prev_cwd)
@@ -346,11 +359,13 @@ class Session:
         if not router or not router.enabled:
             return None
         heavy = router.heavy_model or self._router_heavy_model_name
-        estimated = self._estimate_turn_tokens(user_message)
+        message_tokens = estimate_message_tokens(user_message)
+        context_tokens = self._estimate_turn_tokens(user_message)
         tier_force = force_tier if force_tier in ("fast", "heavy") else None
         decision = classify_prompt(
             user_message,
-            estimated_tokens=estimated,
+            message_tokens=message_tokens,
+            context_tokens=context_tokens,
             router=router,
             heavy_model_name=heavy,
             force_tier=tier_force,
@@ -459,6 +474,7 @@ class Session:
                             f"{cap_hint}"
                         ),
                     )
+                    self.sync_agent_todos_with_workspace()
                     yield self.io.emit(
                         "done",
                         assistant_text="".join(assistant_text),
@@ -472,6 +488,7 @@ class Session:
                     mirror_assistant_complete=True,
                     assistant_text=assistant_text,
                 )
+                self.sync_agent_todos_with_workspace()
                 yield self.io.emit("done", assistant_text="".join(assistant_text))
                 return
 
@@ -562,6 +579,7 @@ class Session:
                     links.append(f"commit:{last_hash}")
                 WorkspaceTodos(self.coder.root).append_links(links, todo_id=turn_todo_id)
 
+            self.sync_agent_todos_with_workspace()
             yield self.io.emit("done", **payload)
         except BaseException as err:
             if is_switch_coder_signal(err):
@@ -570,14 +588,17 @@ class Session:
                     mirror_assistant_complete=True,
                     assistant_text=assistant_text,
                 )
+                self.sync_agent_todos_with_workspace()
                 yield self.io.emit("done", assistant_text="".join(assistant_text))
                 return
             if isinstance(err, BrokenPipeError):
                 yield self.io.emit("error", text=str(err))
+                self.sync_agent_todos_with_workspace()
                 yield self.io.emit("done", assistant_text="".join(assistant_text), error=True)
                 return
             if isinstance(err, Exception):
                 yield self.io.emit("error", text=str(err))
+                self.sync_agent_todos_with_workspace()
                 yield self.io.emit("done", assistant_text="".join(assistant_text), error=True)
                 return
             raise

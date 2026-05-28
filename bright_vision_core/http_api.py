@@ -1,5 +1,5 @@
 """
-HTTP API for aider-vision (FastAPI + Server-Sent Events).
+HTTP API for BrightVision (FastAPI + Server-Sent Events).
 
 Run with::
 
@@ -31,8 +31,13 @@ from bright_vision_core.vision_runtime import configure_vision_runtime
 configure_vision_runtime()
 
 from bright_vision_core.git_undo import undo_last_aider_commit_for_coder
+from bright_vision_core.agent_todos import (
+    sync_session_agent_todos,
+    try_import_agent_plan_for_workspace,
+)
 from bright_vision_core.http_auth import auth_enabled, configure_auth, get_token_from_env, verify_bearer
 from bright_vision_core.session import Session
+from bright_vision_core.session_transcript import transcript_rows_from_coder
 from bright_vision_core.todo_spec_jobs import spec_job_store
 from bright_vision_core.workspace_todos import (
     SPEC_LAYER_TEMPLATES,
@@ -46,7 +51,7 @@ from bright_vision_core.workspace_todos import (
 
 @asynccontextmanager
 async def _app_lifespan(app: FastAPI):
-    # When started via raw uvicorn, still honor AIDER_VISION_TOKEN if set.
+    # When started via raw uvicorn, still honor BRIGHT_VISION_TOKEN if set.
     if get_token_from_env():
         configure_auth("127.0.0.1")
     yield
@@ -61,8 +66,8 @@ class BearerAuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 app = FastAPI(
-    title="aider-vision-core API",
-    description="Headless aider-vision-core sessions for web and Rust clients",
+    title="BrightVision Vision API",
+    description="Headless Cecli sessions for BrightVision web and desktop clients",
     version="0.1.0",
     lifespan=_app_lifespan,
 )
@@ -315,6 +320,15 @@ class SessionInfo(BaseModel):
     files_in_chat: list[str]
 
 
+class TranscriptRow(BaseModel):
+    role: str
+    content: str
+
+
+class TranscriptResponse(BaseModel):
+    messages: list[TranscriptRow]
+
+
 class CommandInfo(BaseModel):
     name: str
     summary: str
@@ -409,6 +423,16 @@ def create_session(body: CreateSessionRequest):
 def get_session(session_id: str):
     session = _get_session(session_id)
     return _session_info(session_id, session)
+
+
+@app.get("/sessions/{session_id}/transcript", response_model=TranscriptResponse)
+def get_session_transcript(session_id: str):
+    """Cecli conversation rows for hydrating the React chat after auto-load or /load-session."""
+    session = _get_session(session_id)
+    rows = transcript_rows_from_coder(session.coder)
+    return TranscriptResponse(
+        messages=[TranscriptRow(role=r["role"], content=r["content"]) for r in rows]
+    )
 
 
 @app.delete("/sessions/{session_id}")
@@ -606,6 +630,23 @@ def export_workspace_todos(workspace: str):
 def import_workspace_todos(body: ImportTodosRequest):
     api = _todos_for_workspace(body.workspace)
     store = api.import_markdown(body.markdown, merge=body.merge)
+    return _todo_list_response(store)
+
+
+@app.post("/workspaces/todos/import-agent-plan", response_model=TodoListResponse)
+def import_workspace_agent_todo_plan(workspace: str):
+    """Pull Cecli agent ``todo.txt`` into workspace Tasks (``.cecli/todos.json``)."""
+    store = try_import_agent_plan_for_workspace(workspace)
+    if store is None:
+        raise HTTPException(status_code=404, detail="No Cecli agent todo.txt in this workspace")
+    return _todo_list_response(store)
+
+
+@app.post("/sessions/{session_id}/todos/import-agent-plan", response_model=TodoListResponse)
+def import_session_agent_todo_plan(session_id: str):
+    """Sync this session's agent todo.txt ↔ workspace Tasks."""
+    session = _get_session(session_id)
+    store = sync_session_agent_todos(session, pull=True, push_active=True)
     return _todo_list_response(store)
 
 

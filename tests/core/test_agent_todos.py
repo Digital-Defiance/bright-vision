@@ -65,6 +65,12 @@ def test_import_agent_plan_missing_file(tmp_path: Path):
         import_agent_plan_for_workspace(tmp_path)
 
 
+def test_try_import_agent_plan_returns_none_when_missing(tmp_path: Path):
+    from bright_vision_core.agent_todos import try_import_agent_plan_for_workspace
+
+    assert try_import_agent_plan_for_workspace(tmp_path) is None
+
+
 def test_import_merges_into_active_task(tmp_path: Path):
     api = WorkspaceTodos(tmp_path)
     now = _now_iso()

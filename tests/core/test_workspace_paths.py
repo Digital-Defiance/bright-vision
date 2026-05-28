@@ -1,4 +1,4 @@
-"""Workspace metadata directory migration."""
+"""Workspace metadata paths under ``.cecli/``."""
 
 from __future__ import annotations
 
@@ -13,32 +13,18 @@ from bright_vision_core.workspace_paths import (
 from bright_vision_core.workspace_todos import WorkspaceTodos
 
 
-def test_migrates_aider_vision_into_cecli(tmp_path: Path):
-    legacy = tmp_path / ".aider-vision"
-    legacy.mkdir()
-    (legacy / "todos.json").write_text('{"version":1,"active_id":null,"todos":[]}', encoding="utf-8")
-    (legacy / "specs").mkdir()
-    (legacy / "specs" / "abc").mkdir()
-    (legacy / "specs" / "abc" / "tasks.md").write_text("# tasks", encoding="utf-8")
-
+def test_workspace_meta_dir_creates_cecli(tmp_path: Path):
     meta = workspace_meta_dir(tmp_path)
     assert meta.name == WORKSPACE_META_DIR == ".cecli"
-    assert not legacy.exists()
-    assert todos_json_path(tmp_path).is_file()
-    assert (meta / "specs" / "abc" / "tasks.md").is_file()
+    assert meta.is_dir()
 
 
-def test_merges_into_existing_cecli_agents(tmp_path: Path):
+def test_existing_cecli_agents_preserved(tmp_path: Path):
     cecli = tmp_path / ".cecli"
     (cecli / "agents").mkdir(parents=True)
-    legacy = tmp_path / ".aider-vision"
-    legacy.mkdir()
-    (legacy / "todos.json").write_text('{"version":1,"active_id":null,"todos":[]}', encoding="utf-8")
-
     meta = workspace_meta_dir(tmp_path)
     assert (cecli / "agents").is_dir()
     assert meta == cecli
-    assert todos_json_path(tmp_path).is_file()
 
 
 def test_workspace_todos_uses_cecli(tmp_path: Path):
@@ -52,19 +38,8 @@ def test_attachments_dir_under_cecli(tmp_path: Path):
     assert path == tmp_path / ".cecli" / "attachments"
 
 
-def test_concurrent_migration_race_safe(tmp_path: Path):
-    """Second merge must not crash if the first pass already moved todos.json."""
-    legacy = tmp_path / ".aider-vision"
-    legacy.mkdir()
-    (legacy / "todos.json").write_text('{"version":1,"active_id":null,"todos":[]}', encoding="utf-8")
-    cecli = tmp_path / ".cecli"
-    cecli.mkdir()
-    (cecli / "agents").mkdir()
-
+def test_concurrent_meta_dir_creation(tmp_path: Path):
+    """Parallel calls must not raise."""
     workspace_meta_dir(tmp_path)
-    # Simulate partial legacy listing after todos.json was moved
-    if legacy.exists():
-        legacy.mkdir(exist_ok=True)
-
     workspace_meta_dir(tmp_path)
-    assert todos_json_path(tmp_path).is_file()
+    assert todos_json_path(tmp_path).parent.is_dir()

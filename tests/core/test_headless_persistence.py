@@ -30,7 +30,7 @@ def test_default_headless_args_includes_persistence_fields():
     assert args.session_encrypt is False
     assert args.auto_save is False
     assert args.auto_load is False
-    assert args.auto_save_session_name == "auto-save"
+    assert args.auto_save_session_name == "brightvision"
     assert args.session_key_file is None
 
 

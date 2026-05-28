@@ -6,10 +6,11 @@ import { defineConfig, devices } from '@playwright/test'
  *   E2E_LLM=1 yarn test:e2e:llm
  *
  * Requires: Ollama running, model pulled (see e2e/helpers/llmEnv.ts).
+ * Includes router coverage (`router-llm.spec.ts`) when E2E_MODEL_ROUTER=1.
  */
 export default defineConfig({
   testDir: 'e2e',
-  testMatch: ['hello-llm.spec.ts', 'agent-llm.spec.ts'],
+  testMatch: ['hello-llm.spec.ts', 'agent-llm.spec.ts', 'context-llm.spec.ts', 'router-llm.spec.ts'],
   fullyParallel: false,
   workers: 1,
   timeout: 900_000,

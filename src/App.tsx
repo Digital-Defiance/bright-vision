@@ -86,6 +86,15 @@ import {
   formatFilesNotAddedSnackbar,
   rewriteAddFileToolMessage,
 } from './utils/addFileMessages'
+import { applyProposedEditSegment } from './utils/applyProposedEdit'
+import {
+  isSessionLoadedToolOutput,
+  transcriptToChatMessages,
+  type TranscriptRow,
+} from './utils/sessionTranscript'
+import type { AssistantContentSegment } from './utils/proposedEdits'
+import { normalizeRepoPath } from './utils/proposedEdits'
+import { isRedundantEditToolOutput } from './utils/suppressDuplicateToolOutput'
 import { appendTimingStatsCsvRow } from './ipc/timingStatsCsv'
 import { ChatPanel, type ChatMessage, type ToolEvent } from './components/chat/ChatPanel'
 import { TodoPanel } from './components/todos/TodoPanel'
@@ -122,6 +131,14 @@ import {
   saveResourceOverlayPrefs,
   type ResourceOverlayPrefs,
 } from './theme/resourceOverlayPrefs'
+import {
+  loadNtfyAlertsPrefs,
+  saveNtfyAlertsPrefs,
+  DEFAULT_NTFY_ALERTS_PREFS,
+  generateNtfyTopic,
+  type NtfyAlertsPrefs,
+} from './theme/ntfyAlertsPrefs'
+import { maybeNotifyTurnComplete } from './ipc/ntfyAlerts'
 import { useAppVersions } from './hooks/useAppVersions'
 import { StderrBatcher } from './utils/stderrBatch'
 import { useThinkingTiming } from './hooks/useThinkingTiming'
@@ -180,6 +197,7 @@ import {
   THINKING_TIMING_STORAGE_KEY,
   EDITOR_LANGUAGE_PREFS_STORAGE_KEY,
   MODEL_ROUTER_PREFS_STORAGE_KEY,
+  NTFY_ALERTS_STORAGE_KEY,
   migrateLegacyStorageKeys,
   readStorageItem,
   removeStorageKeys,
@@ -227,11 +245,7 @@ function migrateConfig(raw: Partial<VisionConfig> & Record<string, unknown>): Vi
   if (typeof merged.autoSaveSessionName !== 'string' || !merged.autoSaveSessionName.trim()) {
     merged.autoSaveSessionName = 'brightvision'
   }
-  if (
-    merged.coreEnginePath === 'aider-vision-core' ||
-    merged.coreEnginePath === 'bright-vision-core' ||
-    merged.coreEnginePath === 'BrightVision-core'
-  ) {
+  if (merged.coreEnginePath === 'bright-vision-core' || merged.coreEnginePath === 'BrightVision-core') {
     merged.coreEnginePath = '.'
   }
   if (!merged.coreApiUrl || merged.coreApiUrl === DEFAULT_CONFIG.coreApiUrl) {
@@ -270,6 +284,8 @@ function AppShell({
   setSuggestedFilesPrefs,
   resourceOverlayPrefs,
   setResourceOverlayPrefs,
+  ntfyAlertsPrefs,
+  setNtfyAlertsPrefs,
   editorLanguagePrefs,
   setEditorLanguagePrefs,
   modelRouterPrefs,
@@ -283,11 +299,16 @@ function AppShell({
   setSuggestedFilesPrefs: React.Dispatch<React.SetStateAction<SuggestedFilesPrefs>>
   resourceOverlayPrefs: ResourceOverlayPrefs
   setResourceOverlayPrefs: React.Dispatch<React.SetStateAction<ResourceOverlayPrefs>>
+  ntfyAlertsPrefs: NtfyAlertsPrefs
+  setNtfyAlertsPrefs: React.Dispatch<React.SetStateAction<NtfyAlertsPrefs>>
   editorLanguagePrefs: EditorLanguagePrefs
   setEditorLanguagePrefs: React.Dispatch<React.SetStateAction<EditorLanguagePrefs>>
   modelRouterPrefs: ModelRouterPrefs
   setModelRouterPrefs: React.Dispatch<React.SetStateAction<ModelRouterPrefs>>
 }) {
+  const ntfyAlertsPrefsRef = useRef(ntfyAlertsPrefs)
+  ntfyAlertsPrefsRef.current = ntfyAlertsPrefs
+
   const [activeTab, setActiveTab] = useState<TabId>('chat')
   const [aboutOpen, setAboutOpen] = useState(false)
   const [editorPendingPath, setEditorPendingPath] = useState<string | null>(null)
@@ -415,7 +436,7 @@ function AppShell({
 
   useEffect(() => {
     migrateLegacyStorageKeys()
-    const stored = readStorageItem(CONFIG_STORAGE_KEY, 'aider-vision-config')
+    const stored = readStorageItem(CONFIG_STORAGE_KEY)
     let merged = DEFAULT_CONFIG
     if (stored) {
       try {
@@ -578,6 +599,22 @@ function AppShell({
       )
     },
     [nextChatMessageId]
+  )
+
+  const hydrateChatFromTranscript = useCallback(
+    (rows: TranscriptRow[]) => {
+      const mapped = transcriptToChatMessages(rows, nextChatMessageId)
+      if (!mapped.length) return
+      setChatMessages(capList(mapped, MAX_CHAT_MESSAGES))
+      setToolEvents([])
+    },
+    [nextChatMessageId]
+  )
+
+  const httpClientRef = useRef<CoreHttpClient | null>(null)
+  const sessionInfoIdRef = useRef<string | null>(null)
+  const hydrateChatFromCoreRef = useRef<(client: CoreHttpClient, sessionId: string) => void>(
+    () => {}
   )
 
   const appendOllamaStatusToChat = useCallback(
@@ -758,6 +795,7 @@ function AppShell({
           break
         }
         if (!text.trim()) break
+        if (isRedundantEditToolOutput(text, lastAssistantStreamRef.current)) break
         streamingAssistantId.current = null
         setToolEvents((prev) =>
           capList(
@@ -776,6 +814,11 @@ function AppShell({
         setTerminalLines((prev) =>
           capList([...prev, { id: orderId, text, type: 'stdout' as const }], MAX_TERMINAL_LINES)
         )
+        if (isSessionLoadedToolOutput(text)) {
+          const client = httpClientRef.current
+          const sid = sessionInfoIdRef.current
+          if (client && sid) hydrateChatFromCoreRef.current(client, sid)
+        }
         break
       }
       case 'tool_error': {
@@ -899,6 +942,14 @@ function AppShell({
             }
           }
         }
+        if (turnTiming?.turnDurationMs) {
+          void maybeNotifyTurnComplete(ntfyAlertsPrefsRef.current, {
+            durationMs: turnTiming.turnDurationMs,
+            queuedRemaining: queuedCountRef.current,
+            editedCount: applied.length,
+            documentVisible: document.visibilityState === 'visible',
+          })
+        }
         if (!turnTiming) takeTurnResourcePeakRef.current()
         turnAssistantMessageIdRef.current = null
         streamingAssistantId.current = null
@@ -982,8 +1033,8 @@ function AppShell({
           if (ev.commit_hash) links.push(`commit:${String(ev.commit_hash)}`)
           if (links.length) {
             void recordTurnLinksRef.current(links)
-            void reloadTodosRef.current()
           }
+          void reloadTodosRef.current()
         }
         if (applied.length > 0) {
           const cfg = savedConfigRef.current
@@ -1114,6 +1165,23 @@ function AppShell({
     refreshSessionInfo,
     patchSessionFiles,
   } = useVisionSession(wrapHandler(handleCoreEvent), { onOutboundMessage })
+
+  httpClientRef.current = httpClient
+  sessionInfoIdRef.current = sessionInfo?.session_id ?? null
+  hydrateChatFromCoreRef.current = (client, sessionId) => {
+    void client
+      .getSessionTranscript(sessionId)
+      .then((rows) => {
+        const typed: TranscriptRow[] = []
+        for (const r of rows) {
+          if (r.role === 'user' || r.role === 'assistant') {
+            typed.push({ role: r.role, content: r.content })
+          }
+        }
+        hydrateChatFromTranscript(typed)
+      })
+      .catch(() => {})
+  }
 
   queuedCountRef.current = queuedCount
 
@@ -1346,6 +1414,31 @@ function AppShell({
     setActiveTab('editor')
   }, [])
 
+  const handleApplyProposedEdit = useCallback(
+    async (
+      messageId: number,
+      segment: Extract<AssistantContentSegment, { type: 'proposed_edit' }>
+    ) => {
+      const result = await applyProposedEditSegment(savedConfigRef.current.workingDir, segment)
+      if (!result.ok) {
+        setSnackbar({ message: result.message, severity: 'error' })
+        return
+      }
+      if (result.path) {
+        setChatMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== messageId || m.role !== 'assistant') return m
+            const paths = new Set([...(m.appliedFiles ?? []), normalizeRepoPath(result.path!)])
+            return { ...m, appliedFiles: [...paths] }
+          })
+        )
+        handleOpenInEditor(result.path)
+      }
+      setSnackbar({ message: result.message, severity: 'info' })
+    },
+    [handleOpenInEditor]
+  )
+
   useEffect(() => {
     if (!isTauriRuntime()) return
     const setup = async () => {
@@ -1375,6 +1468,7 @@ function AppShell({
     saveAppearance(appearance)
     saveThinkingTimingPrefs(thinkingTimingPrefs)
     saveResourceOverlayPrefs(resourceOverlayPrefs)
+    saveNtfyAlertsPrefs(ntfyAlertsPrefs)
     saveEditorLanguagePrefs(editorLanguagePrefs)
     saveModelRouterPrefs(modelRouterPrefs)
     setSnackbar({ message: 'Settings saved', severity: 'info' })
@@ -1390,11 +1484,13 @@ function AppShell({
       RESOURCE_OVERLAY_STORAGE_KEY,
       EDITOR_LANGUAGE_PREFS_STORAGE_KEY,
       MODEL_ROUTER_PREFS_STORAGE_KEY,
+      NTFY_ALERTS_STORAGE_KEY,
     ])
     setAppearance({ ...DEFAULT_APPEARANCE })
     applyAppearanceCssVars(DEFAULT_APPEARANCE)
     setThinkingTimingPrefs({ ...DEFAULT_THINKING_TIMING_PREFS })
     setResourceOverlayPrefs({ ...DEFAULT_RESOURCE_OVERLAY_PREFS })
+    setNtfyAlertsPrefs({ ...DEFAULT_NTFY_ALERTS_PREFS, topic: generateNtfyTopic() })
     setEditorLanguagePrefs({ ...DEFAULT_EDITOR_LANGUAGE_PREFS })
     setModelRouterPrefs({ ...DEFAULT_MODEL_ROUTER_PREFS })
   }
@@ -1479,7 +1575,7 @@ function AppShell({
     try {
       await ensureLocalLlm()
       const routerPayload = modelRouterApiPayload(modelRouterPrefs, savedConfig.model)
-      const { info, workingDir } = await start(savedConfig, {
+      const { info, workingDir, transcript = [] } = await start(savedConfig, {
         modelRouter: routerPayload as ModelRouterApiConfig | undefined,
       })
       if (workingDir !== savedConfig.workingDir) {
@@ -1494,8 +1590,18 @@ function AppShell({
       todoInjectedIdRef.current = null
       streamingAssistantId.current = null
       pendingUserMessageIdsRef.current = []
-      setChatMessages([])
-      setToolEvents([])
+      const restored: TranscriptRow[] = []
+      for (const r of transcript) {
+        if (r.role === 'user' || r.role === 'assistant') {
+          restored.push({ role: r.role, content: r.content })
+        }
+      }
+      if (restored.length) {
+        hydrateChatFromTranscript(restored)
+      } else {
+        setChatMessages([])
+        setToolEvents([])
+      }
       setTerminalLines([
         {
           id: Date.now(),
@@ -2300,6 +2406,10 @@ function AppShell({
               lastUserMessageForRetry={lastUserMessageForRetry}
               onRetryEmptyLlm={(mode) => void handleRetryEmptyLlm(mode)}
               onOpenInEditor={isTauriRuntime() ? handleOpenInEditor : undefined}
+              canApplyEdits={isTauriRuntime()}
+              onApplyProposedEdit={
+                isTauriRuntime() ? (id, seg) => handleApplyProposedEdit(id, seg) : undefined
+              }
               modelRouterEnabled={modelRouterActive}
               lastModelRoute={lastModelRoute}
               routerEscalateOffer={routerEscalateOffer}
@@ -2489,6 +2599,8 @@ function AppShell({
                 }
                 resourceOverlayPrefs={resourceOverlayPrefs}
                 onResourceOverlayPrefsChange={setResourceOverlayPrefs}
+                ntfyAlertsPrefs={ntfyAlertsPrefs}
+                onNtfyAlertsPrefsChange={setNtfyAlertsPrefs}
                 suggestedFilesPrefs={suggestedFilesPrefs}
                 onSuggestedFilesPrefsChange={handleSuggestedFilesPrefsChange}
                 editorLanguagePrefs={editorLanguagePrefs}
@@ -2542,6 +2654,9 @@ export default function App() {
   const [modelRouterPrefs, setModelRouterPrefs] = useState<ModelRouterPrefs>(() =>
     loadModelRouterPrefs()
   )
+  const [ntfyAlertsPrefs, setNtfyAlertsPrefs] = useState<NtfyAlertsPrefs>(() =>
+    loadNtfyAlertsPrefs()
+  )
   const fonts = useMemo(() => resolveAppearanceFonts(appearance), [appearance])
   const theme = useMemo(() => createVisionTheme(fonts.ui), [fonts.ui])
 
@@ -2562,6 +2677,8 @@ export default function App() {
           setSuggestedFilesPrefs={setSuggestedFilesPrefs}
           resourceOverlayPrefs={resourceOverlayPrefs}
           setResourceOverlayPrefs={setResourceOverlayPrefs}
+          ntfyAlertsPrefs={ntfyAlertsPrefs}
+          setNtfyAlertsPrefs={setNtfyAlertsPrefs}
           editorLanguagePrefs={editorLanguagePrefs}
           setEditorLanguagePrefs={setEditorLanguagePrefs}
           modelRouterPrefs={modelRouterPrefs}

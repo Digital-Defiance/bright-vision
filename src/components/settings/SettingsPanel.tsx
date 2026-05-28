@@ -27,6 +27,7 @@ import { AppearanceSection } from './AppearanceSection'
 import { ThinkingTimingSection } from './ThinkingTimingSection'
 import { ResourceOverlaySection } from './ResourceOverlaySection'
 import type { ResourceOverlayPrefs } from '../../theme/resourceOverlayPrefs'
+import type { NtfyAlertsPrefs } from '../../theme/ntfyAlertsPrefs'
 import { LocalLlmActionButtons } from '../local-llm/LocalLlmActionButtons'
 import { LocalLlmPanel } from '../local-llm/LocalLlmPanel'
 import { useLocalLlmControls } from '../../hooks/useLocalLlmControls'
@@ -40,6 +41,7 @@ import { applyLocalLlmHopperFromEnv, type ModelRouterPrefs } from '../../theme/m
 import type { ThinkingStatsStore } from '../../utils/thinkingStats'
 import { AppVersionSection } from './AppVersionSection'
 import { SessionPersistenceSection } from './SessionPersistenceSection'
+import { NtfyAlertsSection } from './NtfyAlertsSection'
 import { AgentsSection } from './AgentsSection'
 import type { AppVersions } from '../../hooks/useAppVersions'
 import type { SubAgentInfo } from '../../ipc/agentCommands'
@@ -59,6 +61,8 @@ interface SettingsPanelProps {
   onTimingStatsMessage?: (message: string, severity: 'info' | 'warning') => void
   resourceOverlayPrefs: ResourceOverlayPrefs
   onResourceOverlayPrefsChange: (prefs: ResourceOverlayPrefs) => void
+  ntfyAlertsPrefs: NtfyAlertsPrefs
+  onNtfyAlertsPrefsChange: (prefs: NtfyAlertsPrefs) => void
   suggestedFilesPrefs: SuggestedFilesPrefs
   onSuggestedFilesPrefsChange: (prefs: SuggestedFilesPrefs) => void
   editorLanguagePrefs: EditorLanguagePrefs
@@ -89,6 +93,8 @@ export function SettingsPanel({
   onTimingStatsMessage,
   resourceOverlayPrefs,
   onResourceOverlayPrefsChange,
+  ntfyAlertsPrefs,
+  onNtfyAlertsPrefsChange,
   suggestedFilesPrefs,
   onSuggestedFilesPrefsChange,
   editorLanguagePrefs,
@@ -422,6 +428,12 @@ export function SettingsPanel({
       <ResourceOverlaySection
         prefs={resourceOverlayPrefs}
         onChange={onResourceOverlayPrefsChange}
+      />
+
+      <NtfyAlertsSection
+        prefs={ntfyAlertsPrefs}
+        onChange={onNtfyAlertsPrefsChange}
+        onMessage={onTimingStatsMessage}
       />
 
       <SessionPersistenceSection config={config} onChange={onChange} />

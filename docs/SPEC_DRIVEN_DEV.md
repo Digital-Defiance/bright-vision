@@ -1,15 +1,15 @@
 # Spec-driven development & in-app TODOs (roadmap #18)
 
-Goal: lightweight **Kiro-like** flow inside Aider Vision without cloning IDE patterns.
+Goal: lightweight **Kiro-like** flow inside BrightVision without cloning IDE patterns.
 
 ## Shipped (v1–v4a)
 
 | Version | What |
 |---------|------|
-| v1 | Tasks tab, `.aider-vision/todos.json`, active task, spec inject, `/todo` command |
+| v1 | Tasks tab, `.cecli/todos.json`, active task, spec inject, `/todo` command |
 | v2 | Session todos HTTP API, `active_todo_id`, templates, checklist |
 | v3 | Workspace todos HTTP, markdown import/export, checklist auto-complete |
-| **v4a** | **Three-layer specs** (requirements / design / implementation tasks), `depends_on`, spec files under `.aider-vision/specs/{id}/`, `spec-driven` template |
+| **v4a** | **Three-layer specs** (requirements / design / implementation tasks), `depends_on`, spec files under `.cecli/specs/{id}/`, `spec-driven` template |
 
 ### Three-layer model (v4a)
 
@@ -27,7 +27,7 @@ Legacy single `spec` is migrated into `requirements` on load when layers are emp
 
 **Injected chat context** includes all three layers plus checklist and blocker notes for incomplete dependencies.
 
-**On disk:** updates sync to `.aider-vision/specs/<task-id>/requirements.md`, `design.md`, `tasks.md` (JSON remains source of truth in the app).
+**On disk:** updates sync to `.cecli/specs/<task-id>/requirements.md`, `design.md`, `tasks.md` (JSON remains source of truth in the app).
 
 **Template:** choose `spec-driven` when creating a task for Kiro-style stubs.
 
@@ -53,12 +53,12 @@ Legacy single `spec` is migrated into `requirements` on load when layers are emp
 
 ## Spec file sync (shipped)
 
-- **To disk** — every todo update writes `.aider-vision/specs/{id}/requirements.md`, `design.md`, `tasks.md`.
+- **To disk** — every todo update writes `.cecli/specs/{id}/requirements.md`, `design.md`, `tasks.md`.
 - **From disk** — **Reload from disk** (UI) or `POST …/sync-spec-files` / Tauri `import_todo_spec_files`.
 
 ## Gap vs Kiro (tracked in ROADMAP #20–22)
 
-| Kiro | Aider Vision today | Roadmap |
+| Kiro | BrightVision today | Roadmap |
 |------|-------------------|---------|
 | Dedicated spec agent product surface | Ephemeral job + poll | **#20** Open |
 | EARS validation & formal spec analysis | Refine prompt only | **#21** Open |

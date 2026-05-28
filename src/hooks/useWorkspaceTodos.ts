@@ -71,6 +71,11 @@ export function useWorkspaceTodos(
       if (api?.client) {
         try {
           await api.client.health()
+          try {
+            await api.client.importAgentTodoPlan(api.workspace)
+          } catch {
+            // Agent plan import is best-effort; list still loads local/API store.
+          }
           const data = await api.client.listWorkspaceTodos(api.workspace)
           setStore(data)
           setHttpReady(true)

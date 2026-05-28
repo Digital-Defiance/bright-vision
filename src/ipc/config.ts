@@ -70,8 +70,8 @@ export const DEFAULT_CONFIG: VisionConfig = {
   coreApiToken: '',
   contextFiles: [],
   sessionEncrypt: false,
-  autoSaveSession: false,
-  autoLoadSession: false,
+  autoSaveSession: true,
+  autoLoadSession: true,
   autoSaveSessionName: 'brightvision',
   chatHistoryFile: true,
 }

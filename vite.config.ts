@@ -48,7 +48,7 @@ export default defineConfig(async () => ({
     },
   },
   preview:
-    process.env.E2E && process.env.E2E_LLM !== "1"
+    process.env.E2E && process.env.E2E_LLM !== "1" && process.env.E2E_INTEGRATION !== "1"
       ? {
           host: "127.0.0.1",
           port: 4173,

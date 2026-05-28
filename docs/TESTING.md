@@ -2,6 +2,8 @@
 
 All checks run on **your machine**. Nothing here requires GitHub Actions — workflow files under `.github/workflows/` stay in the repo for optional use later.
 
+**Feature / roadmap testing policy:** [TESTING_POLICY.md](./TESTING_POLICY.md) (definition of done, tiers, what stays manual).
+
 ## Quick reference
 
 | When | Command | Rough time |
@@ -9,7 +11,11 @@ All checks run on **your machine**. Nothing here requires GitHub Actions — wor
 | After a small TS/UI change | `yarn test:fast` | ~5s |
 | Before pushing (default) | `yarn test:local` | ~15s |
 | Before a larger UI/session change | `yarn test:full` | ~1–2 min |
-| Before a release / submodule bump | `sh scripts/test-local.sh release` | full + verify |
+| Real core + Tasks bridge (no mocks) | `yarn test:e2e:integration` | ~2–3 min |
+| Before a release / submodule bump | `sh scripts/test-local.sh release` | full + bright-core pytest + integration e2e + verify |
+| Self-dev preflight (Ollama + layout) | `yarn dogfood:check` | ~20s — see [DOGFOOD.md](./DOGFOOD.md) |
+| Scenario matrix (all registered SSE outputs) | `yarn test:e2e shipped-scenarios` | ~2–3 min |
+| Fixture-pack structure preflight | `yarn test:e2e:fixtures` | ~1s |
 
 Same tiers via shell:
 
@@ -17,6 +23,7 @@ Same tiers via shell:
 sh scripts/test-local.sh fast      # tsc + Vitest
 sh scripts/test-local.sh local     # + Rust
 sh scripts/test-local.sh full      # + Playwright e2e
+sh scripts/test-local.sh integration  # + real :8741 Playwright (no mockCoreApi)
 sh scripts/test-local.sh release     # + verify:submodule if .venv exists
 ```
 
@@ -89,8 +96,14 @@ yarn test:e2e
 | `session-lifecycle.spec.ts` | Start/stop, connecting, health recovery |
 | `navigation.spec.ts` | Main tabs |
 | `chat-ux.spec.ts` | Sections, proposed edits, token stats; optimistic user bubble on send |
+| `proposed-edits-apply.spec.ts` | Apply to workspace (mock Tauri read/write) |
+| `suggested-files.spec.ts` | Tray, add all, add while busy, open in editor |
+| `agents-bar.spec.ts` | Sub-agent bar + Settings list |
+| `ntfy-alerts.spec.ts` | ntfy Settings + test ping |
+| `session-context.spec.ts` | Context chip files + tokens |
+| `resource-overlay.spec.ts` | CPU/RAM/GPU HUD |
+| `local-llm-ping.spec.ts` | Ollama snapshot + Ping LLM |
 | `stream-chat.spec.ts` | Tool output order in timeline; cumulative stream dedupe (#1, #8) |
-| `progress-activity.spec.ts` | Determinate activity bar from core `progress` SSE (repo scan) |
 | `chat-input.spec.ts` | Send clears input + user bubble; queue, stop turn, multiline |
 | `confirm-flow.spec.ts` | Confirm banner |
 | `chat-context.spec.ts` | Folder attach |
@@ -142,15 +155,22 @@ Exercises a **live** `bright-vision-core` on `:8741` and your **Ollama** model (
 **Run**
 
 ```bash
-# Core-only (SSE + Ollama; hello + /agent) — uses llama3.2:3b via package.json
+# Core-only (SSE + Ollama; hello + /agent) — pinned single-model control lane
 yarn test:llm:core
 
-# Full UI path: Terminal Start → Chat → hello + /agent
+# Full UI path: Terminal Start -> Chat with router lane enabled
 yarn test:e2e:llm
+
+# Full UI path without router assertions (single-model control lane)
+yarn test:e2e:llm:single
 
 # Explicit env (override model or host):
 E2E_OLLAMA_MODEL=ollama_chat/llama3.2:3b E2E_LLM=1 yarn test:llm:core
 E2E_OLLAMA_MODEL=ollama_chat/llama3.2:3b E2E_LLM=1 yarn test:e2e:llm
+# Example bigger model:
+E2E_OLLAMA_MODEL=ollama_chat/qwen3.6:27b-q4_K_M E2E_LLM=1 yarn test:e2e:llm
+# Router lane with explicit fast/heavy tags:
+E2E_MODEL_ROUTER=1 E2E_FAST_MODEL=ollama_chat/qwen2.5-coder:7b E2E_HEAVY_MODEL=ollama_chat/qwen3.6:27b-q4_K_M E2E_LLM=1 yarn test:e2e:llm
 ```
 
 Optional env:
@@ -158,15 +178,54 @@ Optional env:
 | Variable | Purpose |
 |----------|---------|
 | `E2E_OLLAMA_MODEL` | LiteLLM id or bare tag (`yarn test:llm:core` sets `ollama_chat/llama3.2:3b`) |
+| `E2E_MODEL_ROUTER` | `1` enables router assertions/tests (`router-llm.spec.ts`) and primes router prefs in localStorage |
+| `E2E_FAST_MODEL` | Router fast tier model tag/id (falls back to `FAST_MODEL`) |
+| `E2E_HEAVY_MODEL` | Router heavy tier model tag/id (falls back to `HEAVY_MODEL`) |
 | `E2E_OLLAMA_AUTO_PULL` | `1` (default): run `ollama pull` when the model is missing; `0` to fail fast |
 | `E2E_OLLAMA_HOST` | Ollama base URL (default `http://127.0.0.1:11434`) |
+| `E2E_FIXTURE_PACK_ROOT` | Optional absolute path to a custom fixture repo collection (supports submodule-based packs) |
 | `E2E_PYTHON` | Venv shim for spawning Vision API (default `.venv/bin/python3`; `test:e2e:llm` sets this — do not point at Homebrew `python3.14` alone) |
 
 E2E clears **`PYTHONPATH`**. Do not export `PYTHONPATH=$PWD` — the repo’s `cecli/` folder is not the Python package and will break `import cecli` (`unknown location`).
 
-LLM UI e2e uses workspace `e2e/fixtures/hello-workspace` (minimal git repo), not the BrightVision superproject tree.
+| Workspace | Use |
+|-----------|-----|
+| `e2e/fixtures/hello-workspace` | Smoke LLM (`hello-llm`, `agent-llm`) — **no** files in context |
+| `e2e/fixtures/context-workspace` | Context LLM (`context-llm`, `test_context_llm`) — `/add src/e2e_widget.ts`, assert `E2E_CONTEXT_MAGIC` |
+| `e2e/fixtures/integration-workspace` | Real core HTTP (`yarn test:e2e:integration`) — todos/import, not chat context |
 
-Default `yarn test:e2e` **does not** run `hello-llm.spec.ts` or `agent-llm.spec.ts`.
+Do **not** use the BrightVision superproject as the default LLM `workingDir` (slow repo map, flaky).
+
+For larger regression packs, prefer a small pinned fixture repo (or submodule) and set `E2E_FIXTURE_PACK_ROOT` so `hello-workspace` / `context-workspace` resolve from that external pack.
+When `e2e/fixture-pack` exists (submodule), LLM/integration fixture resolution prefers it automatically; set `E2E_FIXTURE_PACK_ROOT` only to override.
+
+Validate the fixture-pack layout (and show submodule pin status when applicable):
+
+```bash
+yarn test:e2e:fixtures
+# or:
+sh scripts/verify-e2e-fixture-pack.sh /absolute/path/to/my-fixture-pack
+```
+
+Tip: when your repo is reachable by multiple mount aliases (`/Users/...` and `/Volumes/...`), pass a canonical path:
+
+```bash
+E2E_FIXTURE_PACK_ROOT="$(cd /path/to/my-fixture-pack && pwd -P)" yarn test:e2e:fixtures
+```
+
+Default `yarn test:e2e` **does not** run `hello-llm.spec.ts`, `agent-llm.spec.ts`, `context-llm.spec.ts`, or `e2e/integration/*`.
+
+### Real core integration (no mocked Vision API)
+
+Spawns **live** `bright-vision-core` on `:8741`; Vite preview **proxies** `/api/core` (no `installMockCoreApi`). **Ollama not required.**
+
+```bash
+source activate.sh
+yarn test:e2e:integration
+# or: sh scripts/test-local.sh integration
+```
+
+See [e2e/ROADMAP_COVERAGE.md](../e2e/ROADMAP_COVERAGE.md#real-core-integration-no-mocked-apicore).
 
 `/agent` LLM tests use a strict no-tools prompt; local models may need **6–10+ minutes** (slash preproc default 300s + Ollama). Playwright timeout **15m** on `agent-llm.spec.ts`. Prefer `yarn test:llm:core` for a faster API-level check of `/agent` + `verbose`.
 

@@ -1,0 +1,61 @@
+import fs from 'node:fs'
+import { expect, test } from '@playwright/test'
+import {
+  ensureIntegrationWorkspace,
+  integrationTodosPath,
+  isIntegrationE2eEnabled,
+  readIntegrationTodoStore,
+  resetIntegrationCecliState,
+  writeAgentTodoFile,
+} from '../helpers/integrationEnv'
+import {
+  openTasks,
+  primeIntegrationApp,
+  startIntegrationSession,
+} from '../helpers/integrationSession'
+
+test.describe.configure({ mode: 'serial' })
+
+test.describe('Agent todo → Tasks (real core + real HTTP)', () => {
+  test.skip(!isIntegrationE2eEnabled(), 'Run: yarn test:e2e:integration')
+
+  test.beforeEach(() => {
+    ensureIntegrationWorkspace()
+    resetIntegrationCecliState()
+  })
+
+  test('import-agent-plan writes todos.json and Tasks tab lists checklist', async ({ page }) => {
+    writeAgentTodoFile(
+      ['Remaining:', '→ Draft roadmap items in docs/ROADMAP.md', '○ Explore codebase', ''].join('\n')
+    )
+
+    await primeIntegrationApp(page)
+    await startIntegrationSession(page)
+
+    const importPlan = page.waitForResponse(
+      (res) =>
+        res.request().method() === 'POST' &&
+        res.url().includes('/workspaces/todos/import-agent-plan') &&
+        res.ok(),
+      { timeout: 30_000 }
+    )
+
+    await openTasks(page)
+    await importPlan
+
+    const taskRow = page.getByTestId('todo-panel').getByRole('button', {
+      name: /Draft roadmap items in docs\/ROADMAP\.md/,
+    })
+    await expect(taskRow).toBeVisible({ timeout: 15_000 })
+    await taskRow.click()
+    await page.getByRole('tab', { name: 'Checklist' }).click()
+    await expect(page.getByRole('textbox', { name: 'Acceptance item…' }).nth(1)).toHaveValue(
+      'Explore codebase'
+    )
+    await expect(page.getByText('No tasks yet')).toHaveCount(0)
+
+    expect(fs.existsSync(integrationTodosPath())).toBe(true)
+    const store = readIntegrationTodoStore()
+    expect(store?.todos?.length).toBeGreaterThan(0)
+  })
+})

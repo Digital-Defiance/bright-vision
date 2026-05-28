@@ -13,7 +13,7 @@ def apply_persistence_to_args(
     session_key_file: str | None = None,
     auto_save: bool = False,
     auto_load: bool = False,
-    auto_save_session_name: str = "auto-save",
+    auto_save_session_name: str = "brightvision",
 ) -> SimpleNamespace:
     """Return a copy of *args* with persistence fields set (does not mutate *args*)."""
     out = SimpleNamespace(**vars(args))
@@ -21,7 +21,7 @@ def apply_persistence_to_args(
     out.session_key_file = session_key_file
     out.auto_save = bool(auto_save)
     out.auto_load = bool(auto_load)
-    out.auto_save_session_name = auto_save_session_name or "auto-save"
+    out.auto_save_session_name = auto_save_session_name or "brightvision"
     if out.session_encrypt and not session_crypto_key_available(session_key_file):
         out.session_encrypt = False
     return out

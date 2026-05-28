@@ -21,6 +21,9 @@ export interface TurnActivitySnapshot {
 /** UI hint only — does not abort the turn (SSE idle timeout is separate). */
 const STALL_WARN_MS = 300_000
 const STREAMING_RECENT_MS = 8_000
+/** No tokens / long Ollama wait — suggest Stop or Force FAST. */
+const WAITING_STALL_MS = 8 * 60_000
+const WAITING_WARN_MS = 3 * 60_000
 
 const PROGRESS_WORKING_RE =
   /waiting for|preparing|ollama|slash command|repo|scanning|vision|llm|working/i
@@ -65,16 +68,39 @@ export function buildTurnActivity(
 
 export function isLikelyStalled(activity: TurnActivitySnapshot): boolean {
   if (activity.kind === 'idle') return false
-  if (
-    activity.kind === 'streaming' ||
-    activity.kind === 'waiting_model' ||
-    activity.kind === 'post_answer_wait' ||
-    activity.kind === 'tool' ||
-    activity.kind === 'confirm'
-  ) {
+  if (activity.kind === 'streaming') return false
+
+  if (activity.kind === 'waiting_model' || activity.kind === 'post_answer_wait') {
+    if (activity.sinceLastEventMs >= WAITING_STALL_MS) return true
+    if (
+      activity.kind === 'post_answer_wait' &&
+      activity.sinceLastTokenMs !== null &&
+      activity.sinceLastTokenMs >= WAITING_STALL_MS
+    ) {
+      return true
+    }
+    return false
+  }
+
+  if (activity.kind === 'tool' || activity.kind === 'confirm') {
     return false
   }
   return activity.sinceLastEventMs >= STALL_WARN_MS
+}
+
+function waitingModelHint(activity: TurnActivitySnapshot, queuedCount: number): string {
+  const min = Math.round(activity.sinceLastEventMs / 60_000)
+  let base =
+    'Waiting for the LLM (Ollama load can be idle on CPU — not the same as generating tokens).'
+  if (activity.sinceLastEventMs >= WAITING_STALL_MS) {
+    base = `Waiting for Ollama for ${min}+ min — likely stuck. Stop, Ping stack, check ollama ps, or Force FAST for UI-style tasks.`
+  } else if (activity.sinceLastEventMs >= WAITING_WARN_MS) {
+    base += ' Taking a long time — try Stop, Force FAST (chat bar), or Terminal → Local LLM → Start.'
+  }
+  if (queuedCount > 0) {
+    return `${base} ${queuedCount} message${queuedCount === 1 ? '' : 's'} will send when this turn completes.`
+  }
+  return base
 }
 
 export function turnActivityHint(
@@ -97,19 +123,20 @@ export function turnActivityHint(
   }
 
   if (activity.kind === 'waiting_model') {
-    const base =
-      'Waiting for the LLM (Ollama load can be idle on CPU — not the same as generating tokens).'
-    if (queuedCount > 0) {
-      return `${base} ${queuedCount} message${queuedCount === 1 ? '' : 's'} will send when this turn completes.`
-    }
-    return base
+    return waitingModelHint(activity, queuedCount)
   }
 
   if (activity.kind === 'post_answer_wait') {
-    const base =
+    const min = Math.round((activity.sinceLastTokenMs ?? activity.sinceLastEventMs) / 60_000)
+    let base =
       'Answer is visible but the turn has not finished — core may be waiting on Ollama (check Settings → Ollama models /api/ps) or repo work. Queued /add messages will not run until the turn ends.'
+    if (activity.sinceLastEventMs >= WAITING_STALL_MS || (activity.sinceLastTokenMs ?? 0) >= WAITING_STALL_MS) {
+      base = `Answer visible but no progress for ${min}+ min — likely stuck on heavy Ollama or repo work. Stop, Force FAST, Ping stack, then retry.`
+    } else if (activity.sinceLastEventMs >= WAITING_WARN_MS) {
+      base += ' If this persists, Stop or Force FAST.'
+    }
     if (queuedCount > 0) {
-      return `${base} Use Add all on suggested files while busy, Clear queue, or Stop — then Ping LLM and retry.`
+      return `${base} Use Add all on suggested files while busy, Clear queue, or Stop — then Ping stack and retry.`
     }
     return `${base} If this persists, Stop the turn or wait for the long SSE timeout.`
   }

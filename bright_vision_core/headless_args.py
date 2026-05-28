@@ -33,7 +33,7 @@ def default_headless_args(*, yes: bool = False) -> SimpleNamespace:
         use_enhanced_map=False,
         auto_save=False,
         auto_load=False,
-        auto_save_session_name="auto-save",
+        auto_save_session_name="brightvision",
         session_encrypt=False,
         session_key_file=None,
     )

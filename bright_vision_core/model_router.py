@@ -14,6 +14,10 @@ from typing import Any, Literal
 
 RouteTier = Literal["fast", "heavy"]
 
+# Per-file context bump for *display* only (routing uses message_tokens).
+_FILE_TOKEN_PER_FILE = 500
+_FILE_TOKEN_CAP = 2_000
+
 # Intent signals (case-insensitive word boundaries).
 _HEAVY_PATTERNS = re.compile(
     r"\b("
@@ -31,13 +35,17 @@ _FAST_PATTERNS = re.compile(
     r"rename|typo|whitespace|format(?:ting)?|lint|prettier|"
     r"color|colour|style|css|spacing|margin|padding|"
     r"label|tooltip|copy|wording|comment(?:s)?|"
-    r"tweak|ui\s+text|button\s+text"
+    r"tweak|ui\s+text|button\s+text|"
+    r"references?|chips?|filesystem|autocomplete|mention|"
+    r"chat\s+panel|message\s+input|text\s+field|component|"
+    r"like\s+we\s+have|@\s*\w"
     r")\b",
     re.IGNORECASE,
 )
 
-_CODE_TASK = re.compile(
-    r"\b(implement|add|fix|create|update|change|patch|write|build)\b",
+# "add" alone is ambiguous (UI copy vs new feature); routing uses stronger verbs only.
+_CODE_TASK_STRONG = re.compile(
+    r"\b(implement|fix|create|update|change|patch|write|build)\b",
     re.IGNORECASE,
 )
 
@@ -166,68 +174,101 @@ class RouteDecision:
     reasons: list[str] = field(default_factory=list)
 
 
+def estimate_message_tokens(
+    user_message: str,
+    *,
+    message_token_count: int | None = None,
+) -> int:
+    """Tokens from the user message only — used for fast/heavy routing."""
+    if message_token_count is not None and message_token_count > 0:
+        return message_token_count
+    return max(len(user_message) // 4, 32)
+
+
 def estimate_prompt_tokens(
     user_message: str,
     *,
     files_in_chat: int = 0,
     message_token_count: int | None = None,
 ) -> int:
-    if message_token_count is not None and message_token_count > 0:
-        return message_token_count
-    base = max(len(user_message) // 4, 32)
-    return base + files_in_chat * 1_500
+    """Rough context size for UI (message + capped file bump). Not used for tier choice."""
+    base = estimate_message_tokens(user_message, message_token_count=message_token_count)
+    file_part = min(max(files_in_chat, 0) * _FILE_TOKEN_PER_FILE, _FILE_TOKEN_CAP)
+    return base + file_part
 
 
 def classify_prompt(
     user_message: str,
     *,
-    estimated_tokens: int,
+    message_tokens: int,
     router: ModelRouterConfig,
     heavy_model_name: str,
+    context_tokens: int | None = None,
     force_tier: RouteTier | None = None,
+    # Back-compat for tests calling estimated_tokens=
+    estimated_tokens: int | None = None,
 ) -> RouteDecision:
+    if estimated_tokens is not None and context_tokens is None:
+        context_tokens = estimated_tokens
+    display_tokens = context_tokens if context_tokens is not None else message_tokens
+
     if force_tier:
         model = router.fast_model if force_tier == "fast" else heavy_model_name
         return RouteDecision(
             tier=force_tier,
             model_name=model,
-            estimated_tokens=estimated_tokens,
+            estimated_tokens=display_tokens,
             reasons=[f"forced:{force_tier}"],
         )
 
     reasons: list[str] = []
 
-    if estimated_tokens >= router.token_heavy_min:
-        reasons.append(f"tokens>={router.token_heavy_min}")
+    if message_tokens >= router.token_heavy_min:
+        reasons.append(f"msg_tokens>={router.token_heavy_min}")
         return RouteDecision(
             tier="heavy",
             model_name=heavy_model_name,
-            estimated_tokens=estimated_tokens,
+            estimated_tokens=display_tokens,
             reasons=reasons,
         )
 
     heavy_hit = _HEAVY_PATTERNS.search(user_message)
     fast_hit = _FAST_PATTERNS.search(user_message)
+    code_task = _CODE_TASK_STRONG.search(user_message) is not None
 
     if heavy_hit:
         reasons.append(f"keyword:{heavy_hit.group(0).lower()}")
         return RouteDecision(
             tier="heavy",
             model_name=heavy_model_name,
-            estimated_tokens=estimated_tokens,
+            estimated_tokens=display_tokens,
             reasons=reasons,
         )
 
-    if fast_hit and estimated_tokens < router.token_heavy_min:
+    if fast_hit:
         reasons.append(f"keyword:{fast_hit.group(0).lower()}")
-
-    if estimated_tokens < router.token_fast_max and (fast_hit or not _CODE_TASK.search(user_message)):
-        if not fast_hit:
-            reasons.append(f"tokens<{router.token_fast_max}")
         return RouteDecision(
             tier="fast",
             model_name=router.fast_model,
-            estimated_tokens=estimated_tokens,
+            estimated_tokens=display_tokens,
+            reasons=reasons,
+        )
+
+    if message_tokens < router.token_fast_max and not code_task:
+        reasons.append(f"msg_tokens<{router.token_fast_max}")
+        return RouteDecision(
+            tier="fast",
+            model_name=router.fast_model,
+            estimated_tokens=display_tokens,
+            reasons=reasons,
+        )
+
+    if message_tokens < router.token_heavy_min:
+        reasons.append("default_fast")
+        return RouteDecision(
+            tier="fast",
+            model_name=router.fast_model,
+            estimated_tokens=display_tokens,
             reasons=reasons,
         )
 
@@ -235,7 +276,7 @@ def classify_prompt(
     return RouteDecision(
         tier="heavy",
         model_name=heavy_model_name,
-        estimated_tokens=estimated_tokens,
+        estimated_tokens=display_tokens,
         reasons=reasons,
     )
 
@@ -254,9 +295,9 @@ def should_escalate_fast_turn(
     if edited_files:
         return False
     if had_tool_error:
-        return _CODE_TASK.search(user_message) is not None
+        return _CODE_TASK_STRONG.search(user_message) is not None
     if len(assistant_text.strip()) > 400:
         return False
-    if not _CODE_TASK.search(user_message):
+    if not _CODE_TASK_STRONG.search(user_message):
         return False
     return True

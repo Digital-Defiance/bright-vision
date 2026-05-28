@@ -41,7 +41,7 @@ POST /sessions/{session_id}/files/upload
 
 Response includes updated `files_in_chat` and `events` (tool_output / errors).
 
-> **Note:** Project-local state lives under **`.cecli/`**: Cecli uses `agents/`, `sessions/`, `logs/`, …; BrightVision adds `todos.json`, `specs/`, `attachments/`. Legacy **`.aider-vision/`**, **`.bright-vision/`**, and **`.brightvision/`** are merged into `.cecli/` on first access.
+> **Note:** Project-local state lives under **`.cecli/`**: Cecli uses `agents/`, `sessions/`, `logs/`, …; BrightVision adds `todos.json`, `specs/`, `attachments/`.
 
 ### Workspace tasks (spec-driven)
 
@@ -89,7 +89,7 @@ POST   /workspaces/todos/{id}/sync-spec-files?workspace=…   import specs from 
 
 `auto_completed` is true when a PATCH checklist update completes every item (task marked done).
 
-Optional auth: set `AIDER_VISION_TOKEN` (or `BRIGHT_VISION_TOKEN` where supported) and send `Authorization: Bearer <token>`.
+Optional auth: set `BRIGHT_VISION_TOKEN` (or `BRIGHT_VISION_TOKEN` where supported) and send `Authorization: Bearer <token>`.
 
 ## Multi-repo workspaces (including nested submodules)
 

@@ -1,4 +1,4 @@
-# Troubleshooting Aider Vision
+# Troubleshooting BrightVision
 
 ## Local LLM / Ollama
 
@@ -65,19 +65,19 @@ The activity bar can show **Connecting** to `http://127.0.0.1:8741` while the he
 1. Click **Stop** on the Terminal tab — it stays enabled whenever the activity bar shows **Connecting** / **Starting engine** (not only when the session is “live”).
 2. Click **Start** again only after Stop finishes; a second Start while connecting will stop the stuck attempt first.
 3. If the port is still busy, quit the app fully and reopen it (startup clears orphaned listeners on `:8741`).
-4. Check Terminal → technical log for Python/uvicorn errors from `aider-vision-core-serve`.
+4. Check Terminal → technical log for Python/uvicorn errors from `bright_vision_core-serve`.
 
 ## `No module named 'aider'`
 
 This is almost always a **stale repo-map cache**, not a missing pip package.
 
-Older runs pickled tag data referencing the pre-rename Python package `aider`. Current code uses `aider_vision_core`.
+Older runs pickled tag data referencing the pre-rename Python package `aider`. Current code uses `bright_vision_core`.
 
 **Fix:**
 
 ```bash
 source activate.sh
-pip install -e aider-vision-core
+pip install -e bright_vision_core
 rm -rf .aider.tags.cache.v*   # in your project workspace
 ```
 
@@ -85,11 +85,11 @@ Restart the app. Core v5+ auto-purges legacy cache directories on session start.
 
 ## TUI progress / `Scanning repo: 0%|` in chat
 
-The desktop app runs core with `AIDER_VISION_HEADLESS=1`. Terminal tqdm bars must not write to stderr.
+The desktop app runs core with `BRIGHT_VISION_HEADLESS=1`. Terminal tqdm bars must not write to stderr.
 
 If you see progress text in chat:
 
-1. Ensure submodule core is up to date (`pip install -e aider-vision-core`).
+1. Ensure submodule core is up to date (`pip install -e bright_vision_core`).
 2. Restart the API process (quit and reopen the app).
 3. Progress should appear in the **header activity bar**, not chat.
 
@@ -107,7 +107,7 @@ See [CECLI_PIN.md](./CECLI_PIN.md).
 
 ## `activate.sh`: `command not found: pip` / python not under `.venv`
 
-Usually a **stale `.venv`** from an old checkout path (e.g. `aider-vision`) or macOS `/usr/bin/python3` (3.9) used to create the venv.
+Usually a **stale `.venv`** from an old checkout path (e.g. old checkout paths) or macOS `/usr/bin/python3` (3.9) used to create the venv.
 
 ```bash
 deactivate 2>/dev/null
@@ -127,9 +127,9 @@ source activate.sh
 
 (`activate.sh` installs `uvicorn[standard]`; only run `pip install "uvicorn[standard]"` manually if you skipped activate.)
 
-## Tauri build: `failed to read plugin permissions` under `/Volumes/Code/aider-vision/…`
+## Tauri build: `failed to read plugin permissions` under `/Volumes/Code/BrightVision/…`
 
-The `src-tauri/target/` directory has **stale absolute paths** from an old checkout name (`aider-vision`, `bright-vision`). Cargo/Tauri then looks for generated files at a path that no longer exists.
+The `src-tauri/target/` directory has **stale absolute paths** from an old checkout name (old checkout paths, `bright-vision`). Cargo/Tauri then looks for generated files at a path that no longer exists.
 
 ```bash
 rm -rf src-tauri/target
@@ -148,8 +148,8 @@ Install Rust so `cargo` is on `PATH` (rustup recommended for universal DMG). See
 From the repo root:
 
 ```bash
-python aider-vision-core/scripts/audit_rename_compat.py
-pytest aider-vision-core/tests/basic/test_vision_runtime.py -q
+python bright_vision_core/scripts/audit_rename_compat.py
+pytest bright_vision_core/tests/basic/test_vision_runtime.py -q
 ```
 
 Run before releases and after large core merges.

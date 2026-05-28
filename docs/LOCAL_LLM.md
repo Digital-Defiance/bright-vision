@@ -36,6 +36,8 @@ Tags are bare Ollama names (no `ollama_chat/` prefix). Omit `HEAVY_MODEL` to use
 
 On **Terminal → Start** with the router enabled, BrightVision pulls only the resolved fast/heavy tags (not every hopper row) so startup stays fast when `OLLAMA_MAX_LOADED_MODELS=1`.
 
+**Routing rules (Vision):** Tier choice uses **your message size**, not files-in-chat inflation. UI/product wording (chips, `@` references, tooltips, …) routes **fast**; heavy keywords or very long messages route **heavy**; other code tasks in the middle band default **fast** (escalate to heavy on failure if enabled). Open files only bump the **~tok** display (capped), not the tier.
+
 **Headless** (`bright-vision-core-serve` without the desktop UI): use `BRIGHT_VISION_MODEL_ROUTER=1`, `BRIGHT_VISION_FAST_MODEL=ollama_chat/…`, optional `BRIGHT_VISION_HEAVY_MODEL` — see [ROADMAP.md](./ROADMAP.md#39--local-model-router).
 
 ### What **Start session** does (Python)

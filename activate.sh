@@ -13,7 +13,6 @@ die() {
 resolve_cecli_root() {
   _engine="${1:-}"
   case "$_engine" in
-    aider-vision-core) echo "${ROOT}/aider-vision-core" ;;
     cecli|./cecli) echo "${ROOT}/cecli" ;;
     bright-vision-core|BrightVision-core)
       if [ -d "${ROOT}/cecli" ]; then echo "${ROOT}/cecli"; else echo "${ROOT}/BrightVision-core"; fi
@@ -52,10 +51,6 @@ pick_cecli_root() {
   fi
   if [ -d "${ROOT}/BrightVision-core/cecli" ]; then
     echo "${ROOT}/BrightVision-core"
-    return 0
-  fi
-  if [ -d "${ROOT}/aider-vision-core" ]; then
-    echo "${ROOT}/aider-vision-core"
     return 0
   fi
   return 1
@@ -102,7 +97,7 @@ fi
 
 "$PYTHON" -m pip install -q -U pip || die "pip upgrade failed"
 
-if [ "${AIDER_VISION_CORE_INSTALL:-editable}" = "pypi" ] && [ -f "${ROOT}/requirements-core.txt" ]; then
+if [ "${BRIGHT_VISION_CORE_INSTALL:-editable}" = "pypi" ] && [ -f "${ROOT}/requirements-core.txt" ]; then
   if ! "$PYTHON" -m pip install -q -r "${ROOT}/requirements-core.txt"; then
     die "PyPI install failed. Use editable: source activate.sh"
     return 1
@@ -110,20 +105,13 @@ if [ "${AIDER_VISION_CORE_INSTALL:-editable}" = "pypi" ] && [ -f "${ROOT}/requir
 else
   CECLI_ROOT="$(pick_cecli_root)" || die "no cecli checkout (git submodule update --init cecli or BrightVision-core)"
 
-  if [ "$CECLI_ROOT" = "${ROOT}/aider-vision-core" ]; then
-    if ! "$PYTHON" -m pip install -q -e "${CECLI_ROOT}"; then
-      die "editable install failed: aider-vision-core"
-      return 1
-    fi
-  else
-    if [ -f "${CECLI_ROOT}/scripts/scm_pep440.sh" ]; then
-      # shellcheck disable=SC1091
-      eval "$(sh "${CECLI_ROOT}/scripts/scm_pep440.sh" "${CECLI_ROOT}")"
-    fi
-    if ! "$PYTHON" -m pip install -q -e "${CECLI_ROOT}"; then
-      die "editable install failed: cecli at ${CECLI_ROOT}"
-      return 1
-    fi
+  if [ -f "${CECLI_ROOT}/scripts/scm_pep440.sh" ]; then
+    # shellcheck disable=SC1091
+    eval "$(sh "${CECLI_ROOT}/scripts/scm_pep440.sh" "${CECLI_ROOT}")"
+  fi
+  if ! "$PYTHON" -m pip install -q -e "${CECLI_ROOT}"; then
+    die "editable install failed: cecli at ${CECLI_ROOT}"
+    return 1
   fi
 
   if [ ! -f "${ROOT}/pyproject.toml" ]; then
@@ -154,7 +142,7 @@ if ! "$PYTHON" -m pip install -q "uvicorn[standard]"; then
   return 1
 fi
 
-if [ "${AIDER_VISION_CORE_INSTALL:-editable}" = "pypi" ]; then
+if [ "${BRIGHT_VISION_CORE_INSTALL:-editable}" = "pypi" ]; then
   if ! "$PYTHON" -m pip install -q "pytest>=8.0" "pytest-asyncio>=0.24"; then
     die "pytest install failed (yarn test:llm:core / test:bright-core)"
     return 1

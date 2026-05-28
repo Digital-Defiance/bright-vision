@@ -11,7 +11,10 @@ test.describe('About dialog', () => {
       'href',
       /digitaldefiance\.org/
     )
-    await expect(dialog.getByRole('link', { name: 'Cecli' })).toHaveAttribute('href', /cecli\.dev/)
+    await expect(dialog.getByRole('link', { name: 'Cecli', exact: true })).toHaveAttribute(
+      'href',
+      /cecli\.dev/
+    )
     await page.getByRole('button', { name: 'Close' }).click()
     await expect(dialog).not.toBeVisible()
   })
