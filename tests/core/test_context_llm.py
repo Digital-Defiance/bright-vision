@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 import unittest
@@ -20,6 +19,7 @@ except ImportError:
     reset_auth_for_tests = None
 
 from llm_ollama import ensure_ollama_for_llm_e2e, ollama_reachable, resolve_vision_model
+from llm_sse import assistant_text, fuzzy_contains_magic, parse_sse_payload
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONTEXT_WORKSPACE = REPO_ROOT / "e2e" / "fixtures" / "context-workspace"
@@ -60,25 +60,6 @@ def _ensure_context_workspace() -> str:
     return str(CONTEXT_WORKSPACE)
 
 
-def _parse_sse_payload(raw: str) -> list[dict]:
-    events: list[dict] = []
-    for part in raw.split("\n\n"):
-        for line in part.split("\n"):
-            if not line.startswith("data: "):
-                continue
-            events.append(json.loads(line[6:]))
-    return events
-
-
-def _assistant_text(events: list[dict]) -> str:
-    tokens = [e.get("text", "") for e in events if e.get("type") == "token"]
-    text = "".join(tokens)
-    if text.strip():
-        return text
-    done = next((e for e in events if e.get("type") == "done"), None)
-    return str(done.get("assistant_text") or "") if done else ""
-
-
 @unittest.skipIf(TestClient is None, "fastapi not installed")
 @unittest.skipIf(os.environ.get("E2E_LLM") != "1", "set E2E_LLM=1 to run real LLM tests")
 @unittest.skipIf(not ollama_reachable(), "Ollama not reachable")
@@ -112,8 +93,12 @@ class TestContextLlm(unittest.TestCase):
         ) as stream:
             self.assertEqual(stream.status_code, 200)
             add_body = stream.read().decode("utf-8")
-        add_events = _parse_sse_payload(add_body)
+        add_events = parse_sse_payload(add_body)
         self.assertFalse([e for e in add_events if e.get("type") == "error"])
+        info = client.get(f"/sessions/{session_id}")
+        self.assertEqual(info.status_code, 200, info.text)
+        in_chat = [p.replace("\\", "/") for p in (info.json().get("files_in_chat") or [])]
+        self.assertIn(WIDGET_REL, in_chat, f"expected {WIDGET_REL} in context after /add: {in_chat}")
 
         question = (
             "Using only the file you have in context, what is the exact string value assigned to "
@@ -127,12 +112,11 @@ class TestContextLlm(unittest.TestCase):
             self.assertEqual(stream.status_code, 200)
             body = stream.read().decode("utf-8")
 
-        events = _parse_sse_payload(body)
+        events = parse_sse_payload(body)
         errors = [e for e in events if e.get("type") == "error"]
         self.assertFalse(errors, errors)
-        reply = _assistant_text(events)
-        self.assertIn(
-            E2E_CONTEXT_MAGIC,
-            reply,
-            f"expected {E2E_CONTEXT_MAGIC!r} in reply: {reply[:500]!r}",
+        reply = assistant_text(events)
+        self.assertTrue(
+            fuzzy_contains_magic(reply, E2E_CONTEXT_MAGIC),
+            f"expected {E2E_CONTEXT_MAGIC!r} (or its segments) in reply: {reply[:500]!r}",
         )

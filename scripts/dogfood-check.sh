@@ -36,6 +36,7 @@ if [ -x .venv/bin/python3 ]; then
     tests/core/test_workspace_paths.py \
     tests/core/test_headless_args.py \
     tests/core/test_superproject_integration.py \
+    tests/core/test_superproject_dogfood.py \
     -q
 fi
 

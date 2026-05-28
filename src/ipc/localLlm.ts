@@ -81,7 +81,7 @@ export function formatLlmPingSummary(r: LlmPingResult): string {
 export function formatLlmPingHint(r: LlmPingResult): string | null {
   if (!llmPingNeedsSessionStart(r)) return null
   const detail = r.coreHealthError?.trim()
-  const base = `Ollama is ready. Ping does not start ${DISPLAY_VISION_API} — use Terminal → Start (session) so :8741 is listening.`
+  const base = `Ollama is ready. Ping does not start ${DISPLAY_VISION_API} — use Settings → Start ${DISPLAY_VISION_API} or Terminal → Start (full session) so :8741 is listening.`
   return detail ? `${base} (${detail})` : base
 }
 

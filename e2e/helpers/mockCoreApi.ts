@@ -9,6 +9,7 @@ import {
   emptyTodoStore,
 } from './fixtures'
 import { formatSse } from './sse'
+import { importAgentPlanFromDisk } from './agentTodoImportDisk'
 
 export interface MockCoreOptions {
   sessionId?: string
@@ -24,6 +25,8 @@ export interface MockCoreOptions {
   agentPlanMissing?: boolean
   /** Store applied when import-agent-plan succeeds (default: agentPlanTodoStore()). */
   agentPlanTodos?: TodoStore
+  /** Run real import_agent_plan_for_workspace against workspacePath (reads agent todo.txt on disk). */
+  agentTodoImportFromDisk?: boolean
   /** SSE event arrays per user message (cycles). */
   messageTurns?: Record<string, unknown>[][]
   /** Delay before fulfilling POST .../messages (keeps turn busy for queue/stop tests). */
@@ -50,6 +53,13 @@ export async function installMockCoreApi(page: Page, opts: MockCoreOptions = {})
   const transcript = opts.sessionTranscript ?? []
   let healthHits = 0
   let todoStore = cloneStore(opts.initialTodos ?? emptyTodoStore())
+  if (opts.agentTodoImportFromDisk && opts.workspacePath) {
+    try {
+      todoStore = cloneStore(importAgentPlanFromDisk(opts.workspacePath))
+    } catch {
+      /* keep initial/empty; POST import-agent-plan still exercises disk import */
+    }
+  }
   let filesInChat = [...(opts.filesInChat ?? [])]
   let sessionAutoCommits = true
   let messageTurnIndex = 0
@@ -293,7 +303,22 @@ export async function installMockCoreApi(page: Page, opts: MockCoreOptions = {})
         return
       }
       agentPlanImportCount += 1
-      todoStore = cloneStore(opts.agentPlanTodos ?? agentPlanTodoStore())
+      if (opts.agentTodoImportFromDisk && opts.workspacePath) {
+        try {
+          todoStore = cloneStore(importAgentPlanFromDisk(opts.workspacePath))
+        } catch (err) {
+          await route.fulfill({
+            status: 500,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              detail: err instanceof Error ? err.message : String(err),
+            }),
+          })
+          return
+        }
+      } else {
+        todoStore = cloneStore(opts.agentPlanTodos ?? agentPlanTodoStore())
+      }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

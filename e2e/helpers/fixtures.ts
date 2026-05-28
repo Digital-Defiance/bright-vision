@@ -88,6 +88,28 @@ export function proposedEditTurnEvents() {
   ]
 }
 
+/** Engine auto-applied edit — `done.edited_files` matches proposed block path. */
+export function engineAppliedEditTurnEvents() {
+  return [
+    {
+      type: 'token',
+      text: '► **ANSWER**\n\n```src/example.ts\n<<<<<<< SEARCH\nold\n=======\nnew\n>>>>>>> REPLACE\n```\n',
+    },
+    { type: 'done', edited_files: ['src/example.ts'] },
+  ]
+}
+
+/** Non-edit fenced code (syntax display only). */
+export function displayFenceTurnEvents() {
+  return [
+    {
+      type: 'token',
+      text: '► **ANSWER**\nExample:\n\n```python\nprint("e2e-display-fence")\n```\n',
+    },
+    { type: 'done', edited_files: [] as string[] },
+  ]
+}
+
 /** Default assistant turn for mocked SSE. */
 export function defaultTurnEvents() {
   return [

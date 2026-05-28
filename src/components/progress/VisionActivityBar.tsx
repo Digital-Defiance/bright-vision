@@ -1,5 +1,7 @@
 import { Box, LinearProgress, Typography } from '@mui/material'
 import { ThinkingTimerInline } from '../chat/ThinkingTimerBar'
+import { useMonotonicEtaProgress } from '../../hooks/useMonotonicEtaProgress'
+import { isTurnEtaVisible } from '../../utils/turnEtaEstimate'
 import type { TurnEtaEstimate } from '../../utils/turnEtaEstimate'
 import type { LiveThinkingState } from '../../utils/thinkingTiming'
 import type { ProcessSnapshot } from '../../progress/types'
@@ -17,6 +19,12 @@ export function VisionActivityBar({
   turnEta = null,
 }: VisionActivityBarProps) {
   const show = process.active || process.phase === 'error' || liveTiming != null
+  const etaVisible = isTurnEtaVisible(turnEta)
+  const etaPct = useMonotonicEtaProgress(
+    show ? turnEta : null,
+    liveTiming?.responseElapsedMs ?? 0
+  )
+
   if (!show) return null
 
   const indeterminate = process.progress === null
@@ -65,21 +73,50 @@ export function VisionActivityBar({
         }}
       />
       <Box className="vision-activity__meta">
-        <Typography variant="caption" className="vision-activity__label" component="span">
-          {primaryLabel}
-          {pct != null && (
-            <Box component="span" className="vision-activity__pct" sx={{ ml: 1 }}>
-              {pct}%
-            </Box>
-          )}
-        </Typography>
-        {liveTiming && <ThinkingTimerInline live={liveTiming} eta={turnEta} />}
-        {(process.detail || countLabel) && (
-          <Typography variant="caption" className="vision-activity__detail" component="span">
-            {countLabel && process.detail
-              ? `${countLabel} · ${process.detail}`
-              : countLabel || process.detail}
+        <Box className="vision-activity__meta-primary">
+          <Typography variant="caption" className="vision-activity__label" component="span">
+            {primaryLabel}
+            {pct != null && (
+              <Box component="span" className="vision-activity__pct" sx={{ ml: 1 }}>
+                {pct}%
+              </Box>
+            )}
           </Typography>
+          {(process.detail || countLabel) && (
+            <Typography variant="caption" className="vision-activity__detail" component="span">
+              {countLabel && process.detail
+                ? `${countLabel} · ${process.detail}`
+                : countLabel || process.detail}
+            </Typography>
+          )}
+        </Box>
+        {(liveTiming || (etaVisible && etaPct != null)) && (
+          <Box className="vision-activity__meta-trailing">
+            {liveTiming && <ThinkingTimerInline live={liveTiming} eta={turnEta} />}
+            {etaVisible && etaPct != null && (
+              <LinearProgress
+                className="vision-activity__bar vision-activity__bar--eta"
+                variant="determinate"
+                value={etaPct}
+                data-testid="vision-activity-eta"
+                aria-label="Estimated time remaining"
+                sx={{
+                  flex: '1 1 120px',
+                  minWidth: 80,
+                  maxWidth: 280,
+                  height: 4,
+                  borderRadius: 999,
+                  bgcolor: 'action.hover',
+                  '& .MuiLinearProgress-bar': {
+                    borderRadius: 999,
+                    transition: 'transform 0.4s ease-out',
+                    background: (theme) =>
+                      `linear-gradient(90deg, ${theme.palette.success.dark}, ${theme.palette.success.main})`,
+                  },
+                }}
+              />
+            )}
+          </Box>
         )}
       </Box>
     </Box>

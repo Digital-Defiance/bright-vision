@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CoreHttpClient } from '../ipc/httpClient'
 import { isTauriRuntime } from '../ipc/isTauri'
 import { loadTodoStore, normalizeTodo, saveTodoStore } from '../todos/storage'
@@ -45,6 +45,7 @@ export function useWorkspaceTodos(
   const [store, setStore] = useState<TodoStore | null>(null)
   const [loading, setLoading] = useState(true)
   const [httpReady, setHttpReady] = useState(false)
+  const reloadGenerationRef = useRef(0)
   const tauriLocal = isTauriRuntime()
 
   const mirrorToDisk = useCallback(
@@ -63,10 +64,13 @@ export function useWorkspaceTodos(
   )
 
   const reload = useCallback(async () => {
+    const generation = ++reloadGenerationRef.current
+    const stale = () => generation !== reloadGenerationRef.current
     setLoading(true)
     try {
       if (tauriLocal) {
-        setStore(await loadTodoStore(workingDir))
+        const local = await loadTodoStore(workingDir)
+        if (!stale()) setStore(local)
       }
       if (api?.client) {
         try {
@@ -76,22 +80,25 @@ export function useWorkspaceTodos(
           } catch {
             // Agent plan import is best-effort; list still loads local/API store.
           }
+          if (stale()) return
           const data = await api.client.listWorkspaceTodos(api.workspace)
+          if (stale()) return
           setStore(data)
           setHttpReady(true)
           await mirrorToDisk(data)
           return
         } catch {
-          setHttpReady(false)
+          if (!stale()) setHttpReady(false)
         }
       } else {
         setHttpReady(false)
       }
       if (!tauriLocal) {
-        setStore(await loadTodoStore(workingDir))
+        const local = await loadTodoStore(workingDir)
+        if (!stale()) setStore(local)
       }
     } finally {
-      setLoading(false)
+      if (!stale()) setLoading(false)
     }
   }, [api, workingDir, tauriLocal, mirrorToDisk])
 

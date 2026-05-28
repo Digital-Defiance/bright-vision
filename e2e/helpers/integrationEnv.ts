@@ -2,12 +2,19 @@ import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {
+  CHAR_SPLIT_AGENT_TODO_JSON,
+  writeAgentTodoFile,
+  writeCharSplitCorruptedAgentTodoFile,
+} from './agentTodoFixture'
 import { buildVisionCoreEnv, REPO_ROOT } from './llmEnv'
 
 const E2E_DIR = path.dirname(fileURLToPath(import.meta.url))
 
 /** Git workspace for real-core Playwright integration (no mocked /api/core). */
 export const INTEGRATION_WORKSPACE = path.join(REPO_ROOT, 'e2e/fixtures/integration-workspace')
+
+export { CHAR_SPLIT_AGENT_TODO_JSON, writeAgentTodoFile, writeCharSplitCorruptedAgentTodoFile }
 
 export function isIntegrationE2eEnabled(): boolean {
   return process.env.E2E_INTEGRATION === '1'
@@ -28,16 +35,6 @@ export function ensureIntegrationWorkspace(): string {
   return INTEGRATION_WORKSPACE
 }
 
-/** Write Cecli agent todo.txt (format from UpdateTodoList). Returns repo-relative path. */
-export function writeAgentTodoFile(content: string, sessionId = 'e2e-integration'): string {
-  const date = '2026-05-27'
-  const rel = `.cecli/agents/${date}/${sessionId}/todo.txt`
-  const abs = path.join(INTEGRATION_WORKSPACE, rel)
-  fs.mkdirSync(path.dirname(abs), { recursive: true })
-  fs.writeFileSync(abs, content.endsWith('\n') ? content : `${content}\n`, 'utf8')
-  return rel
-}
-
 export function integrationTodosPath(): string {
   return path.join(INTEGRATION_WORKSPACE, '.cecli', 'todos.json')
 }
@@ -50,10 +47,10 @@ export function resetIntegrationCecliState(): void {
   }
 }
 
-export function readIntegrationTodoStore(): { todos?: unknown[] } | null {
+export function readIntegrationTodoStore(): { todos?: { title?: string }[] } | null {
   const p = integrationTodosPath()
   if (!fs.existsSync(p)) return null
-  return JSON.parse(fs.readFileSync(p, 'utf8')) as { todos?: unknown[] }
+  return JSON.parse(fs.readFileSync(p, 'utf8')) as { todos?: { title?: string }[] }
 }
 
 export function buildIntegrationAppConfig() {

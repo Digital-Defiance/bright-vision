@@ -14,6 +14,7 @@ All checks run on **your machine**. Nothing here requires GitHub Actions — wor
 | Real core + Tasks bridge (no mocks) | `yarn test:e2e:integration` | ~2–3 min |
 | Before a release / submodule bump | `sh scripts/test-local.sh release` | full + bright-core pytest + integration e2e + verify |
 | Self-dev preflight (Ollama + layout) | `yarn dogfood:check` | ~20s — see [DOGFOOD.md](./DOGFOOD.md) |
+| Full automated dogfood gate (no GUI) | `yarn dogfood:gate` | release tier; optional `DOGFOOD_LLM=1` |
 | Scenario matrix (all registered SSE outputs) | `yarn test:e2e shipped-scenarios` | ~2–3 min |
 | Fixture-pack structure preflight | `yarn test:e2e:fixtures` | ~1s |
 
@@ -155,11 +156,14 @@ Exercises a **live** `bright-vision-core` on `:8741` and your **Ollama** model (
 **Run**
 
 ```bash
-# Core-only (SSE + Ollama; hello + /agent) — pinned single-model control lane
+# Core-only (SSE + Ollama) — hello, /agent, context, todo, edit-block, transcript
 yarn test:llm:core
 
 # Full UI path: Terminal Start -> Chat with router lane enabled
 yarn test:e2e:llm
+
+# Opt-in: repo root workspace (slow); run separately or via dogfood gate
+E2E_SUPERPROJECT_LLM=1 yarn test:e2e:llm:superproject
 
 # Full UI path without router assertions (single-model control lane)
 yarn test:e2e:llm:single
@@ -184,6 +188,9 @@ Optional env:
 | `E2E_OLLAMA_AUTO_PULL` | `1` (default): run `ollama pull` when the model is missing; `0` to fail fast |
 | `E2E_OLLAMA_HOST` | Ollama base URL (default `http://127.0.0.1:11434`) |
 | `E2E_FIXTURE_PACK_ROOT` | Optional absolute path to a custom fixture repo collection (supports submodule-based packs) |
+| `E2E_SUPERPROJECT_LLM` | `1` runs `superproject-llm.spec.ts` (BrightVision repo root; slow) |
+| `DOGFOOD_LLM` | `1` with `yarn dogfood:gate` runs `test:llm:core` + `test:e2e:llm` when Ollama is up |
+| `DOGFOOD_SUPERPROJECT_LLM` | `1` with `dogfood:gate` also runs superproject LLM lane |
 | `E2E_PYTHON` | Venv shim for spawning Vision API (default `.venv/bin/python3`; `test:e2e:llm` sets this — do not point at Homebrew `python3.14` alone) |
 
 E2E clears **`PYTHONPATH`**. Do not export `PYTHONPATH=$PWD` — the repo’s `cecli/` folder is not the Python package and will break `import cecli` (`unknown location`).
@@ -192,7 +199,9 @@ E2E clears **`PYTHONPATH`**. Do not export `PYTHONPATH=$PWD` — the repo’s `c
 |-----------|-----|
 | `e2e/fixtures/hello-workspace` | Smoke LLM (`hello-llm`, `agent-llm`) — **no** files in context |
 | `e2e/fixtures/context-workspace` | Context LLM (`context-llm`, `test_context_llm`) — `/add src/e2e_widget.ts`, assert `E2E_CONTEXT_MAGIC` |
+| `e2e/fixtures/edit-block-workspace` | Edit LLM (`edit-block-llm`, `test_edit_block_llm`) — SEARCH/REPLACE on `src/patchme.ts` |
 | `e2e/fixtures/integration-workspace` | Real core HTTP (`yarn test:e2e:integration`) — todos/import, not chat context |
+| BrightVision repo root | Superproject LLM only when `E2E_SUPERPROJECT_LLM=1` — `/add bright_vision_core/README.md` |
 
 Do **not** use the BrightVision superproject as the default LLM `workingDir` (slow repo map, flaky).
 

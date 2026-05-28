@@ -50,6 +50,18 @@ yarn dogfood:check
 
 Runs: `activate.sh` sanity, `yarn verify:submodule`, `yarn test:fast`, optional Ollama reachability, optional `yarn test:bright-core` when `.venv` is present.
 
+## Automated gate (hands-off)
+
+```bash
+yarn dogfood:gate
+# With Ollama running and models pulled:
+DOGFOOD_LLM=1 yarn dogfood:gate
+# Include slow superproject-root LLM lane:
+DOGFOOD_LLM=1 DOGFOOD_SUPERPROJECT_LLM=1 yarn dogfood:gate
+```
+
+Runs: `dogfood:check` → `test-local.sh release` (mocked e2e + bright-core + integration). When `DOGFOOD_LLM=1`, also `yarn test:llm:core` and `yarn test:e2e:llm` (same stack as daily dogfood, including router when `E2E_MODEL_ROUTER=1` in package.json).
+
 ## Manual sign-off (#19)
 
 When submodule or `git_workspace` behavior changes, run [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) sections **A–D** in `yarn tauri dev`.

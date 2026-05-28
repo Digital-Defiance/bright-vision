@@ -46,27 +46,61 @@ def is_agent_linked_task(item: TodoItem) -> bool:
     return bool(parse_agent_todo_link(item.links)) or AGENT_PLAN_LINK in item.links
 
 
+def _recover_char_split_agent_rows(rows: list[AgentTodoRow]) -> list[AgentTodoRow]:
+    """
+    Recover when UpdateTodoList wrote one todo line per JSON character (local model quirk).
+
+    BrightVision imports agent todo.txt into Tasks checklist + tasks_md; without this,
+    a corrupted file keeps single-character rows until the user clears the task.
+    """
+    if len(rows) < 8 or not all(len(row.text) <= 2 for row in rows):
+        return rows
+    joined = "".join(row.text for row in rows).strip()
+    if not joined.startswith(("[", "{")):
+        return rows
+    try:
+        from cecli.tools.update_todo_list import normalize_task_items
+
+        items = normalize_task_items(joined)
+    except Exception:
+        return rows
+    recovered: list[AgentTodoRow] = []
+    for item in items:
+        text = str(item.get("task") or "").strip()
+        if not text:
+            continue
+        recovered.append(
+            AgentTodoRow(
+                text=text,
+                done=bool(item.get("done", False)),
+                current=bool(item.get("current", False)),
+            )
+        )
+    return recovered or rows
+
+
 def parse_agent_todo_txt(content: str) -> list[AgentTodoRow]:
     """Parse ``todo.txt`` written by cecli ``updatetodolist``."""
     rows: list[AgentTodoRow] = []
     for raw in content.splitlines():
-        line = raw.strip()
-        if not line or line in ("Done:", "Remaining:"):
+        line = raw.rstrip("\n\r")
+        stripped = line.strip()
+        if stripped in ("Done:", "Remaining:"):
             continue
         done = False
         current = False
         text = line
         if line.startswith("✓ "):
             done = True
-            text = line[2:].strip()
+            text = line[2:]
         elif line.startswith("→ "):
             current = True
-            text = line[2:].strip()
+            text = line[2:]
         elif line.startswith("○ "):
-            text = line[2:].strip()
+            text = line[2:]
         else:
             continue
-        if text:
+        if text != "":
             rows.append(AgentTodoRow(text=text, done=done, current=current))
     return rows
 
@@ -162,16 +196,27 @@ def rows_to_tasks_md(rows: list[AgentTodoRow]) -> str:
     return "\n".join(lines).strip() + "\n"
 
 
+def _usable_plan_title_text(text: str) -> bool:
+    """Reject char-split JSON debris (e.g. ``[``) mistaken for a task title after /agent."""
+    t = text.strip()
+    if not t:
+        return False
+    alnum = sum(1 for c in t if c.isalnum())
+    if len(t) <= 2 and alnum < 2:
+        return False
+    return True
+
+
 def plan_title_from_rows(rows: list[AgentTodoRow]) -> str:
     for row in rows:
         if row.current and not row.done:
             t = row.text.strip()
-            if t:
+            if _usable_plan_title_text(t):
                 return t[:120]
     for row in rows:
         if not row.done:
             t = row.text.strip()
-            if t:
+            if _usable_plan_title_text(t):
                 return t[:120]
     return AGENT_PLAN_TITLE
 
@@ -205,6 +250,8 @@ def import_agent_plan_store(
 ) -> TodoStore:
     if not rows:
         return store
+
+    rows = _recover_char_split_agent_rows(rows)
 
     checklist = [
         ChecklistItem(id=uuid.uuid4().hex[:8], text=row.text, done=row.done) for row in rows

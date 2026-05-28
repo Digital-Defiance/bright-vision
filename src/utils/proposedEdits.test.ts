@@ -35,4 +35,5 @@ describe('parseAssistantContent', () => {
     expect(segs.some((s) => s.type === 'proposed_edit')).toBe(true)
     expect(segs.some((s) => s.type === 'prose' && s.content.includes('<<<<<<<'))).toBe(false)
   })
+
 })

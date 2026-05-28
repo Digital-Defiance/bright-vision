@@ -50,7 +50,7 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 
 | # | Status | Item |
 |---|--------|------|
-| **19** | **Done** | **Automated:** `yarn verify:submodule`, `test_git_workspace.py`, `test_superproject_integration.py`, `yarn test:bright-core`, `yarn test:e2e:integration`. **Release sign-off (manual):** A–D in [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) via `yarn tauri dev` before announcing superproject dogfood. |
+| **19** | **Done** | **Automated:** `yarn dogfood:check`, `yarn dogfood:gate`, `test_superproject_dogfood.py`, `yarn verify:submodule`, `test_git_workspace.py`, `test_superproject_integration.py`, `yarn test:bright-core`, `yarn test:e2e:integration`, LLM lanes (`test:llm:core`, `test:e2e:llm`, opt-in `E2E_SUPERPROJECT_LLM`). **Release sign-off (manual):** A–D in [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) via `yarn tauri dev` before announcing superproject dogfood. |
 | **31** | **Done** | **Release hygiene** — `release-hygiene.spec.ts`, `yarn verify:submodule`, [RELEASE.md](./RELEASE.md) commit/tag/bump checklist. |
 
 ---
@@ -364,13 +364,14 @@ Prefer **permissive licenses** and **small bundle** ([AGENTS.md](../AGENTS.md)).
 
 | Signal | Route |
 |--------|--------|
-| Context ≥ `token_heavy_min` (default 12k) | Heavy |
+| Live session context + reserve &gt; fast model `max_input_tokens` | Heavy |
+| Message tokens ≥ `token_heavy_min` (default 12k) | Heavy |
 | Keywords: refactor, race condition, architecture, … | Heavy |
 | Keywords: rename, color, typo, … and context &lt; heavy min | Fast |
 | Context &lt; `token_fast_max` (4k) and no heavy keywords | Fast (if not a code-task verb) |
 | Fast tier, no edits, code-task verbs | Auto-escalate heavy (one retry) |
 
-**Done:** Classify prompts (tokens + keywords); **model hopper** in Settings; Tauri `local_llm_prepare_hopper` + `ollama_ensure_model_loaded` (swap unload/load, `load_ms` in UI); auto-escalate + manual **Escalate to heavy**; **Force fast/heavy** in chat; `model_pool` on session create. **May 2026:** route on message tokens (not file-in-chat bump), middle-band `default_fast`, UI fast keywords; long Ollama wait stall hints; silent failed auto-load (`io.drain_events`).
+**Done:** Classify prompts (tokens + keywords); route **heavy** when live context exceeds fast model window (Cecli metadata); **model hopper** in Settings; Tauri `local_llm_prepare_hopper` + `ollama_ensure_model_loaded` (swap unload/load, `load_ms` in UI); auto-escalate + manual **Escalate to heavy**; **Force fast/heavy** in chat; `model_pool` on session create. **May 2026:** route on message tokens (not file-in-chat bump), middle-band `default_fast`, UI fast keywords; long Ollama wait stall hints; silent failed auto-load (`io.drain_events`).
 
 **Longer-term:** 1B classifier model; route timing history in Settings stats.
 

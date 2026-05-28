@@ -4,6 +4,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import StopIcon from '@mui/icons-material/Stop'
 import { Alert, Button, CircularProgress, Stack, Typography } from '@mui/material'
+import { DISPLAY_VISION_API } from '../../brand'
 import type { LocalLlmControls } from '../../hooks/useLocalLlmControls'
 
 interface LocalLlmActionButtonsProps {
@@ -45,7 +46,9 @@ export function LocalLlmActionButtons({
         >
           Start Local LLM
         </Button>
-        <Tooltip title="Checks Ollama (generate probe) and Vision API /health. Does not start the API — use Terminal → Start for that.">
+        <Tooltip
+          title={`Checks Ollama (generate probe) and ${DISPLAY_VISION_API} /health. Does not start the API — use Settings → Start Vision API or Terminal → Start.`}
+        >
           <span>
             <Button
               size="small"

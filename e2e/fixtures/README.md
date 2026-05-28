@@ -38,7 +38,7 @@ sh scripts/verify-e2e-fixture-pack.sh /absolute/path/to/my-fixture-pack
 |-----------|------------|----------|
 | `context-workspace` | `ensureContextLlmE2eWorkspace()` | LLM read-back of `E2E_CONTEXT_MAGIC` in `src/e2e_widget.ts` |
 | `hello-workspace` | `ensureHelloLlmE2eWorkspace()` | Smoke LLM reply (minimal repo) |
-| `integration-workspace` | `ensureIntegrationWorkspace()` | Real `:8741` HTTP + agent `todo.txt` import |
+| `integration-workspace` | `ensureIntegrationWorkspace()` | Real `:8741` HTTP + agent `todo.txt` import (incl. char-split recovery via `writeCharSplitCorruptedAgentTodoFile()` in `e2e/helpers/integrationEnv.ts`; spec `e2e/integration/import-agent-plan.spec.ts`) |
 | `edit-block-workspace` | `ensureEditBlockWorkspace()` | `src/patchme.ts` with `value = 'old'` for SEARCH/REPLACE apply |
 | `tasks-seeded-workspace` | `ensureTasksSeededWorkspace()` | Pre-filled `.cecli/todos.json` for Tasks tab / workspace API |
 

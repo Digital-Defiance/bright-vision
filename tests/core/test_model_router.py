@@ -1,6 +1,7 @@
 from bright_vision_core.model_router import (
     ModelRouterConfig,
     classify_prompt,
+    context_exceeds_fast_model_limit,
     estimate_message_tokens,
     estimate_prompt_tokens,
     should_escalate_fast_turn,
@@ -56,7 +57,7 @@ def test_classify_high_message_tokens_heavy():
 
 
 def test_files_in_chat_do_not_force_heavy():
-    """Large context_tokens (files) with small message must not route heavy."""
+    """Capped file bump with small message must not route heavy when under fast window."""
     router = ModelRouterConfig(
         enabled=True,
         fast_model="ollama_chat/small",
@@ -67,6 +68,9 @@ def test_files_in_chat_do_not_force_heavy():
     context_tokens = estimate_prompt_tokens(msg, files_in_chat=4)
     assert context_tokens > message_tokens
     assert message_tokens < router.token_fast_max
+    assert not context_exceeds_fast_model_limit(
+        context_tokens, router.fast_model, fast_max_input=32_768
+    )[0]
     d = classify_prompt(
         msg,
         message_tokens=message_tokens,
@@ -76,6 +80,60 @@ def test_files_in_chat_do_not_force_heavy():
     )
     assert d.tier == "fast"
     assert d.estimated_tokens == context_tokens
+
+
+def test_context_exceeds_fast_model_limit():
+    exceeds, limit = context_exceeds_fast_model_limit(
+        17_670,
+        "ollama_chat/deepseek-coder:6.7b",
+        fast_max_input=16_384,
+    )
+    assert exceeds is True
+    assert limit == 16_384
+    fits, _ = context_exceeds_fast_model_limit(
+        10_000,
+        "ollama_chat/deepseek-coder:6.7b",
+        fast_max_input=16_384,
+    )
+    assert fits is False
+
+
+def test_classify_routes_heavy_when_context_exceeds_fast_window():
+    """Repro: short UI message but full session > deepseek 16k → heavy, not fast."""
+    router = ModelRouterConfig(
+        enabled=True,
+        fast_model="ollama_chat/deepseek-coder:6.7b",
+        heavy_model="ollama_chat/qwen3.6:27b-q4_K_M",
+    )
+    msg = "tweak the chat panel label"
+    message_tokens = estimate_message_tokens(msg)
+    assert message_tokens < router.token_fast_max
+    d = classify_prompt(
+        msg,
+        message_tokens=message_tokens,
+        context_tokens=17_670,
+        router=router,
+        heavy_model_name="ollama_chat/qwen3.6:27b-q4_K_M",
+    )
+    assert d.tier == "heavy"
+    assert d.model_name == "ollama_chat/qwen3.6:27b-q4_K_M"
+    assert any("fast_max=" in r for r in d.reasons)
+
+
+def test_fast_keyword_loses_to_context_overflow():
+    router = ModelRouterConfig(
+        enabled=True,
+        fast_model="ollama_chat/deepseek-coder:6.7b",
+        heavy_model="ollama_chat/big",
+    )
+    d = classify_prompt(
+        "Rename the button label to Save",
+        message_tokens=200,
+        context_tokens=20_000,
+        router=router,
+        heavy_model_name="ollama_chat/big",
+    )
+    assert d.tier == "heavy"
 
 
 def test_code_task_middle_band_defaults_fast():

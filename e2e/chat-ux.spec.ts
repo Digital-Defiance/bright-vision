@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { expectOptimisticSend } from './helpers/chatSend'
-import { defaultTurnEvents, hangingTurnEvents } from './helpers/fixtures'
+import { defaultTurnEvents, hangingTurnEvents, proposedEditTurnEvents } from './helpers/fixtures'
 import { openChat, startMockSession } from './helpers/session'
 
 test.describe('Chat UX (roadmap #1–2, #9–10, #13)', () => {
@@ -19,7 +19,9 @@ test.describe('Chat UX (roadmap #1–2, #9–10, #13)', () => {
     await expect(page.getByText('Explain the module')).toBeVisible()
   })
 
-  test('proposed edit accordion and applied label after done', async ({ page }) => {
+  test('proposed edit accordion when engine has not applied yet', async ({ page }) => {
+    await startMockSession(page, { messageTurns: [proposedEditTurnEvents()] })
+    await openChat(page)
     await page.getByTestId('chat-input').fill('Patch src/example.ts')
     await page.getByTestId('chat-send').click()
     await expectOptimisticSend(page, 'Patch src/example.ts')

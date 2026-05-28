@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Any, Literal
 
 RouteTier = Literal["fast", "heavy"]
@@ -17,6 +18,9 @@ RouteTier = Literal["fast", "heavy"]
 # Per-file context bump for *display* only (routing uses message_tokens).
 _FILE_TOKEN_PER_FILE = 500
 _FILE_TOKEN_CAP = 2_000
+
+# Reserve completion tokens when comparing session context to fast model window.
+_FAST_CONTEXT_OUTPUT_RESERVE = 2_048
 
 # Intent signals (case-insensitive word boundaries).
 _HEAVY_PATTERNS = re.compile(
@@ -197,6 +201,44 @@ def estimate_prompt_tokens(
     return base + file_part
 
 
+@lru_cache(maxsize=64)
+def lookup_model_max_input_tokens(model_name: str) -> int | None:
+    """Cecli/LiteLLM metadata for a model id (e.g. ``ollama_chat/deepseek-coder:6.7b``)."""
+    name = (model_name or "").strip()
+    if not name:
+        return None
+    try:
+        from cecli.models import model_info_manager
+
+        info = model_info_manager.get_model_info(name) or {}
+        raw = info.get("max_input_tokens") or 0
+        return int(raw) if int(raw) > 0 else None
+    except Exception:
+        return None
+
+
+def context_exceeds_fast_model_limit(
+    context_tokens: int,
+    fast_model_name: str,
+    *,
+    fast_max_input: int | None = None,
+    output_reserve: int = _FAST_CONTEXT_OUTPUT_RESERVE,
+) -> tuple[bool, int | None]:
+    """
+    True when the live session context cannot fit the fast model (plus completion reserve).
+
+    ``fast_max_input`` overrides metadata lookup (tests).
+    """
+    if context_tokens <= 0:
+        return False, None
+    limit = fast_max_input
+    if limit is None:
+        limit = lookup_model_max_input_tokens(fast_model_name)
+    if limit is None:
+        return False, None
+    return context_tokens + output_reserve > limit, limit
+
+
 def classify_prompt(
     user_message: str,
     *,
@@ -222,6 +264,22 @@ def classify_prompt(
         )
 
     reasons: list[str] = []
+
+    if context_tokens is not None and context_tokens > 0:
+        exceeds_fast, fast_limit = context_exceeds_fast_model_limit(
+            context_tokens, router.fast_model
+        )
+        if exceeds_fast and fast_limit is not None:
+            reasons.append(
+                f"context_tokens>={fast_limit - _FAST_CONTEXT_OUTPUT_RESERVE} "
+                f"(fast_max={fast_limit})"
+            )
+            return RouteDecision(
+                tier="heavy",
+                model_name=heavy_model_name,
+                estimated_tokens=display_tokens,
+                reasons=reasons,
+            )
 
     if message_tokens >= router.token_heavy_min:
         reasons.append(f"msg_tokens>={router.token_heavy_min}")

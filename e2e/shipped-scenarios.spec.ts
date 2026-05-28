@@ -52,6 +52,16 @@ for (const name of listScenarioNames()) {
           await expect.poll(() => writes.length).toBeGreaterThan(0)
           expect(String(writes.at(-1)?.content ?? '')).toContain(E2E_EDIT_BLOCK_NEW.trim())
           break
+        case 'applied-edit':
+          await expect(page.getByText('Applied', { exact: true })).toBeVisible({ timeout: 15_000 })
+          break
+        case 'display-fence':
+          await expect(page.getByTestId('chat-fence-block')).toBeVisible({ timeout: 15_000 })
+          await expect(page.getByTestId('chat-fence-block')).toContainText(
+            'print("e2e-display-fence")'
+          )
+          await expect(page.getByText('Proposed only')).toHaveCount(0)
+          break
         case 'confirm':
           await expect(page.getByRole('button', { name: 'Yes' })).toBeVisible({ timeout: 15_000 })
           break

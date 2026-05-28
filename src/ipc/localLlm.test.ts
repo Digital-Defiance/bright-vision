@@ -107,7 +107,7 @@ describe('localLlm', () => {
     expect(formatLlmPingSummary(r)).toBe('LLM OK (545ms) · Vision API not running')
     expect(llmPingNeedsSessionStart(r)).toBe(true)
     expect(llmPingAlertSeverity(r)).toBe('warning')
-    expect(formatLlmPingHint(r)).toContain('Terminal → Start')
+    expect(formatLlmPingHint(r)).toContain('Start Vision API')
     expect(formatLlmPingHint(r)).toContain('connection refused')
     expect(formatLlmPingHint(r)).toContain('Ping does not start')
   })

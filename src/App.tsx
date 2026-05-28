@@ -103,6 +103,8 @@ import { useWorkspaceTodos } from './hooks/useWorkspaceTodos'
 import { WelcomePanel } from './components/onboarding/WelcomePanel'
 import { AboutDialog } from './components/settings/AboutDialog'
 import { SettingsPanel } from './components/settings/SettingsPanel'
+import { VisionApiActionButtons } from './components/settings/VisionApiActionButtons'
+import { useVisionApiControls } from './hooks/useVisionApiControls'
 import type { SubAgentInfo } from './ipc/agentCommands'
 
 const EditorPanel = lazy(() =>
@@ -1521,6 +1523,16 @@ function AppShell({
     ])
   }, [])
 
+  const visionApiControls = useVisionApiControls(savedConfig, {
+    sessionActive: lifecycleActive,
+    onLogLines: appendTerminalLog,
+    onApiUrl: (url) => {
+      const next = { ...savedConfig, coreApiUrl: url }
+      setSavedConfig(next)
+      setConfig(next)
+    },
+  })
+
   const ensureLocalLlm = async (): Promise<void> => {
     if (!isTauriRuntime() || !savedConfig.manageLocalLlm || !isOllamaVisionModel(savedConfig.model)) {
       return
@@ -2493,6 +2505,12 @@ function AppShell({
                   onManageChange={(manageLocalLlm) => setConfig({ ...config, manageLocalLlm })}
                   onLogLines={appendTerminalLog}
                 />
+                <Box sx={{ mt: 1.5 }}>
+                  <VisionApiActionButtons
+                    controls={visionApiControls}
+                    sessionActive={lifecycleActive}
+                  />
+                </Box>
               </Box>
               <Typography
                 variant="caption"

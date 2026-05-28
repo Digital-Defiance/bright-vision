@@ -36,7 +36,7 @@ Tags are bare Ollama names (no `ollama_chat/` prefix). Omit `HEAVY_MODEL` to use
 
 On **Terminal → Start** with the router enabled, BrightVision pulls only the resolved fast/heavy tags (not every hopper row) so startup stays fast when `OLLAMA_MAX_LOADED_MODELS=1`.
 
-**Routing rules (Vision):** Tier choice uses **your message size**, not files-in-chat inflation. UI/product wording (chips, `@` references, tooltips, …) routes **fast**; heavy keywords or very long messages route **heavy**; other code tasks in the middle band default **fast** (escalate to heavy on failure if enabled). Open files only bump the **~tok** display (capped), not the tier.
+**Routing rules (Vision):** Tier choice uses **your message size** for intent (UI wording → fast; architect/refactor keywords → heavy). When the session’s **live context** (Cecli `token_count` on current messages) plus a completion reserve would exceed the **fast model’s `max_input_tokens`**, the router picks **heavy** even for short messages — avoids `exceeds the 16,384 token limit` on small fast models. The capped per-file bump in **~tok** display still does not alone force heavy. Middle-band code tasks default **fast** when context fits (escalate to heavy on failure if enabled).
 
 **Headless** (`bright-vision-core-serve` without the desktop UI): use `BRIGHT_VISION_MODEL_ROUTER=1`, `BRIGHT_VISION_FAST_MODEL=ollama_chat/…`, optional `BRIGHT_VISION_HEAVY_MODEL` — see [ROADMAP.md](./ROADMAP.md#39--local-model-router).
 
@@ -117,7 +117,7 @@ Or leave **Auto before session** on and use **Terminal → Start** once.
 | **LLM OK (Nms)** | Ollama is up, your model is pulled, and a tiny generate succeeded — local inference works. |
 | **Vision API not running** | `bright-vision-core-serve` is not listening on `:8741` yet. That is normal when the session is **Stopped**. The UI shows a **warning** (not green) with the connect error when available. |
 
-Fix: **Terminal → Start** (starts `bright-vision-core-serve` and the session). **Ping stack** again; you should see **Vision API OK**. Local LLM (**Start Local LLM**) and the session (**Start**) are separate steps unless **Auto before session** is on.
+Fix: **Settings → Start Vision API** (HTTP only) or **Terminal → Start** (API + coding session). **Ping stack** again; you should see **Vision API OK**. Local LLM (**Start Local LLM**), the API, and the session (**Start**) are separate steps unless **Auto before session** is on.
 
 **Not in /api/ps** only means the model is not loaded in RAM; ping can still pass if the tag is pulled.
 

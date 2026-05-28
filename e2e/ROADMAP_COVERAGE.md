@@ -11,14 +11,14 @@ Run: `yarn test:full` or `sh scripts/test-local.sh full`. **Release tier:** `sh 
 | Roadmap | Status in product | E2E / tests |
 |---------|-------------------|-------------|
 | **Core lifecycle** | Done | `session-lifecycle.spec.ts`, `ingestProgress.test.ts` (progress SSE → activity bar) |
-| **#1–2, #8–11, #13, #25** Chat UX | Done | `chat-ux.spec.ts`, `stream-chat.spec.ts`, `proposed-edits-apply.spec.ts`, `applyProposedEdit.test.ts` |
+| **#1–2, #8–11, #13, #25** Chat UX | Done | `chat-ux.spec.ts`, `chat-parsing.spec.ts`, `stream-chat.spec.ts`, `proposed-edits-apply.spec.ts`, `applyProposedEdit.test.ts`, `proposedEdits.test.ts`, scenarios `display-fence` / `applied-edit` |
 | **#3–5** Queue / stop / multiline | Done | `chat-input.spec.ts` (`helpers/chatSend.ts`, `chatStream.test.ts`) |
 | **#7** Confirm | Done | `confirm-flow.spec.ts` |
 | **#12** `/add` Tab paths | Done (Tauri) | `path-completion.spec.ts` (mock Tauri) |
 | **#16** Images/PDF | Done | `file-upload.spec.ts` |
 | **#17** Prompt before commit | Done | `settings-config.spec.ts` |
 | **#18** Tasks / generate-spec | Done | `tasks-workspace.spec.ts` |
-| **#19** Submodule / superproject | Done (automated) | `release-hygiene.spec.ts`, `test_git_workspace.py`, `test_superproject_integration.py`, `yarn verify:submodule`; **manual:** [SUBMODULE_VERIFICATION.md](../docs/SUBMODULE_VERIFICATION.md) A–D |
+| **#19** Submodule / superproject | Done (automated) | `test_superproject_dogfood.py`, `release-hygiene.spec.ts`, `test_git_workspace.py`, `test_superproject_integration.py`, `yarn verify:submodule`, `yarn dogfood:gate`; LLM: `superproject-llm` (opt-in); **manual:** [SUBMODULE_VERIFICATION.md](../docs/SUBMODULE_VERIFICATION.md) A–D |
 | **#23–24** Process + chat | Done | lifecycle + chat suites |
 | **#26** Git poll (not inotify) | Partial | `git-polling.spec.ts`, `useGitStatus.test.ts` — **Open:** native FS watcher |
 | **#27** Git visualization | Done (desktop) | `tauri-git.spec.ts` (mock Tauri) |

@@ -1,5 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
-import { expectOptimisticSend, expectTurnIdle } from './helpers/chatSend'
+import { expect, test } from '@playwright/test'
+import { expectOptimisticSend } from './helpers/chatSend'
 import {
   assertOllamaForLlmE2e,
   ensureOllamaModelPulled,
@@ -10,26 +10,9 @@ import {
 } from './helpers/llmEnv'
 import { expectLatestAssistantReply } from './helpers/llmChat'
 import { openLlmChat, primeLlmE2eApp, startLlmE2eSession } from './helpers/llmSession'
+import { settleTurnAfterReply } from './helpers/llmTurn'
 
 test.describe.configure({ mode: 'serial', timeout: 900_000 })
-
-async function dismissConfirmIfPresent(page: Page) {
-  // Some models still attempt workspace edits for "rename" prompts.
-  const no = page.getByRole('button', { name: 'No' })
-  if (await no.count()) {
-    await no.first().click()
-  }
-}
-
-async function settleTurnAfterReply(page: Page, timeoutMs = 180_000) {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    await dismissConfirmIfPresent(page)
-    if ((await page.getByTestId('chat-stop-turn').count()) === 0) break
-    await page.waitForTimeout(400)
-  }
-  await expectTurnIdle(page, timeoutMs)
-}
 
 test.describe('LLM auto-router @router', () => {
   test.skip(!isLlmE2eEnabled(), 'Run with E2E_LLM=1')

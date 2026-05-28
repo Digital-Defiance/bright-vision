@@ -13,9 +13,11 @@ from bright_vision_core.agent_todos import (
     import_agent_plan_for_workspace,
     import_agent_plan_store,
     parse_agent_todo_txt,
+    plan_title_from_rows,
     rows_from_todo_item,
     format_agent_todo_txt,
     AgentTodoRow,
+    _recover_char_split_agent_rows,
 )
 from bright_vision_core.workspace_todos import ChecklistItem, TodoItem, WorkspaceTodos, _now_iso
 
@@ -33,6 +35,40 @@ Remaining:
     assert rows[0].done and rows[0].text == "First done"
     assert rows[1].current and not rows[1].done
     assert rows[2].text == "Next task"
+
+
+def test_parse_agent_todo_txt_preserves_space_only_task_lines():
+    # Char-split corruption uses ``○ {ch}``; a space task is ``○  `` (prefix + space).
+    rows = parse_agent_todo_txt("Remaining:\n○  \n○ x\n")
+    assert len(rows) == 2
+    assert rows[0].text == " "
+    assert rows[1].text == "x"
+
+
+def test_plan_title_skips_char_split_debris():
+    broken = [AgentTodoRow(text=c, done=False, current=(c == "[")) for c in "[{"]
+    assert plan_title_from_rows(broken) == AGENT_PLAN_TITLE
+
+
+def test_plan_title_uses_recovered_current_task():
+    rows = [
+        AgentTodoRow(text="Explore the codebase", done=False, current=True),
+        AgentTodoRow(text="Draft roadmap", done=False, current=False),
+    ]
+    assert plan_title_from_rows(rows) == "Explore the codebase"
+
+
+def test_recover_char_split_agent_rows():
+    json_text = (
+        '[{"task": "Explore the codebase", "done": false, "current": true},'
+        '{"task": "Draft roadmap", "done": false}]'
+    )
+    broken = [AgentTodoRow(text=c, done=False, current=False) for c in json_text]
+    rows = _recover_char_split_agent_rows(broken)
+    assert len(rows) == 2
+    assert rows[0].text == "Explore the codebase"
+    assert rows[0].current
+    assert rows[1].text == "Draft roadmap"
 
 
 def test_import_agent_plan_into_workspace(tmp_path: Path):

@@ -31,6 +31,8 @@ import type { NtfyAlertsPrefs } from '../../theme/ntfyAlertsPrefs'
 import { LocalLlmActionButtons } from '../local-llm/LocalLlmActionButtons'
 import { LocalLlmPanel } from '../local-llm/LocalLlmPanel'
 import { useLocalLlmControls } from '../../hooks/useLocalLlmControls'
+import { useVisionApiControls } from '../../hooks/useVisionApiControls'
+import { VisionApiActionButtons } from './VisionApiActionButtons'
 import type { ThinkingTimingPrefs } from '../../theme/thinkingTimingPrefs'
 import type { SuggestedFilesPrefs } from '../../theme/suggestedFilesPrefs'
 import { SuggestedFilesSection } from './SuggestedFilesSection'
@@ -113,6 +115,10 @@ export function SettingsPanel({
   const [localLlmSnap, setLocalLlmSnap] = useState<LocalLlmSnapshot | null>(null)
   const [ollamaTagsSnap, setOllamaTagsSnap] = useState<OllamaModelsSnapshot | null>(null)
   const localLlmControls = useLocalLlmControls(config)
+  const visionApiControls = useVisionApiControls(config, {
+    sessionActive,
+    onApiUrl: (url) => onChange({ ...config, coreApiUrl: url }),
+  })
 
   const refreshLocalLlm = useCallback(() => {
     if (!isTauriRuntime()) return
@@ -238,8 +244,7 @@ export function SettingsPanel({
               <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
                 <strong>Step 2 — Start Ollama:</strong> after step 1 (or setting{' '}
                 <code>ollama_chat/…</code> above), use Start then Ping. Same controls as{' '}
-                <strong>Terminal → Local LLM</strong>. Ping checks inference; use{' '}
-                <strong>Terminal → Start</strong> for the coding session ({DISPLAY_VISION_API}).
+                <strong>Terminal → Local LLM</strong>.
               </Typography>
               {isOllamaVisionModel(config.model) ? (
                 <LocalLlmActionButtons controls={localLlmControls} showSecondary={false} />
@@ -248,6 +253,20 @@ export function SettingsPanel({
                   Set <strong>LLM model</strong> to <code>ollama_chat/&lt;tag&gt;</code> or click{' '}
                   <strong>Sync from env files</strong> to enable Start and Ping.
                 </Typography>
+              )}
+              {isTauriRuntime() && (
+                <>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 2, mb: 1 }}>
+                    <strong>Step 3 — Start {DISPLAY_VISION_API}:</strong> spawns{' '}
+                    <code>bright-vision-core-serve</code> on :8741 (tasks API, health, chat when you
+                    open a session). Use <strong>Terminal → Start</strong> for a full coding session
+                    (Ollama if enabled + API + Cecli workspace).
+                  </Typography>
+                  <VisionApiActionButtons
+                    controls={visionApiControls}
+                    sessionActive={sessionActive}
+                  />
+                </>
               )}
             </Paper>
           )}

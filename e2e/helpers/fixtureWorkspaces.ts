@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { TauriHandler } from './mockTauri'
 import { resolveFixturePackRoot } from './llmEnv'
 import { sampleTodoStore } from './fixtures'
+import { writeCharSplitCorruptedAgentTodoFile } from './agentTodoFixture'
 
 const FIXTURE_PACK_ROOT = resolveFixturePackRoot()
 
@@ -15,6 +16,7 @@ export const CONTEXT_LLM_E2E_WORKSPACE = workspaceRoot('context-workspace')
 export const HELLO_LLM_E2E_WORKSPACE = workspaceRoot('hello-workspace')
 export const EDIT_BLOCK_WORKSPACE = workspaceRoot('edit-block-workspace')
 export const TASKS_SEEDED_WORKSPACE = workspaceRoot('tasks-seeded-workspace')
+export const AGENT_TODO_CHAR_SPLIT_WORKSPACE = workspaceRoot('agent-todo-char-split-workspace')
 
 export const E2E_CONTEXT_MAGIC = 'bv-context-fixture-7f3a'
 export const E2E_CONTEXT_WIDGET_REL = 'src/e2e_widget.ts'
@@ -103,6 +105,20 @@ export function ensureTasksSeededWorkspace(): string {
     'e2e tasks-seeded'
   )
   return TASKS_SEEDED_WORKSPACE
+}
+
+/** Git workspace with char-split agent todo.txt (post-/agent UpdateTodoList quirk). */
+export function ensureAgentTodoCharSplitWorkspace(): string {
+  fs.mkdirSync(AGENT_TODO_CHAR_SPLIT_WORKSPACE, { recursive: true })
+  const readme = path.join(AGENT_TODO_CHAR_SPLIT_WORKSPACE, 'README.md')
+  if (!fs.existsSync(readme)) {
+    fs.writeFileSync(readme, '# E2E agent todo char-split workspace\n', 'utf8')
+  }
+  gitInitIfNeeded(AGENT_TODO_CHAR_SPLIT_WORKSPACE, ['README.md'], 'e2e agent-todo-char-split')
+  const cecli = path.join(AGENT_TODO_CHAR_SPLIT_WORKSPACE, '.cecli')
+  if (fs.existsSync(cecli)) fs.rmSync(cecli, { recursive: true })
+  writeCharSplitCorruptedAgentTodoFile(AGENT_TODO_CHAR_SPLIT_WORKSPACE, 'agent-char-split')
+  return AGENT_TODO_CHAR_SPLIT_WORKSPACE
 }
 
 /** Tauri handlers that read/write real files under a fixture workspace. */

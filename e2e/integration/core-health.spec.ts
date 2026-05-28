@@ -38,7 +38,7 @@ test.describe('Real Vision API smoke', () => {
   test('import-agent-plan HTTP with agent todo on disk', async () => {
     resetIntegrationCecliState()
     const workspace = ensureIntegrationWorkspace()
-    writeAgentTodoFile('Remaining:\n→ API smoke task\n')
+    writeAgentTodoFile(workspace, 'Remaining:\n→ API smoke task\n')
     const res = await postImportAgentPlan(workspace)
     const text = await res.text()
     expect(res.ok, text).toBe(true)

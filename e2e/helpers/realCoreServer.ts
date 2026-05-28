@@ -6,6 +6,26 @@ import { buildVisionCoreEnv, coreHealthUrl, ollamaEnvForCore, REPO_ROOT } from '
 const PID_FILE = path.join(REPO_ROOT, '.e2e-llm-core.pid')
 const CORE_PORT = 8741
 
+/** Free :8741 so integration tests load the current ``bright_vision_core`` (not a stale desktop serve). */
+function killListenersOnPort(port: number): void {
+  try {
+    const out = execFileSync('lsof', ['-ti', `tcp:${port}`], { encoding: 'utf8' }).trim()
+    if (!out) return
+    for (const pidStr of out.split(/\s+/)) {
+      const pid = Number(pidStr)
+      if (pid > 0) {
+        try {
+          process.kill(pid, 'SIGTERM')
+        } catch {
+          /* already gone */
+        }
+      }
+    }
+  } catch {
+    /* port idle or lsof unavailable */
+  }
+}
+
 /**
  * Venv `bin/python3` is often a symlink to Homebrew. Do not realpath it — spawning the
  * base interpreter skips pyvenv.cfg and site-packages (uvicorn, bright_vision_core).
@@ -67,7 +87,11 @@ async function waitForHealth(timeoutMs: number): Promise<void> {
 }
 
 export async function startRealCoreServer(): Promise<void> {
-  if (fs.existsSync(PID_FILE)) {
+  const forceRestart = process.env.E2E_INTEGRATION === '1'
+  if (forceRestart) {
+    await stopRealCoreServer()
+    killListenersOnPort(CORE_PORT)
+  } else if (fs.existsSync(PID_FILE)) {
     try {
       const oldPid = Number(fs.readFileSync(PID_FILE, 'utf8').trim())
       if (oldPid > 0) process.kill(oldPid, 0)

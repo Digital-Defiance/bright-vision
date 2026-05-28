@@ -10,7 +10,16 @@ import { defineConfig, devices } from '@playwright/test'
  */
 export default defineConfig({
   testDir: 'e2e',
-  testMatch: ['hello-llm.spec.ts', 'agent-llm.spec.ts', 'context-llm.spec.ts', 'router-llm.spec.ts'],
+  testMatch: [
+    'hello-llm.spec.ts',
+    'agent-llm.spec.ts',
+    'context-llm.spec.ts',
+    'router-llm.spec.ts',
+    'todo-list-llm.spec.ts',
+    'edit-block-llm.spec.ts',
+    'transcript-llm.spec.ts',
+    'superproject-llm.spec.ts',
+  ],
   fullyParallel: false,
   workers: 1,
   timeout: 900_000,

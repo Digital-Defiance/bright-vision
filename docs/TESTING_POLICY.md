@@ -21,7 +21,8 @@ Before setting a roadmap row to **Done**:
 
 ## What stays manual (by design)
 
-- **Real Ollama chat** — `yarn test:e2e:llm`, `yarn test:llm:core` (opt-in). Smoke uses `hello-workspace`; context read-back uses `context-workspace` (`src/e2e_widget.ts`).
+- **Real Ollama chat** — `yarn test:e2e:llm`, `yarn test:llm:core` (opt-in). Lanes: hello, agent, context, router, todo list, edit block, transcript; superproject root only with `E2E_SUPERPROJECT_LLM=1`.
+- **Hands-off gate** — `yarn dogfood:gate`; add `DOGFOOD_LLM=1` when Ollama is running.
 - **Real Tauri binary** — file pickers, keychain, DMG smoke (`yarn tauri dev`).
 - **#19 release sign-off** — SUBMODULE_VERIFICATION A–D for “hack on Vision itself” (automated gate is `yarn test:bright-core` + `yarn test:e2e:integration` + `yarn verify:submodule`).
 

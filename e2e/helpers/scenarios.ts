@@ -5,7 +5,9 @@ import {
   confirmTurnEvents,
   cumulativeStreamTurnEvents,
   defaultTurnEvents,
+  displayFenceTurnEvents,
   emptyTodoStore,
+  engineAppliedEditTurnEvents,
   sampleTodoStore,
   scanProgressTurnEvents,
   slowTurnEvents,
@@ -15,6 +17,7 @@ import {
   E2E_EDIT_BLOCK_NEW,
   E2E_EDIT_BLOCK_OLD,
   E2E_EDIT_BLOCK_REL,
+  ensureAgentTodoCharSplitWorkspace,
   ensureEditBlockWorkspace,
   ensureTasksSeededWorkspace,
   fixtureDiskTauriHandlers,
@@ -23,6 +26,8 @@ import {
 export type ScenarioName =
   | 'default'
   | 'proposed-edit'
+  | 'applied-edit'
+  | 'display-fence'
   | 'confirm'
   | 'suggested-files'
   | 'cumulative-stream'
@@ -30,6 +35,7 @@ export type ScenarioName =
   | 'empty-llm'
   | 'session-transcript'
   | 'tasks-seeded'
+  | 'agent-todo-char-split'
 
 export interface ScenarioDefinition {
   /** Human label for failures */
@@ -37,7 +43,8 @@ export interface ScenarioDefinition {
   /** SSE turn arrays cycled per user message */
   turns: Record<string, unknown>[][]
   /** Optional git fixture for disk-backed Tauri I/O */
-  workspace?: 'edit-block' | 'tasks-seeded'
+  workspace?: 'edit-block' | 'tasks-seeded' | 'agent-todo-char-split'
+  agentTodoImportFromDisk?: boolean
   /** Initial todos for workspace HTTP API */
   initialTodos?: ReturnType<typeof emptyTodoStore>
   /** GET /transcript body */
@@ -85,6 +92,14 @@ const SCENARIOS: Record<ScenarioName, ScenarioDefinition> = {
     ],
     workspace: 'edit-block',
   },
+  'applied-edit': {
+    label: 'engine-applied SEARCH/REPLACE',
+    turns: [engineAppliedEditTurnEvents()],
+  },
+  'display-fence': {
+    label: 'plain display code fence',
+    turns: [displayFenceTurnEvents()],
+  },
   confirm: {
     label: 'confirm flow',
     turns: [confirmTurnEvents()],
@@ -120,6 +135,12 @@ const SCENARIOS: Record<ScenarioName, ScenarioDefinition> = {
     workspace: 'tasks-seeded',
     initialTodos: sampleTodoStore(),
   },
+  'agent-todo-char-split': {
+    label: 'char-split agent todo → Tasks title',
+    turns: [defaultTurnEvents()],
+    workspace: 'agent-todo-char-split',
+    agentTodoImportFromDisk: true,
+  },
 }
 
 export function getScenario(name: ScenarioName): ScenarioDefinition {
@@ -130,8 +151,9 @@ export function listScenarioNames(): ScenarioName[] {
   return Object.keys(SCENARIOS) as ScenarioName[]
 }
 
-function resolveWorkspaceRoot(kind: 'edit-block' | 'tasks-seeded'): string {
+function resolveWorkspaceRoot(kind: 'edit-block' | 'tasks-seeded' | 'agent-todo-char-split'): string {
   if (kind === 'edit-block') return ensureEditBlockWorkspace()
+  if (kind === 'agent-todo-char-split') return ensureAgentTodoCharSplitWorkspace()
   return ensureTasksSeededWorkspace()
 }
 
@@ -145,13 +167,16 @@ export function mockSessionForScenario(
     messageTurns: def.turns,
     initialTodos: def.initialTodos,
     sessionTranscript: def.transcript,
+    agentTodoImportFromDisk: def.agentTodoImportFromDisk,
   }
   if (def.workspace) {
     const root = resolveWorkspaceRoot(def.workspace)
     core.workspacePath = root
   }
   let tauri = extra.tauri
-  if (name === 'proposed-edit' && def.workspace === 'edit-block') {
+  const editBlockScenario =
+    (name === 'proposed-edit' || name === 'applied-edit') && def.workspace === 'edit-block'
+  if (editBlockScenario) {
     const root = ensureEditBlockWorkspace()
     const disk = fixtureDiskTauriHandlers(root)
     const extraHandlers =
@@ -166,7 +191,7 @@ export function mockSessionForScenario(
     }
     core.filesInChat = [E2E_EDIT_BLOCK_REL]
   }
-  if (name === 'proposed-edit' && !tauri) {
+  if ((name === 'proposed-edit' || name === 'applied-edit') && !tauri) {
     tauri = true
   }
   return { ...extra, ...core, ...(tauri !== undefined ? { tauri } : {}) }

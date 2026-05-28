@@ -37,6 +37,24 @@ export function isRouterLlmE2eEnabled(): boolean {
   return v === '1' || v === 'true' || v === 'yes' || v === 'on'
 }
 
+/** Opt-in: use BrightVision repo root as workspace (slow repo map on session start). */
+export function isSuperprojectLlmEnabled(): boolean {
+  const v = process.env.E2E_SUPERPROJECT_LLM?.trim().toLowerCase()
+  return (
+    isLlmE2eEnabled() && (v === '1' || v === 'true' || v === 'yes' || v === 'on')
+  )
+}
+
+export const SUPERPROJECT_README_HEADING = 'bright_vision_core'
+
+export function superprojectLlmWorkspace(): string {
+  return REPO_ROOT
+}
+
+export function superprojectLlmReadmeRel(): string {
+  return 'bright_vision_core/README.md'
+}
+
 function parseEnvFile(filePath: string): Record<string, string> {
   if (!fs.existsSync(filePath)) return {}
   const out: Record<string, string> = {}

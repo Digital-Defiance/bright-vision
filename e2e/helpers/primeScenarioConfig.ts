@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test'
 import { E2E_CONFIG, E2E_CONFIG_STORAGE_KEY } from './testConfig'
 import { getScenario, type ScenarioName } from './scenarios'
 import {
+  ensureAgentTodoCharSplitWorkspace,
   ensureEditBlockWorkspace,
   ensureTasksSeededWorkspace,
 } from './fixtureWorkspaces'
@@ -11,6 +12,7 @@ export async function primeScenarioConfig(page: Page, scenario: ScenarioName) {
   let workingDir = E2E_CONFIG.workingDir
   if (def.workspace === 'edit-block') workingDir = ensureEditBlockWorkspace()
   if (def.workspace === 'tasks-seeded') workingDir = ensureTasksSeededWorkspace()
+  if (def.workspace === 'agent-todo-char-split') workingDir = ensureAgentTodoCharSplitWorkspace()
   const cfg = {
     ...E2E_CONFIG,
     workingDir,

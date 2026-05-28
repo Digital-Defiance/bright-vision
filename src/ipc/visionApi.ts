@@ -3,13 +3,13 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
-import { invokeWithTimeout } from './tauriInvoke'
 import type { VisionConfig } from './config'
 import type { CoreEventBase } from './events'
 import type { CoreSessionInfo, ModelRouterApiConfig, SendMessageOptions } from './httpClient'
 import { CoreHttpClient } from './httpClient'
 import { waitForVisionApi } from './health'
 import { isTauriRuntime } from './isTauri'
+import { spawnDesktopVisionApi } from './visionApiSpawn'
 import type { ProcessUpdate } from '../progress/types'
 
 export type CoreEventHandler = (event: CoreEventBase) => void
@@ -93,18 +93,7 @@ export function createVisionApiSession(
             detail: cfg.coreEnginePath,
             progress: 0.2,
           })
-          if (cfg.sessionEncrypt) {
-            await invokeWithTimeout<string>('ensure_session_encryption_key', {})
-          }
-          url = await invokeWithTimeout<string>('start_core_api', {
-            workingDir: cfg.workingDir,
-            coreEnginePath: cfg.coreEnginePath,
-            pythonPath: cfg.pythonPath,
-            extraParams: cfg.extraParams,
-            ollamaApiBase: cfg.ollamaApiBase,
-            port: 8741,
-            sessionEncrypt: cfg.sessionEncrypt,
-          })
+          url = await spawnDesktopVisionApi(cfg)
           desktopStartedServe = true
         }
         if (signal.aborted) throw new DOMException('Start cancelled', 'AbortError')
