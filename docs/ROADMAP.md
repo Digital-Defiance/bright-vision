@@ -22,11 +22,11 @@ Living backlog for chat UX, engine behavior, spec-driven work, and charter-level
 
 ## Dogfooding (after engine swap)
 
-Primary validation mode: **use the desktop app on real repos** (especially hacking on BrightVision itself), not more automation or CI.
+Primary validation mode: **automated agent dogfood** on the superproject (`yarn dogfood:agent`) — Vision HTTP, pytest, integration e2e, optional Ollama — not manual GUI clicking.
 
 | Doc | Use when |
 |-----|----------|
-| [DOGFOOD.md](./DOGFOOD.md) | **Self-dev loop** — local Ollama, `yarn dogfood:check`, daily prompts, friction logging |
+| [DOGFOOD.md](./DOGFOOD.md) | **Agent-first dogfood** — `yarn dogfood:agent`, headless gate, optional `DOGFOOD_LLM=1`, friction → tests |
 | [USER_WORKFLOW.md](./USER_WORKFLOW.md) | Workspace = **superproject root** (repo root), not `cecli/` alone |
 | [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) | Editing files under `bright-vision-core/` + parent tree in one session |
 | [TESTING.md](./TESTING.md) | Before/after sessions: `yarn test:local` (quick), `yarn test:full` before larger changes |
@@ -50,7 +50,7 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 
 | # | Status | Item |
 |---|--------|------|
-| **19** | **Done** | **Automated:** `yarn dogfood:check`, `yarn dogfood:gate`, `test_superproject_dogfood.py`, `yarn verify:submodule`, `test_git_workspace.py`, `test_superproject_integration.py`, `yarn test:bright-core`, `yarn test:e2e:integration`, LLM lanes (`test:llm:core`, `test:e2e:llm`, opt-in `E2E_SUPERPROJECT_LLM`). **Release sign-off (manual):** A–D in [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) via `yarn tauri dev` before announcing superproject dogfood. |
+| **19** | **Done** | **Automated (primary):** `yarn dogfood:agent` (`dogfood:check` + `dogfood:gate`), `test_superproject_dogfood.py`, `yarn verify:submodule`, `test_git_workspace.py`, `test_superproject_integration.py`, `yarn test:bright-core`, `yarn test:e2e:integration`, LLM lanes (`test:llm:core`, `test:e2e:llm`, opt-in `E2E_SUPERPROJECT_LLM`). **Optional release spot-check:** SUBMODULE_VERIFICATION A–D in `yarn tauri dev` (native shell only). |
 | **31** | **Done** | **Release hygiene** — `release-hygiene.spec.ts`, `yarn verify:submodule`, [RELEASE.md](./RELEASE.md) commit/tag/bump checklist. |
 
 ---
@@ -420,8 +420,8 @@ Prefer **permissive licenses** and **small bundle** ([AGENTS.md](../AGENTS.md)).
 
 ## Known context
 
-- **Local testing (no CI required):** `yarn test:fast` / `yarn test:local` / `yarn test:full` / `yarn test:e2e:integration`; see [TESTING.md](./TESTING.md), [TESTING_POLICY.md](./TESTING_POLICY.md). Playwright mocks `/api/core` + Tauri `invoke` — does **not** replace `yarn tauri dev` dogfooding ([e2e/ROADMAP_COVERAGE.md](../e2e/ROADMAP_COVERAGE.md)).
-- **#19:** Automated gate is `yarn test:bright-core` + `yarn test:e2e:integration` + `yarn verify:submodule`. **SUBMODULE_VERIFICATION.md** A–D remains the manual sign-off before release announcements.
+- **Local testing (no CI required):** `yarn dogfood:agent` for self-dev; see [TESTING.md](./TESTING.md), [TESTING_POLICY.md](./TESTING_POLICY.md). Playwright mocks `/api/core` + Tauri `invoke` — primary dogfood is headless ([e2e/ROADMAP_COVERAGE.md](../e2e/ROADMAP_COVERAGE.md)).
+- **#19:** Daily dogfood is `yarn dogfood:agent` (see [DOGFOOD.md](./DOGFOOD.md)). **SUBMODULE_VERIFICATION.md** A–D is optional GUI sign-off before release announcements only.
 - **#31:** Use [RELEASE.md](./RELEASE.md) when sharing builds; `sh scripts/test-local.sh release` runs the automated release tier.
 - **Stuck “Connecting”:** Terminal **Stop** while activity bar shows boot/connect; quit app to clear orphaned `:8741` ([TROUBLESHOOTING.md](./TROUBLESHOOTING.md)). Covered in mocked e2e only.
 - **`POST /sessions/{id}/confirm`**: body `{ "confirm_id", "answer": true|false }`.
@@ -429,14 +429,14 @@ Prefer **permissive licenses** and **small bundle** ([AGENTS.md](../AGENTS.md)).
 - **`/add` completion**: Tauri desktop only (#12); type path manually on web-only `yarn dev`.
 - **Tasks:** `.cecli/todos.json`; workspace API when session + core up; Tauri file mirror when core is down.
 - **18d:** Task list uses **manual order** (Up/Down); `depends_on` shows **blocked** chip, not auto-sort.
-- **Dogfooding:** [DOGFOOD.md](./DOGFOOD.md), `yarn dogfood:check`. Friction to watch: wrong workspace (submodule-only root), proposed vs applied edits, commit in wrong repo, Tasks generate-spec + Implement on real core.
+- **Dogfooding:** [DOGFOOD.md](./DOGFOOD.md), `yarn dogfood:agent`. Friction → failing test or roadmap row: wrong workspace root, proposed vs applied edits, commit in wrong repo, char-split agent todo titles.
 - **Orange `[BrightVision] Task was destroyed…` in chat:** Python asyncio stderr when the core event loop is closed while tasks still wait (common after **Stop** mid-turn or SSE abort during “Waiting for Ollama”; can also appear under heavy Ollama load). Usually harmless noise; recovery = **Stop** → optional **Clear queue** → **Terminal Stop/Start** if still stuck. Manual **`proceed` while a turn is running** is **queued** (bubble appears only when it is actually sent) — it does not preempt the current Ollama wait.
 
 ## Suggested fix order
 
-**While dogfooding** (fix only what blocks daily use; file small roadmap/doc updates when you learn something):
+**While dogfooding** (agents run automation; fix what fails; file small roadmap/doc updates when you learn something):
 
-1. **#19 dogfooding** — `yarn dogfood:check` then [DOGFOOD.md](./DOGFOOD.md) + [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) A–D on `yarn tauri dev` (superproject root); Tasks generate-spec + one **Implement** step on a real task.
+1. **#19 dogfooding** — `yarn dogfood:agent` (add `DOGFOOD_LLM=1` when Ollama is up). Agents use [DOGFOOD.md](./DOGFOOD.md) scenarios via headless API / pytest / integration e2e — not daily `yarn tauri dev`.
 2. **Friction from dogfood** — promote to **Open** rows or fix immediately (lifecycle, git tab, context attach, tasks sync).
 3. **#28 / #32** (if context picking hurts) — **#32** suggested-files tray + queued `/add`; file-tree / modified-file highlights over **#26** watcher unless git poll is insufficient.
 4. **#31** — [RELEASE.md](./RELEASE.md) when sharing builds or pinning submodule for collaborators.

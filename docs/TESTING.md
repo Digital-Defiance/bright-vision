@@ -13,8 +13,9 @@ All checks run on **your machine**. Nothing here requires GitHub Actions — wor
 | Before a larger UI/session change | `yarn test:full` | ~1–2 min |
 | Real core + Tasks bridge (no mocks) | `yarn test:e2e:integration` | ~2–3 min |
 | Before a release / submodule bump | `sh scripts/test-local.sh release` | full + bright-core pytest + integration e2e + verify |
-| Self-dev preflight (Ollama + layout) | `yarn dogfood:check` | ~20s — see [DOGFOOD.md](./DOGFOOD.md) |
-| Full automated dogfood gate (no GUI) | `yarn dogfood:gate` | release tier; optional `DOGFOOD_LLM=1` |
+| **Agent dogfood (default self-dev)** | `yarn dogfood:agent` | check + gate; optional `DOGFOOD_LLM=1` — [DOGFOOD.md](./DOGFOOD.md) |
+| Self-dev preflight only | `yarn dogfood:check` | ~20s |
+| Full dogfood gate only | `yarn dogfood:gate` | release tier; optional `DOGFOOD_LLM=1` |
 | Scenario matrix (all registered SSE outputs) | `yarn test:e2e shipped-scenarios` | ~2–3 min |
 | Fixture-pack structure preflight | `yarn test:e2e:fixtures` | ~1s |
 

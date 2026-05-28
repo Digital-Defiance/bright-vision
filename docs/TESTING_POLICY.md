@@ -13,7 +13,8 @@ Before setting a roadmap row to **Done**:
    | Unit | `yarn test` / `pytest tests/core/…` | Parsers, policy, HTTP handlers, pure logic |
    | Integration | `yarn test:e2e:integration` + `test_http_*` | Live Vision API `:8741`, workspace files |
    | Mocked E2E | `yarn test:e2e` | React + mocked `/api/core` (+ mock Tauri when needed) |
-   | Manual | [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md), `yarn tauri dev` | Native shell, dogfood sign-off |
+   | Agent dogfood | `yarn dogfood:agent` | Headless gate: check + release tier + integration |
+   | Manual | [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md), `yarn tauri dev` | Native shell spot-check (release only) |
 
 2. **Update** [e2e/ROADMAP_COVERAGE.md](../e2e/ROADMAP_COVERAGE.md) with the spec file or pytest module.
 
@@ -22,9 +23,9 @@ Before setting a roadmap row to **Done**:
 ## What stays manual (by design)
 
 - **Real Ollama chat** — `yarn test:e2e:llm`, `yarn test:llm:core` (opt-in). Lanes: hello, agent, context, router, todo list, edit block, transcript; superproject root only with `E2E_SUPERPROJECT_LLM=1`.
-- **Hands-off gate** — `yarn dogfood:gate`; add `DOGFOOD_LLM=1` when Ollama is running.
-- **Real Tauri binary** — file pickers, keychain, DMG smoke (`yarn tauri dev`).
-- **#19 release sign-off** — SUBMODULE_VERIFICATION A–D for “hack on Vision itself” (automated gate is `yarn test:bright-core` + `yarn test:e2e:integration` + `yarn verify:submodule`).
+- **Agent dogfood (primary)** — `yarn dogfood:agent`; add `DOGFOOD_LLM=1` when Ollama is running.
+- **Real Tauri binary** — file pickers, keychain, DMG smoke (`yarn tauri dev`) — optional, not daily dogfood.
+- **#19 release spot-check** — SUBMODULE_VERIFICATION A–D in GUI when shipping native builds; daily bar is `yarn dogfood:agent`.
 
 ## Local tiers
 

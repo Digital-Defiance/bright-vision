@@ -1,6 +1,8 @@
 # Submodule & multi-repo verification (#19)
 
-Confirm that BrightVision can treat the **superproject root** as the workspace and correctly edit files in the parent tree **and** the **`cecli/`** submodule.
+Confirm that BrightVision treats the **superproject root** as the workspace and correctly edits files in the parent tree **and** the **`cecli/`** submodule.
+
+**Primary validation is automated** — agents and CI should not depend on manual GUI steps for daily work.
 
 ## Prerequisites
 
@@ -10,30 +12,40 @@ git submodule update --init --recursive cecli
 source activate.sh
 ```
 
-- Workspace in Settings / welcome must be the **repo root** (`BrightVision/`), not `cecli/` alone.
+- Workspace for tests and headless sessions must be the **repo root** (`BrightVision/`), not `cecli/` alone.
 - Submodule must be on a real commit: `git -C cecli status`.
 
-## Automated
+## Automated (daily dogfood)
 
 From **superproject** root (after `source activate.sh`):
 
 ```bash
-yarn dogfood:check     # preflight + verify + fast tests
-# or only:
-yarn verify:submodule
+yarn dogfood:agent
+# or faster preflight only:
+yarn dogfood:check
 ```
 
-Core unit + integration tests:
+This runs, among other checks:
+
+| Check | Proves |
+|-------|--------|
+| `yarn verify:submodule` | Parent + `cecli/` discovery |
+| `tests/core/test_superproject_dogfood.py` | `RepoSet`, `Session.create` on superproject paths |
+| `tests/core/test_superproject_integration.py` | Integration-level superproject behavior |
+| `yarn test:e2e:integration` | Live `:8741` + workspace fixtures (in `dogfood:gate`) |
 
 ```bash
 yarn test:git-workspace
 yarn test:bright-core
-# includes tests/core/test_superproject_integration.py on parent checkout
 ```
 
 `scripts/verify_submodule_workspace.py` checks parent `bright_vision_core/` + `cecli/` submodule discovery.
 
-## Manual checklist
+## Optional: manual GUI checklist (release spot-check)
+
+Use **`yarn tauri dev`** only when validating **native shell** behavior or before a release announcement. Not required when `yarn dogfood:agent` is green.
+
+Settings / welcome workspace = superproject root.
 
 ### A. Submodule discovery
 
@@ -62,8 +74,7 @@ yarn test:bright-core
 ### E. Regression guards
 
 ```bash
-yarn test:bright-core
-yarn dogfood:check
+yarn dogfood:agent
 ```
 
 ## Failure modes to watch
@@ -77,7 +88,7 @@ yarn dogfood:check
 
 ## Done criteria
 
-- `yarn verify:submodule` and `test_superproject_integration.py` pass (automated baseline).
-- All sections **A–D** pass on macOS via Vision UI (manual regression before releases).
+- `yarn dogfood:agent` green (or equivalent: `dogfood:check` + `dogfood:gate` + integration when `.venv` exists).
+- All sections **A–D** pass on macOS via Vision UI — **optional**, before releases only.
 
-See also [DOGFOOD.md](./DOGFOOD.md) for the daily self-dev loop.
+See [DOGFOOD.md](./DOGFOOD.md) for the agent-first self-dev loop.

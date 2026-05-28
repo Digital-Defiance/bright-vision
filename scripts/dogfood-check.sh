@@ -58,4 +58,4 @@ else
   echo "SKIP: curl not found"
 fi
 
-printf '\nDogfood preflight OK. Next: yarn tauri dev (see docs/DOGFOOD.md)\n'
+printf '\nDogfood preflight OK. Next: yarn dogfood:agent (see docs/DOGFOOD.md)\n'

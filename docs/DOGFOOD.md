@@ -1,107 +1,124 @@
-# Dogfooding BrightVision (self-dev)
+# Dogfooding BrightVision (agent-first)
 
-Use **BrightVision on BrightVision** with a **local Ollama** model — no Cursor/cloud required for day-to-day hacking on this repo.
+**Dogfood** means BrightVision validates **itself** through the same stack agents use: superproject workspace, `bright-vision-core-serve` on `:8741`, cecli `Session`, optional local Ollama — **without** requiring a human to click Chat/Tasks in the desktop shell.
 
-## Goal
+Humans and Cursor agents share one contract:
 
-| Layer | What “100% dogfood” means |
-|-------|---------------------------|
-| **Workspace** | Settings → project = **repo root** (`BrightVision/`), not `cecli/` alone |
-| **Engine** | Bundled Vision HTTP (`bright_vision_core` + `cecli` submodule) via **Terminal → Start** |
-| **Model** | `ollama_chat/…` from `local-llm.env`; **Local LLM → Start** before session |
-| **Validation** | Automated checks below + manual A–D when you change git/submodule behavior |
+| Who | How |
+|-----|-----|
+| **Agent / CI** | `yarn dogfood:agent` (or `yarn dogfood:gate` with optional `DOGFOOD_LLM=1`) |
+| **Human (optional)** | `yarn tauri dev` for native shell spot-checks only |
 
-## One-time setup (M4 / macOS)
+The desktop app is not the definition of done; the **automated gate** is.
+
+## What “100% dogfood” means
+
+| Layer | Requirement |
+|-------|-------------|
+| **Workspace** | Repo root (`BrightVision/`), not `cecli/` alone — enforced in `test_superproject_dogfood.py`, integration e2e, LLM fixtures |
+| **Engine** | Vision HTTP + cecli (pytest, integration e2e, LLM lanes) — same paths as React → SSE |
+| **Model** | Optional for the default gate; `DOGFOOD_LLM=1` runs real Ollama turns when reachable |
+| **Validation** | `yarn dogfood:agent` green; friction → failing test or [ROADMAP.md](./ROADMAP.md) row |
+
+## Daily loop (no GUI)
 
 ```bash
 cd /path/to/BrightVision
 git submodule update --init --recursive cecli
 source activate.sh
 yarn install
-yarn dogfood:setup    # writes local-llm.env + pulls fast/heavy Ollama models (M4-friendly)
+
+yarn dogfood:agent
+# Full bar + Ollama when running:
+DOGFOOD_LLM=1 yarn dogfood:agent
+# Slow superproject-root LLM lane:
+DOGFOOD_LLM=1 DOGFOOD_SUPERPROJECT_LLM=1 yarn dogfood:agent
+```
+
+**Agents (Cursor, headless scripts):** run the same commands after substantive changes. Do not ask the user to open the UI unless a change is **native-only** (file picker, keychain, DMG).
+
+### What `yarn dogfood:agent` runs
+
+1. **`yarn dogfood:check`** — layout, `verify:submodule`, `yarn test:fast`, core superproject pytest when `.venv` exists, optional Ollama probe  
+2. **`yarn dogfood:gate`** — `test-local.sh release` (mocked e2e + bright-core + integration e2e + verify)  
+3. **Optional LLM** — when `DOGFOOD_LLM=1` and Ollama is up: `yarn test:llm:core` + `yarn test:e2e:llm` (+ superproject lane when `DOGFOOD_SUPERPROJECT_LLM=1`)
+
+Shorthand:
+
+| Command | Use |
+|---------|-----|
+| `yarn dogfood:check` | Fast preflight (~20s) |
+| `yarn dogfood:gate` | Full gate without LLM |
+| `yarn dogfood:agent` | **Default** — check + gate (alias for agent workflow) |
+
+## One-time machine setup
+
+```bash
+yarn dogfood:setup    # local-llm.env + M4-friendly Ollama pulls
 # or: cp local-llm.env.example local-llm.env && ollama pull …
 ```
 
-Install [Ollama](https://ollama.com/) if `yarn dogfood:setup` is not used.
+Ollama is only required for `DOGFOOD_LLM=1`. The default gate does not need a running model.
 
-In the app: **Settings → Ollama env files → Sync from env files** → **Terminal → Local LLM → Start** → **Terminal → Start** (session).
+## Automated coverage map (#19)
 
-## Daily loop
+| Concern | Automated proof |
+|---------|-----------------|
+| Superproject + submodule paths | `test_superproject_dogfood.py`, `test_superproject_integration.py`, `yarn verify:submodule` |
+| Vision HTTP / todos / agent import | `yarn test:bright-core`, `yarn test:e2e:integration` |
+| UI contracts (mocked) | `yarn test:e2e`, `shipped-scenarios.spec.ts` |
+| Char-split agent todo → Tasks title | `agent-todo-char-split.spec.ts`, `integration/import-agent-plan.spec.ts` |
+| Real local LLM (opt-in) | `yarn test:llm:core`, `yarn test:e2e:llm` |
 
-```bash
-source activate.sh
-yarn dogfood:check          # fast preflight (no GUI)
-yarn tauri dev              # desktop dogfood
-```
+Manual GUI checklist: [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) — **release spot-check only**, not daily.
 
-Inside the app:
+## Agent self-dev scenarios
 
-1. Confirm **project path** = superproject root (welcome or Settings).
-2. **Chat** — small change in `src/` or `bright_vision_core/`; confirm **Applied** on disk.
-3. **Tasks** — one **Generate spec** + one **Implement** step on a real todo (proves core + workspace API).
-4. **Git** tab — stage/commit in the right repo (parent vs `cecli/` submodule).
-5. Before larger merges: `yarn test:local` and, when `.venv` exists, `yarn test:e2e:integration`.
+Copy into an agent session (headless or in-app chat). Prefer driving **`POST /sessions`** + SSE when not using the GUI.
 
-## Automated preflight
-
-```bash
-yarn dogfood:check
-```
-
-Runs: `activate.sh` sanity, `yarn verify:submodule`, `yarn test:fast`, optional Ollama reachability, optional `yarn test:bright-core` when `.venv` is present.
-
-## Automated gate (hands-off)
-
-```bash
-yarn dogfood:gate
-# With Ollama running and models pulled:
-DOGFOOD_LLM=1 yarn dogfood:gate
-# Include slow superproject-root LLM lane:
-DOGFOOD_LLM=1 DOGFOOD_SUPERPROJECT_LLM=1 yarn dogfood:gate
-```
-
-Runs: `dogfood:check` → `test-local.sh release` (mocked e2e + bright-core + integration). When `DOGFOOD_LLM=1`, also `yarn test:llm:core` and `yarn test:e2e:llm` (same stack as daily dogfood, including router when `E2E_MODEL_ROUTER=1` in package.json).
-
-## Manual sign-off (#19)
-
-When submodule or `git_workspace` behavior changes, run [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) sections **A–D** in `yarn tauri dev`.
-
-## Self-dev prompts (copy/paste)
-
-**Smoke (fast tier):**
+**Smoke (fast tier, read-only):**
 
 > Read `bright_vision_core/session.py` and summarize how `Session.create` sets `fnames` for the workspace root.
 
 **Context + edit (superproject):**
 
-> `/add bright_vision_core/http_api.py` — add a one-line docstring note that this is the BrightVision Vision HTTP API. Show SEARCH/REPLACE only; I will apply from the UI.
+> `/add bright_vision_core/http_api.py` — add a one-line docstring that this is the BrightVision Vision HTTP API. Emit SEARCH/REPLACE only.
 
-**Tasks + spec:**
+**Tasks + spec (core HTTP):**
 
-> In Tasks, create a todo “Dogfood checklist doc”, generate spec layers, then implement the first implementation task only.
+> Create a workspace todo via API or Tasks, run generate-spec, implement the first implementation task only — assert `.cecli/todos.json` and spec files on disk.
 
-## Friction → roadmap
+**Post-/agent todo sync:**
 
-When something blocks daily use, either fix it in-session or add a row to [ROADMAP.md](./ROADMAP.md) with:
+> After a turn that calls UpdateTodoList, `POST /workspaces/todos/import-agent-plan` must yield a real title (not `[` from char-split JSON). See `e2e/integration/import-agent-plan.spec.ts`.
 
-- workspace path, file path, model, expected vs actual
-- whether the bug is UI, Vision HTTP, cecli, or Ollama
+## Friction → tests or roadmap
 
-**Watch list** (from roadmap): wrong workspace root, proposed vs applied edits, commit in wrong repo, stuck Connecting (`:8741`), asyncio “Task was destroyed” after Stop (usually harmless).
+When automated dogfood fails or an agent hits a new blocker:
+
+1. Add a **repro** — pytest, integration spec, or mocked e2e (preferred).  
+2. Or add a row to [ROADMAP.md](./ROADMAP.md) with workspace path, file path, model, expected vs actual, layer (UI / Vision HTTP / cecli / Ollama).
+
+**Watch list:** wrong workspace root, proposed vs applied edits, commit in wrong repo, stuck Connecting (`:8741`), asyncio “Task was destroyed” after Stop, char-split `UpdateTodoList` titles.
+
+## Optional: desktop spot-check
+
+Use when you change **Tauri-only** behavior (tray, keychain, native apply, file dialogs, resource overlay):
+
+```bash
+yarn tauri dev
+```
+
+In the app: project = repo root → **Terminal → Local LLM → Start** → **Terminal → Start**. Spot-check [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) **A–D** before a release announcement — not before every merge.
 
 ## Local LLM on Apple Silicon
 
-See [LOCAL_LLM.md](./LOCAL_LLM.md). Prefer one **fast** + one **heavy** model in Settings hopper; enable **model router** when VRAM is tight.
-
-**Optional** release-tier gate before tagging:
-
-```bash
-sh scripts/test-local.sh release   # bright-core + integration e2e when .venv exists
-```
+See [LOCAL_LLM.md](./LOCAL_LLM.md). Fast + heavy hopper + model router for dogfood under VRAM pressure.
 
 ## Related
 
-- [USER_WORKFLOW.md](./USER_WORKFLOW.md) — install paths
-- [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) — superproject + `cecli/`
-- [TESTING.md](./TESTING.md) — test pyramid
-- [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) — stuck session / orphaned API
+- [USER_WORKFLOW.md](./USER_WORKFLOW.md) — install paths  
+- [SUBMODULE_VERIFICATION.md](./SUBMODULE_VERIFICATION.md) — superproject + `cecli/` (automated + optional GUI)  
+- [TESTING.md](./TESTING.md) — test pyramid  
+- [TESTING_POLICY.md](./TESTING_POLICY.md) — definition of done  
+- [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) — stuck session / orphaned API  

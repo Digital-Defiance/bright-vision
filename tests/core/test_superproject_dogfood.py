@@ -1,6 +1,7 @@
 """
-Automate SUBMODULE_VERIFICATION A–D at Session/git_workspace layer (no GUI).
+Agent dogfood: superproject + submodule layout at Session/git_workspace layer (no GUI).
 
+Covers SUBMODULE_VERIFICATION concerns A/D at the core — run via yarn dogfood:agent.
 Skipped unless BrightVision superproject layout exists.
 """
 

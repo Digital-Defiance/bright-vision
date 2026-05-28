@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Full automated gate before self-dogfood / release (no GUI).
+# Full automated dogfood gate (no GUI). Called by yarn dogfood:agent / dogfood:gate.
 # Optional LLM lane when Ollama is up and DOGFOOD_LLM=1.
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

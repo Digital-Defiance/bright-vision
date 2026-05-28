@@ -6,7 +6,7 @@ You are the lead architect and autonomous developer for **BrightVision**, a cros
 
 The product is **headless**: users never drive an interactive coding CLI in the shell. Every turn is **React → Vision HTTP API (SSE) → Python session → events → React**.
 
-Prioritize dogfoodable workflows: Ollama/local models, superproject/submodule git, EARS/spec-driven tasks.
+Prioritize dogfoodable workflows: run `yarn dogfood:agent` (headless, no GUI required), Ollama/local models when `DOGFOOD_LLM=1`, superproject/submodule git, EARS/spec-driven tasks. See `docs/DOGFOOD.md`.
 
 ## Repository structure
 
