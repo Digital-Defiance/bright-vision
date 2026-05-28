@@ -7,29 +7,8 @@ import { openTasks, startMockSession } from './helpers/session'
  */
 test.describe('Agent todo char-split → Tasks title', () => {
   test('import from disk shows recovered task title, not [', async ({ page }) => {
-    const importPlan = page.waitForResponse(
-      (res) =>
-        res.request().method() === 'POST' &&
-        res.url().includes('/workspaces/todos/import-agent-plan') &&
-        res.ok(),
-      { timeout: 30_000 }
-    )
-    const todosListed = page.waitForResponse(async (res) => {
-      if (res.request().method() !== 'GET' || !res.url().includes('/workspaces/todos')) return false
-      if (res.url().includes('import-agent-plan')) return false
-      if (!res.ok()) return false
-      try {
-        const body = (await res.json()) as { todos?: { title?: string }[] }
-        return body.todos?.some((t) => /Explore the codebase/i.test(t.title ?? '')) ?? false
-      } catch {
-        return false
-      }
-    })
-
     await startMockSession(page, { scenario: 'agent-todo-char-split' })
-    await openTasks(page)
-    await importPlan
-    await todosListed
+    await openTasks(page, { waitForAgentPlanImport: true })
 
     const taskButton = page.getByTestId('todo-panel').getByRole('button', {
       name: /Explore the codebase/,

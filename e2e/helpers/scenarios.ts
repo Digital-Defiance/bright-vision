@@ -14,6 +14,7 @@ import {
   suggestedFilesTurnEvents,
   markdownAnswerTurnEvents,
 } from './fixtures'
+import { normalizeWorkspacePath } from './workspacePath'
 import {
   E2E_EDIT_BLOCK_NEW,
   E2E_EDIT_BLOCK_OLD,
@@ -158,9 +159,9 @@ export function listScenarioNames(): ScenarioName[] {
 }
 
 function resolveWorkspaceRoot(kind: 'edit-block' | 'tasks-seeded' | 'agent-todo-char-split'): string {
-  if (kind === 'edit-block') return ensureEditBlockWorkspace()
-  if (kind === 'agent-todo-char-split') return ensureAgentTodoCharSplitWorkspace()
-  return ensureTasksSeededWorkspace()
+  if (kind === 'edit-block') return normalizeWorkspacePath(ensureEditBlockWorkspace())
+  if (kind === 'agent-todo-char-split') return normalizeWorkspacePath(ensureAgentTodoCharSplitWorkspace())
+  return normalizeWorkspacePath(ensureTasksSeededWorkspace())
 }
 
 /** Build {@link startMockSession} options for a named scenario. */

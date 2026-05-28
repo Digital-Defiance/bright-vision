@@ -10,6 +10,7 @@ import {
 } from './fixtures'
 import { formatSse } from './sse'
 import { importAgentPlanFromDisk } from './agentTodoImportDisk'
+import { normalizeWorkspacePath } from './workspacePath'
 
 export interface MockCoreOptions {
   sessionId?: string
@@ -272,11 +273,10 @@ export async function installMockCoreApi(page: Page, opts: MockCoreOptions = {})
     })
   })
 
-  const normWs = (p: string) => p.replace(/\\/g, '/').replace(/\/$/, '')
   const wsMatch = (url: URL) => {
     const raw = url.searchParams.get('workspace') ?? ''
-    const ws = normWs(decodeURIComponent(raw))
-    const root = normWs(workspace)
+    const ws = normalizeWorkspacePath(decodeURIComponent(raw))
+    const root = normalizeWorkspacePath(workspace)
     return ws === root
   }
 
@@ -483,7 +483,15 @@ export async function installMockCoreApi(page: Page, opts: MockCoreOptions = {})
       const m = url.pathname.match(/\/workspaces\/todos\/([^/]+)$/)
       if (!m) return false
       const seg = m[1]
-      return seg !== 'active' && !url.pathname.includes('generate-spec')
+      if (
+        seg === 'active' ||
+        seg === 'export' ||
+        seg === 'import' ||
+        seg === 'import-agent-plan'
+      ) {
+        return false
+      }
+      return !url.pathname.includes('generate-spec')
     },
     async (route) => {
     const url = new URL(route.request().url())

@@ -78,15 +78,29 @@ export async function openChat(page: Page) {
   await expect(page.getByTestId('chat-input')).toBeVisible()
 }
 
-export async function openTasks(page: Page) {
+export async function openTasks(
+  page: Page,
+  opts?: { waitForAgentPlanImport?: boolean }
+) {
+  const importPlan = opts?.waitForAgentPlanImport
+    ? page.waitForResponse(
+        (res) =>
+          res.request().method() === 'POST' &&
+          res.url().includes('/workspaces/todos/import-agent-plan') &&
+          res.ok(),
+        { timeout: 30_000 }
+      )
+    : null
   const todosLoaded = page.waitForResponse(
     (res) =>
       res.request().method() === 'GET' &&
       res.url().includes('/workspaces/todos') &&
+      !res.url().includes('import-agent-plan') &&
       res.ok(),
     { timeout: 15_000 }
   )
   await page.getByTestId('nav-tasks').click()
+  if (importPlan) await importPlan
   await todosLoaded
   await expect(page.getByTestId('todo-panel')).toBeVisible()
 }
