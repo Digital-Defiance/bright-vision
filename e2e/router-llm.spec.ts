@@ -41,7 +41,7 @@ test.describe('LLM auto-router @router', () => {
       timeout: 240_000,
     })
     await expectLatestAssistantReply(page, /begin|start|run|button|label|response/i, 360_000)
-    await settleTurnAfterReply(page, 180_000)
+    await settleTurnAfterReply(page, 360_000)
 
     const heavyPrompt =
       'Provide an architecture review for this app with migration risks and security considerations.'
@@ -52,7 +52,7 @@ test.describe('LLM auto-router @router', () => {
       timeout: 240_000,
     })
     await expectLatestAssistantReply(page, /architecture|security|migration|response/i, 360_000)
-    await settleTurnAfterReply(page, 180_000)
+    await settleTurnAfterReply(page, 360_000)
   })
 })
 

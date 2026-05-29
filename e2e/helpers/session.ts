@@ -105,6 +105,12 @@ export async function openTasks(
   await expect(page.getByTestId('todo-panel')).toBeVisible()
 }
 
+/** MUI Select for new-task template (not a native `<select>`). */
+export async function selectTodoTemplate(page: Page, template: string) {
+  await page.getByRole('combobox', { name: 'Template' }).click()
+  await page.getByRole('option', { name: template, exact: true }).click()
+}
+
 export async function openSettings(page: Page) {
   await page.getByTestId('nav-settings').click()
 }

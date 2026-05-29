@@ -119,7 +119,7 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 | v2 | **Done** | Session todos HTTP API, `active_todo_id` / `inject_todo_spec`, templates, checklist |
 | v3 | **Done** | Workspace todos HTTP, checklist auto-complete, markdown import/export |
 | v4a | **Done** | Three-layer specs, `depends_on`, `spec-driven` template, `.cecli/specs/{id}/` sync |
-| v4b | **Done** | AI generate/refine spec, steered **Implement** per implementation task |
+| v4b | **Done** | AI generate/refine spec, steered **Implement** per implementation task. **Tests:** `tasks-generate-spec.spec.ts`, `test_generate_spec_parse.py`, `test_http_generate_spec_mock.py`; LLM: `spec-generate-llm.spec.ts` @spec-gen, `test_generate_spec_llm.py` (`E2E_LLM=1`) |
 | v5 | **Done** | Background `generate-spec` jobs; ephemeral session; job poll |
 
 | # | Status | Item |
@@ -130,9 +130,9 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 
 | # | Status | Item |
 |---|--------|------|
-| **20** | **Open** | Dedicated spec-agent UX — separate surface/thread for spec work (not only ephemeral jobs + Tasks tab) |
-| **21** | **Open** | EARS / requirements linter — validate WHEN/SHALL structure; beyond LLM “Refine spec” |
-| **22** | **Open** | Repo-wide spec index — discover and sync all `.cecli/specs/**`; “Sync Files” style maintenance |
+| **20** | **Partial** | **Spec agent** — **Spec** tab + **Settings → session mode** (`vibe` \| `spec`); spec_focus; `.cecli/steering`. **Open:** save-triggered hook automation (beyond PATCH EARS fields). |
+| **21** | **Partial** | **EARS module** — **v1 shipped:** `bright_vision_core/ears/`, lint/index/trace HTTP + Tasks, generate/refine gate, Spec tab; pytest + mocked/LLM e2e (`tasks-ears*`, `spec-generate-llm`, `test_generate_spec_llm`). **Open:** lint-on-save blur, stricter trace, pre-commit gate. [EARS_MODULE.md](./EARS_MODULE.md) |
+| **22** | **Partial** | Repo-wide spec index — **v1 shipped:** `GET …/spec-index`, **Check spec index**, **Repair folders**, `tasks-ears-index.spec.ts`. **Open:** re-index after generate-spec / todo save. |
 
 ---
 
@@ -441,7 +441,7 @@ Prefer **permissive licenses** and **small bundle** ([AGENTS.md](../AGENTS.md)).
 2. **Friction from dogfood** — promote to **Open** rows or fix immediately (lifecycle, git tab, context attach, tasks sync).
 3. **#28 / #32** (if context picking hurts) — **#32** suggested-files tray + queued `/add`; file-tree / modified-file highlights over **#26** watcher unless git poll is insufficient.
 4. **#31** — [RELEASE.md](./RELEASE.md) when sharing builds or pinning submodule for collaborators.
-5. **#20–22** — Kiro-depth spec product (after dogfood stabilizes core loop).
+5. **#21–22 v1 → Done** — dogfood on superproject Tasks (Validate EARS, spec index, generate-spec); then **lint on requirements blur**, **re-index after generate-spec** (~2–3 days). **#20** save-triggered spec hooks in parallel.
 6. **#29, #30** — Plugins, remaining web parity (longer horizon).
 7. **#33** — Resource overlay when local LLM / long runs make CPU/GPU visibility painful (CPU/RAM first; GPU best-effort).
 8. **#38** — Editor left-rail tab + file tabs + explorer after core chat/context loop is stable; spike CodeMirror + `react-resizable-panels`; extend `TabId` / `NAV` — do not merge Chat into a top tab row.

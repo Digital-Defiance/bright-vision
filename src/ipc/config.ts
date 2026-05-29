@@ -52,6 +52,8 @@ export interface VisionConfig {
   autoSaveSessionName: string
   /** Append chat transcript to `.cecli/chat.history`. */
   chatHistoryFile: boolean
+  /** Default session mode when starting Vision API (vibe = code chat, spec = spec-first). */
+  sessionMode: 'vibe' | 'spec'
 }
 
 export const DEFAULT_CONFIG: VisionConfig = {
@@ -74,6 +76,7 @@ export const DEFAULT_CONFIG: VisionConfig = {
   autoLoadSession: true,
   autoSaveSessionName: 'brightvision',
   chatHistoryFile: true,
+  sessionMode: 'vibe',
 }
 
 export function parseContextFilesInput(raw: string): string[] {

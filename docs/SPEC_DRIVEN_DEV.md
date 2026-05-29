@@ -60,9 +60,12 @@ Legacy single `spec` is migrated into `requirements` on load when layers are emp
 
 | Kiro | BrightVision today | Roadmap |
 |------|-------------------|---------|
-| Dedicated spec agent product surface | Ephemeral job + poll | **#20** Open |
-| EARS validation & formal spec analysis | Refine prompt only | **#21** Open |
-| Sync Files / repo-wide spec index | Per-task JSON + optional spec folder | **#22** Open |
+| Dedicated spec agent product surface | **Spec** tab (dedicated transcript) + spec-focus + generate/refine jobs | **#20** Partial — vibe/spec session types, hooks |
+| EARS validation & formal spec analysis | Validate EARS, trace, lint in generate/refine, apply gate | **#21** Partial — [EARS_MODULE.md](./EARS_MODULE.md) |
+| Sync Files / repo-wide spec index | Spec index scan + **Repair folders** | **#22** Partial |
+| Steering files | `.cecli/STEERING.md`, `.cecli/steering/*.md` in spec-focus | Expand defaults / UI editor |
+| Vibe vs Spec session | **Settings → Default session mode** (`vibe` \| `spec`); spec opens **Spec** tab on start | Per-turn override via Spec tab / Spec focus toggle |
+| Save → EARS check | `PATCH` returns `ears_*` fields; UI snackbar on regression | Optional file-watcher hook (longer-term) |
 
 ## API
 

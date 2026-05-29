@@ -110,6 +110,9 @@ yarn test:e2e
 | `confirm-flow.spec.ts` | Confirm banner |
 | `chat-context.spec.ts` | Folder attach |
 | `tasks-workspace.spec.ts` | Tasks + generate-spec |
+| `tasks-generate-spec.spec.ts` | Three-layer generate/refine + `ears_blocked` snackbar (mock) |
+| `tasks-ears.spec.ts` | Validate EARS (mock lint) |
+| `spec-generate-llm.spec.ts` | Real Ollama generate-spec + layer sanity (`E2E_LLM=1`, `@spec-gen`) |
 | `settings-config.spec.ts` | Settings persistence; Cecli session encrypt/auto-save API flags |
 | `tauri-git.spec.ts` | Git panel (mock Tauri) |
 | `path-completion.spec.ts` | `/add` Tab (desktop vs web) |
@@ -160,13 +163,16 @@ Exercises a **live** `bright-vision-core` on `:8741` and your **Ollama** model (
 # Core-only (SSE + Ollama) — hello, /agent, context, todo, edit-block, transcript
 yarn test:llm:core
 
-# Full UI path: Terminal Start -> Chat with router lane enabled
+# Full UI path (skips @router — two long chat turns, often flaky on one GPU)
 yarn test:e2e:llm
 
-# Opt-in: repo root workspace (slow); run separately or via dogfood gate
+# Opt-in router lane (fast + heavy model turns)
+yarn test:e2e:llm:router
+
+# Opt-in: repo root workspace (slow RepoSet map; README via contextFiles at session start)
 E2E_SUPERPROJECT_LLM=1 yarn test:e2e:llm:superproject
 
-# Full UI path without router assertions (single-model control lane)
+# Same as test:e2e:llm with explicit default model tag
 yarn test:e2e:llm:single
 
 # Explicit env (override model or host):
@@ -175,7 +181,7 @@ E2E_OLLAMA_MODEL=ollama_chat/llama3.2:3b E2E_LLM=1 yarn test:e2e:llm
 # Example bigger model:
 E2E_OLLAMA_MODEL=ollama_chat/qwen3.6:27b-q4_K_M E2E_LLM=1 yarn test:e2e:llm
 # Router lane with explicit fast/heavy tags:
-E2E_MODEL_ROUTER=1 E2E_FAST_MODEL=ollama_chat/qwen2.5-coder:7b E2E_HEAVY_MODEL=ollama_chat/qwen3.6:27b-q4_K_M E2E_LLM=1 yarn test:e2e:llm
+E2E_FAST_MODEL=ollama_chat/qwen2.5-coder:7b E2E_HEAVY_MODEL=ollama_chat/qwen3.6:27b-q4_K_M yarn test:e2e:llm:router
 ```
 
 Optional env:
@@ -183,7 +189,7 @@ Optional env:
 | Variable | Purpose |
 |----------|---------|
 | `E2E_OLLAMA_MODEL` | LiteLLM id or bare tag (`yarn test:llm:core` sets `ollama_chat/llama3.2:3b`) |
-| `E2E_MODEL_ROUTER` | `1` enables router assertions/tests (`router-llm.spec.ts`) and primes router prefs in localStorage |
+| `E2E_MODEL_ROUTER` | `1` required for `yarn test:e2e:llm:router` (`router-llm.spec.ts`) |
 | `E2E_FAST_MODEL` | Router fast tier model tag/id (falls back to `FAST_MODEL`) |
 | `E2E_HEAVY_MODEL` | Router heavy tier model tag/id (falls back to `HEAVY_MODEL`) |
 | `E2E_OLLAMA_AUTO_PULL` | `1` (default): run `ollama pull` when the model is missing; `0` to fail fast |
@@ -191,6 +197,7 @@ Optional env:
 | `E2E_FIXTURE_PACK_ROOT` | Optional absolute path to a custom fixture repo collection (supports submodule-based packs) |
 | `E2E_SUPERPROJECT_LLM` | `1` runs `superproject-llm.spec.ts` (BrightVision repo root; slow) |
 | `DOGFOOD_LLM` | `1` with `yarn dogfood:gate` runs `test:llm:core` + `test:e2e:llm` when Ollama is up |
+| `LLM_SPEC_GEN_TIMEOUT_S` | Background generate-spec job wait (pytest `test_generate_spec_llm`, HTTP sync poll, `spec-generate-llm` e2e; default `900` in `test:llm:core`) |
 | `LLM_TEST_TURN_TIMEOUT_S` | Per-turn SSE read cap in `test:llm:core` (default `300`; `/agent` uses max with `VISION_AGENT_PREPROC_TIMEOUT_S`) |
 | `VISION_AGENT_PREPROC_TIMEOUT_S` | Wall-clock cap for `/agent` preproc in core + pytest (default `480` in `test:llm:core`; `0` = no cap in dev) |
 | `VISION_SLASH_PREPROC_TIMEOUT_S` | Cap for other slash preproc (default `240` in `test:llm:core`, `300` in product) |
@@ -205,7 +212,7 @@ E2E clears **`PYTHONPATH`**. Do not export `PYTHONPATH=$PWD` — the repo’s `c
 | `e2e/fixtures/context-workspace` | Context LLM (`context-llm`, `test_context_llm`) — `/add src/e2e_widget.ts`, assert `E2E_CONTEXT_MAGIC` |
 | `e2e/fixtures/edit-block-workspace` | Edit LLM (`edit-block-llm`, `test_edit_block_llm`) — SEARCH/REPLACE on `src/patchme.ts` |
 | `e2e/fixtures/integration-workspace` | Real core HTTP (`yarn test:e2e:integration`) — todos/import, not chat context |
-| BrightVision repo root | Superproject LLM only when `E2E_SUPERPROJECT_LLM=1` — `/add bright_vision_core/README.md` |
+| BrightVision repo root | Superproject LLM only when `E2E_SUPERPROJECT_LLM=1` — Vision API: session + README in `files`, one message with `preproc: false` (avoids UI slash preproc + active-task inject) |
 
 Do **not** use the BrightVision superproject as the default LLM `workingDir` (slow repo map, flaky).
 

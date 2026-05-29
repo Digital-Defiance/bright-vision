@@ -1,5 +1,4 @@
 import { expect, type Page } from '@playwright/test'
-import { expectTurnIdle } from './chatSend'
 
 /** Dismiss confirm dialogs that block turn completion. */
 export async function dismissConfirmIfPresent(page: Page) {
@@ -11,12 +10,16 @@ export async function dismissConfirmIfPresent(page: Page) {
 
 /** Wait until stop button clears and chat is idle (handles trailing confirms). */
 export async function settleTurnAfterReply(page: Page, timeoutMs = 180_000) {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    await dismissConfirmIfPresent(page)
-    if ((await page.getByTestId('chat-stop-turn').count()) === 0) break
-    await page.waitForTimeout(400)
-  }
-  const remaining = Math.max(5_000, deadline - Date.now())
-  await expectTurnIdle(page, remaining)
+  await expect
+    .poll(
+      async () => {
+        await dismissConfirmIfPresent(page)
+        const stop = await page.getByTestId('chat-stop-turn').count()
+        const activity = await page.getByTestId('vision-activity').count()
+        const inputEnabled = await page.getByTestId('chat-input').isEnabled()
+        return stop === 0 && activity === 0 && inputEnabled
+      },
+      { timeout: timeoutMs, intervals: [400, 800, 1500] }
+    )
+    .toBe(true)
 }

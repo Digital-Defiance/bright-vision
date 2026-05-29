@@ -375,6 +375,25 @@ export function SettingsPanel({
             helperText="Automatically answer Yes on the next N confirmation prompts (0 = always ask)."
           />
           <TextField
+            label="Default session mode"
+            fullWidth
+            size="small"
+            select
+            SelectProps={{ native: true }}
+            value={config.sessionMode}
+            onChange={(e) =>
+              onChange({
+                ...config,
+                sessionMode: e.target.value === 'spec' ? 'spec' : 'vibe',
+              })
+            }
+            helperText="Spec sessions open the Spec tab and inject steering + task spec on every turn (Kiro-style)."
+            data-testid="settings-session-mode"
+          >
+            <option value="vibe">Vibe — implementation chat (default)</option>
+            <option value="spec">Spec — spec-first session</option>
+          </TextField>
+          <TextField
             label="Prompt before commit"
             fullWidth
             size="small"

@@ -6,10 +6,14 @@ import FileUploadIcon from '@mui/icons-material/FileUpload'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import FactCheckIcon from '@mui/icons-material/FactCheck'
+import FolderSharedIcon from '@mui/icons-material/FolderShared'
+import HubIcon from '@mui/icons-material/Hub'
 import LinkIcon from '@mui/icons-material/Link'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import { DISPLAY_VISION_API } from '../../brand'
 import {
+  Alert,
   Box,
   Button,
   Checkbox,
@@ -20,8 +24,10 @@ import {
   DialogContent,
   DialogTitle,
   FormControl,
+  FormControlLabel,
   IconButton,
   InputLabel,
+  Switch,
   List,
   ListItem,
   ListItemButton,
@@ -40,6 +46,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { isTodoBlocked } from '../../todos/layers'
 import { parseImplementationSteps, type ImplementationStep } from '../../todos/tasksMd'
 import type { ChecklistItem, TodoItem, TodoStatus } from '../../todos/types'
+import {
+  earsIssueLabel,
+  type EarsLintResult,
+  type SpecIndexResult,
+  type TraceabilityResult,
+} from '../../todos/earsTypes'
 import { TODO_TEMPLATES } from '../../todos/types'
 
 const STATUS_COLOR: Record<TodoStatus, 'default' | 'primary' | 'success' | 'warning'> = {
@@ -96,6 +108,15 @@ interface TodoPanelProps {
   onImportMarkdown?: (markdown: string, merge: boolean) => void | Promise<void>
   onMoveTodo?: (id: string, direction: 'up' | 'down') => void
   onSyncSpecFromDisk?: (id: string) => void | Promise<void>
+  onLintRequirements?: (id: string, draftRequirements: string) => Promise<EarsLintResult>
+  onFetchSpecIndex?: () => Promise<SpecIndexResult>
+  onRepairSpecFolders?: () => Promise<{ created_count: number; created_ids: string[] }>
+  specFocusMode?: boolean
+  onSpecFocusChange?: (enabled: boolean) => void
+  onTraceSpec?: (
+    id: string,
+    draft: { requirements: string; design: string; tasks_md: string }
+  ) => Promise<TraceabilityResult>
   onCancelSpecGenerate?: () => void
 }
 
@@ -120,6 +141,12 @@ export function TodoPanel({
   onImportMarkdown,
   onMoveTodo,
   onSyncSpecFromDisk,
+  onLintRequirements,
+  onFetchSpecIndex,
+  onRepairSpecFolders,
+  specFocusMode = false,
+  onSpecFocusChange,
+  onTraceSpec,
   onCancelSpecGenerate,
   currentBranch,
   tauriLocal,
@@ -138,6 +165,12 @@ export function TodoPanel({
   const [specTab, setSpecTab] = useState<SpecTab>('requirements')
   const [newTemplate, setNewTemplate] = useState<string>('')
   const [generateOpen, setGenerateOpen] = useState(false)
+  const [earsLint, setEarsLint] = useState<EarsLintResult | null>(null)
+  const [earsLinting, setEarsLinting] = useState(false)
+  const [specIndex, setSpecIndex] = useState<SpecIndexResult | null>(null)
+  const [specIndexing, setSpecIndexing] = useState(false)
+  const [specTrace, setSpecTrace] = useState<TraceabilityResult | null>(null)
+  const [specTracing, setSpecTracing] = useState(false)
   const [generatePrompt, setGeneratePrompt] = useState('')
   const [generateMode, setGenerateMode] = useState<'generate' | 'refine'>('generate')
 
@@ -147,6 +180,49 @@ export function TodoPanel({
     () => (selected ? parseImplementationSteps(tasksMd) : []),
     [selected?.id, tasksMd]
   )
+
+  const implementBlockedByEars = Boolean(earsLint && !earsLint.ok)
+
+  useEffect(() => {
+    setEarsLint(null)
+    setSpecTrace(null)
+  }, [selectedId])
+
+  const runEarsLint = async () => {
+    if (!selected || !onLintRequirements) return
+    setEarsLinting(true)
+    try {
+      const result = await onLintRequirements(selected.id, requirements)
+      setEarsLint(result)
+    } finally {
+      setEarsLinting(false)
+    }
+  }
+
+  const runSpecIndex = async () => {
+    if (!onFetchSpecIndex) return
+    setSpecIndexing(true)
+    try {
+      setSpecIndex(await onFetchSpecIndex())
+    } finally {
+      setSpecIndexing(false)
+    }
+  }
+
+  const runTraceSpec = async () => {
+    if (!selected || !onTraceSpec) return
+    setSpecTracing(true)
+    try {
+      const result = await onTraceSpec(selected.id, {
+        requirements,
+        design,
+        tasks_md: tasksMd,
+      })
+      setSpecTrace(result)
+    } finally {
+      setSpecTracing(false)
+    }
+  }
 
   useEffect(() => {
     if (selected) {
@@ -267,6 +343,44 @@ export function TodoPanel({
               Export
             </Button>
           )}
+          {httpReady && onFetchSpecIndex && (
+            <Button
+              size="small"
+              startIcon={
+                specIndexing ? <CircularProgress size={16} /> : <FolderSharedIcon />
+              }
+              disabled={loading || specIndexing}
+              onClick={() => void runSpecIndex()}
+              data-testid="todo-spec-index"
+            >
+              Check spec index
+            </Button>
+          )}
+          {httpReady && onRepairSpecFolders && (
+            <Button
+              size="small"
+              disabled={loading}
+              onClick={() => {
+                void onRepairSpecFolders().then(() => setSpecIndex(null))
+              }}
+              data-testid="todo-repair-spec-folders"
+            >
+              Repair folders
+            </Button>
+          )}
+          {sessionReady && onSpecFocusChange && (
+            <FormControlLabel
+              control={
+                <Switch
+                  size="small"
+                  checked={specFocusMode}
+                  onChange={(e) => onSpecFocusChange(e.target.checked)}
+                  data-testid="todo-spec-focus"
+                />
+              }
+              label="Spec focus"
+            />
+          )}
           {onImportMarkdown && (
             <>
               <input
@@ -318,6 +432,38 @@ export function TodoPanel({
         <Box component="code">UpdateTodoList</Box> syncs into Tasks when a chat turn finishes or when
         you open this tab.
       </Typography>
+      {specIndex && (
+        <Alert
+          severity={specIndex.ok ? 'success' : 'warning'}
+          sx={{ mx: 1 }}
+          data-testid="spec-index-summary"
+          onClose={() => setSpecIndex(null)}
+        >
+          {specIndex.ok
+            ? `Spec index OK — ${specIndex.folders.length} folder(s), ${specIndex.task_ids.length} task(s)`
+            : `${specIndex.error_count} error(s), ${specIndex.warning_count} warning(s) across spec folders`}
+        </Alert>
+      )}
+      {specIndex && specIndex.issues.length > 0 && (
+        <Stack spacing={0.25} sx={{ mx: 1, maxHeight: 120, overflow: 'auto' }} data-testid="spec-index-issues">
+          {specIndex.issues.map((issue, idx) => (
+            <Typography
+              key={`${issue.code}-${issue.todo_id ?? idx}`}
+              variant="caption"
+              component="div"
+              color={
+                issue.severity === 'error'
+                  ? 'error.main'
+                  : issue.severity === 'warning'
+                    ? 'warning.main'
+                    : 'text.secondary'
+              }
+            >
+              {earsIssueLabel(issue)}
+            </Typography>
+          ))}
+        </Stack>
+      )}
 
       <Stack direction="row" sx={{ flex: 1, minHeight: 0, gap: 1 }}>
         <Paper
@@ -503,25 +649,64 @@ export function TodoPanel({
                 variant="scrollable"
                 allowScrollButtonsMobile
               >
-                <Tab label="Requirements" value="requirements" />
+                <Tab
+                  label={
+                    earsLint && earsLint.error_count > 0
+                      ? `Requirements (${earsLint.error_count})`
+                      : 'Requirements'
+                  }
+                  value="requirements"
+                />
                 <Tab label="Design" value="design" />
                 <Tab label="Tasks" value="tasks" />
                 <Tab label="Checklist" value="checklist" />
               </Tabs>
 
               {specTab === 'requirements' && (
-                <TextField
-                  label="Requirements (EARS-style)"
-                  size="small"
-                  fullWidth
-                  multiline
-                  minRows={8}
-                  maxRows={16}
-                  value={requirements}
-                  onChange={(e) => setRequirements(e.target.value)}
-                  onBlur={persistEditor}
-                  placeholder="WHEN … THE system SHALL …"
-                />
+                <Stack spacing={1}>
+                  <TextField
+                    label="Requirements (EARS-style)"
+                    size="small"
+                    fullWidth
+                    multiline
+                    minRows={8}
+                    maxRows={16}
+                    value={requirements}
+                    onChange={(e) => setRequirements(e.target.value)}
+                    onBlur={persistEditor}
+                    placeholder="WHEN … THE system SHALL …"
+                  />
+                  {earsLint && (
+                    <Alert
+                      severity={earsLint.ok ? 'success' : 'error'}
+                      data-testid="ears-lint-summary"
+                    >
+                      {earsLint.ok
+                        ? `EARS OK (${earsLint.clauses.length} clause${earsLint.clauses.length === 1 ? '' : 's'})`
+                        : `${earsLint.error_count} error(s), ${earsLint.warning_count} warning(s)`}
+                    </Alert>
+                  )}
+                  {earsLint && earsLint.issues.length > 0 && (
+                    <Stack spacing={0.5} data-testid="ears-lint-issues">
+                      {earsLint.issues.map((issue, idx) => (
+                        <Typography
+                          key={`${issue.code}-${issue.line ?? idx}`}
+                          variant="caption"
+                          component="div"
+                          color={
+                            issue.severity === 'error'
+                              ? 'error.main'
+                              : issue.severity === 'warning'
+                                ? 'warning.main'
+                                : 'text.secondary'
+                          }
+                        >
+                          {earsIssueLabel(issue)}
+                        </Typography>
+                      ))}
+                    </Stack>
+                  )}
+                </Stack>
               )}
               {specTab === 'design' && (
                 <TextField
@@ -539,6 +724,37 @@ export function TodoPanel({
               )}
               {specTab === 'tasks' && (
                 <>
+                  {specTrace && (
+                    <Alert
+                      severity={specTrace.ok ? 'success' : 'warning'}
+                      data-testid="spec-trace-summary"
+                      onClose={() => setSpecTrace(null)}
+                    >
+                      {specTrace.req_ids.length === 0
+                        ? 'No REQ-### ids in requirements.'
+                        : `${specTrace.req_ids.length} requirement id(s); ${specTrace.error_count} error(s), ${specTrace.warning_count} warning(s)`}
+                    </Alert>
+                  )}
+                  {specTrace && specTrace.issues.length > 0 && (
+                    <Stack spacing={0.5} data-testid="spec-trace-issues">
+                      {specTrace.issues.map((issue, idx) => (
+                        <Typography
+                          key={`${issue.code}-${issue.req_id ?? idx}`}
+                          variant="caption"
+                          component="div"
+                          color={
+                            issue.severity === 'error'
+                              ? 'error.main'
+                              : issue.severity === 'warning'
+                                ? 'warning.main'
+                                : 'text.secondary'
+                          }
+                        >
+                          {earsIssueLabel(issue)}
+                        </Typography>
+                      ))}
+                    </Stack>
+                  )}
                   <TextField
                     label="Implementation tasks"
                     size="small"
@@ -575,7 +791,14 @@ export function TodoPanel({
                             <Button
                               size="small"
                               variant="outlined"
-                              disabled={sessionBusy || !sessionReady}
+                              disabled={
+                                sessionBusy || !sessionReady || implementBlockedByEars
+                              }
+                              title={
+                                implementBlockedByEars
+                                  ? 'Fix EARS errors (Validate EARS) before implementing'
+                                  : undefined
+                              }
                               onClick={() => {
                                 persistEditor()
                                 onImplementStep(
@@ -691,6 +914,32 @@ export function TodoPanel({
                     >
                       Refine spec
                     </Button>
+                    {onLintRequirements && (
+                      <Button
+                        size="small"
+                        startIcon={
+                          earsLinting ? <CircularProgress size={16} /> : <FactCheckIcon />
+                        }
+                        disabled={!sessionReady || earsLinting}
+                        onClick={() => void runEarsLint()}
+                        data-testid="todo-validate-ears"
+                      >
+                        Validate EARS
+                      </Button>
+                    )}
+                    {onTraceSpec && selected && (
+                      <Button
+                        size="small"
+                        startIcon={
+                          specTracing ? <CircularProgress size={16} /> : <HubIcon />
+                        }
+                        disabled={!sessionReady || specTracing}
+                        onClick={() => void runTraceSpec()}
+                        data-testid="todo-trace-spec"
+                      >
+                        Trace coverage
+                      </Button>
+                    )}
                     {onSyncSpecFromDisk && selected && (
                       <Button
                         size="small"

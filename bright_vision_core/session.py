@@ -10,7 +10,9 @@ import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Iterator, TypeVar
+from typing import Any, Iterator, Literal, TypeVar
+
+SessionMode = Literal["vibe", "spec"]
 
 _T = TypeVar("_T")
 
@@ -33,6 +35,9 @@ from bright_vision_core.git_undo import undo_last_aider_commit_for_coder
 from bright_vision_core.git_workspace import create_git_workspace
 from bright_vision_core.headless_args import default_headless_args
 from bright_vision_core.headless_persistence import apply_persistence_to_args
+from bright_vision_core.ears.prompt import requirements_pass_ears
+from bright_vision_core.spec_steering import build_spec_focus_preamble
+from bright_vision_core.spec_layers import normalize_spec_layer_traceability
 from bright_vision_core.todo_spec_generate import build_generate_message, parse_generated_layers
 from bright_vision_core.roadmap_hints import maybe_append_roadmap_hint
 from bright_vision_core.slash_helpers import (
@@ -167,12 +172,16 @@ class Session:
         io: EventIO,
         *,
         model_router: ModelRouterConfig | None = None,
+        spec_focus: bool = False,
+        session_mode: SessionMode = "vibe",
     ):
         self.coder = coder
         self.io = io
         self._model_router = model_router
         self._router_heavy_model_name = coder.main_model.name
         self._last_route: RouteDecision | None = None
+        self.session_mode: SessionMode = session_mode
+        self.spec_focus = spec_focus or session_mode == "spec"
         self.coder.yield_stream = True
         self.coder.stream = bool(coder.stream)
         self.coder.pretty = False
@@ -217,6 +226,8 @@ class Session:
         auto_load: bool = False,
         auto_save_session_name: str = "brightvision",
         chat_history_file: bool | str | None = True,
+        spec_focus: bool = False,
+        session_mode: SessionMode = "vibe",
     ) -> Session:
         workspace = Path(workspace_dir).resolve()
         if not workspace.is_dir():
@@ -315,7 +326,13 @@ class Session:
                 except Exception:
                     pass
                 io.drain_events()
-            return cls(coder, io, model_router=router_cfg if router_cfg and router_cfg.enabled else None)
+            return cls(
+                coder,
+                io,
+                model_router=router_cfg if router_cfg and router_cfg.enabled else None,
+                spec_focus=spec_focus,
+                session_mode=session_mode,
+            )
         finally:
             os.chdir(prev_cwd)
 
@@ -382,19 +399,23 @@ class Session:
         preproc: bool = True,
         active_todo_id: str | None = None,
         inject_todo_spec: bool = False,
+        spec_focus: bool = False,
         force_tier: str | None = None,
         escalate_from_last: bool = False,
     ) -> Iterator[dict[str, Any]]:
         turn_todo_id: str | None = None
         user_text = maybe_append_roadmap_hint(message, self.coder)
+        focus = spec_focus or self.spec_focus or self.session_mode == "spec"
         if active_todo_id:
             todos = WorkspaceTodos(self.coder.root)
             store = todos.load()
             item = todos.find(store, active_todo_id)
             if item:
                 turn_todo_id = item.id
-                if inject_todo_spec:
+                if inject_todo_spec or focus:
                     user_text = format_todo_context(item, store=store) + message
+        if focus:
+            user_text = build_spec_focus_preamble(self.coder.root) + user_text
 
         self.io.emit("user_message", text=user_text)
         for event in self.io.drain_events():
@@ -768,23 +789,34 @@ class Session:
         *,
         mode: str = "generate",
         apply: bool = True,
+        enforce_ears: bool = True,
     ) -> dict[str, Any]:
         api = WorkspaceTodos(self.coder.root)
         item = api.get(todo_id)
         msg = build_generate_message(prompt, mode=mode, item=item)  # type: ignore[arg-type]
         raw = self.run_one_shot(msg)
-        layers = parse_generated_layers(raw)
+        layers = normalize_spec_layer_traceability(parse_generated_layers(raw))
+        ears_blocked = False
+        ears_issues: list[dict] = []
+        req_text = layers.get("requirements", "")
         if apply and any(layers.values()):
-            item, _ = api.update(
-                todo_id,
-                requirements=layers.get("requirements", ""),
-                design=layers.get("design", ""),
-                tasks_md=layers.get("tasks_md", ""),
-            )
+            ok, ears_issues = requirements_pass_ears(req_text)
+            if enforce_ears and not ok:
+                apply = False
+                ears_blocked = True
+            else:
+                item, _ = api.update(
+                    todo_id,
+                    requirements=req_text,
+                    design=layers.get("design", ""),
+                    tasks_md=layers.get("tasks_md", ""),
+                )
         return {
             "requirements": layers.get("requirements", ""),
             "design": layers.get("design", ""),
             "tasks_md": layers.get("tasks_md", ""),
             "raw": raw,
             "item": item,
+            "ears_blocked": ears_blocked,
+            "ears_issues": ears_issues,
         }

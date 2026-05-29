@@ -230,6 +230,17 @@ class WorkspaceTodos:
         self.path = todos_json_path(self.root)
         self.specs_root = specs_root(self.root)
 
+    def repair_spec_folders(self) -> tuple[int, list[str]]:
+        """Create missing ``.cecli/specs/{id}/`` dirs and sync markdown from todos.json."""
+        store = self.load()
+        created: list[str] = []
+        for item in store.todos:
+            folder = self.specs_root / item.id
+            if not folder.is_dir():
+                created.append(item.id)
+            self.sync_spec_files(item)
+        return len(created), created
+
     def sync_spec_files(self, item: TodoItem) -> None:
         """Write three-layer markdown under ``.cecli/specs/{id}/`` for external editing."""
         item = migrate_todo_layers(item)

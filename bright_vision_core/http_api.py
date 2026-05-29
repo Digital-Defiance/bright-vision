@@ -39,7 +39,7 @@ from bright_vision_core.http_auth import auth_enabled, configure_auth, get_token
 from bright_vision_core.session import Session
 from bright_vision_core.session_debug import build_session_debug_export
 from bright_vision_core.session_transcript import transcript_rows_from_coder
-from bright_vision_core.todo_spec_jobs import spec_job_store
+from bright_vision_core.todo_spec_jobs import spec_gen_timeout_s, spec_job_store
 from bright_vision_core.workspace_todos import (
     SPEC_LAYER_TEMPLATES,
     TODO_TEMPLATES,
@@ -151,6 +151,14 @@ class CreateSessionRequest(BaseModel):
         True,
         description="Append turns to .cecli/chat.history (cecli chat history file)",
     )
+    spec_focus: bool = Field(
+        False,
+        description="Session defaults to spec-focus chat (steering + task spec inject)",
+    )
+    session_mode: str = Field(
+        "vibe",
+        description="vibe = implementation chat; spec = Kiro-style spec session (steering + inject)",
+    )
 
 
 class ConfirmRequest(BaseModel):
@@ -168,6 +176,10 @@ class MessageRequest(BaseModel):
     inject_todo_spec: bool = Field(
         False,
         description="When true with active_todo_id, prepend task spec to the message",
+    )
+    spec_focus: bool = Field(
+        False,
+        description="Spec-focus turn: steering + always inject active task spec (#20)",
     )
     force_tier: str | None = Field(
         default=None,
@@ -250,6 +262,8 @@ class MoveTodoRequest(BaseModel):
 class PatchTodoResponse(BaseModel):
     item: TodoItemModel
     auto_completed: bool = False
+    ears_requirements_ok: bool | None = None
+    ears_error_count: int | None = None
 
 
 class ImportTodosRequest(BaseModel):
@@ -258,10 +272,96 @@ class ImportTodosRequest(BaseModel):
     merge: bool = False
 
 
+class LintRequirementsRequest(BaseModel):
+    """Optional draft text; when omitted, lints the task's stored ``requirements`` field."""
+
+    requirements: str | None = None
+
+
+class EarsIssueModel(BaseModel):
+    code: str
+    message: str
+    severity: str
+    line: int | None = None
+    req_id: str | None = None
+    todo_id: str | None = None
+
+
+class EarsClauseModel(BaseModel):
+    req_id: str | None = None
+    line: int
+    text: str
+    pattern: str
+
+
+class EarsLintResponse(BaseModel):
+    ok: bool
+    error_count: int
+    warning_count: int
+    source_path: str | None = None
+    issues: list[EarsIssueModel] = Field(default_factory=list)
+    clauses: list[EarsClauseModel] = Field(default_factory=list)
+
+
+class SpecFolderRecordModel(BaseModel):
+    todo_id: str
+    has_requirements: bool = False
+    has_design: bool = False
+    has_tasks: bool = False
+    req_ids: list[str] = Field(default_factory=list)
+    requirements_ok: bool | None = None
+    requirements_errors: int = 0
+
+
+class SpecIndexResponse(BaseModel):
+    ok: bool
+    error_count: int
+    warning_count: int
+    task_ids: list[str] = Field(default_factory=list)
+    folders: list[SpecFolderRecordModel] = Field(default_factory=list)
+    issues: list[EarsIssueModel] = Field(default_factory=list)
+
+
+class TraceSpecRequest(BaseModel):
+    """Optional draft layers; omitted fields use the task's stored markdown."""
+
+    requirements: str | None = None
+    design: str | None = None
+    tasks_md: str | None = None
+
+
+class TraceLinkModel(BaseModel):
+    req_id: str
+    in_design: bool = False
+    task_steps: list[int] = Field(default_factory=list)
+
+
+class TraceStepModel(BaseModel):
+    number: int
+    text: str
+    done: bool
+    req_refs: list[str] = Field(default_factory=list)
+
+
+class TraceabilityResponse(BaseModel):
+    ok: bool
+    error_count: int
+    warning_count: int
+    req_ids: list[str] = Field(default_factory=list)
+    links: list[TraceLinkModel] = Field(default_factory=list)
+    steps: list[TraceStepModel] = Field(default_factory=list)
+    design_headings: list[str] = Field(default_factory=list)
+    issues: list[EarsIssueModel] = Field(default_factory=list)
+
+
 class GenerateTodoSpecRequest(BaseModel):
     prompt: str = Field(..., min_length=1)
     mode: str = Field("generate", description="generate | refine")
     apply: bool = Field(True, description="Write parsed layers back to the task")
+    enforce_ears: bool = Field(
+        True,
+        description="When apply=true, skip persist if generated requirements fail EARS lint",
+    )
     background: bool = Field(
         True,
         description="Use ephemeral session in a background thread (chat session stays free)",
@@ -284,6 +384,8 @@ class GenerateTodoSpecJobStatus(BaseModel):
     tasks_md: str = ""
     raw: str = ""
     item: TodoItemModel | None = None
+    ears_blocked: bool = False
+    ears_issues: list[EarsIssueModel] = Field(default_factory=list)
 
 
 class GenerateTodoSpecResponse(BaseModel):
@@ -294,6 +396,8 @@ class GenerateTodoSpecResponse(BaseModel):
     tasks_md: str = ""
     raw: str = ""
     item: TodoItemModel | None = None
+    ears_blocked: bool = False
+    ears_issues: list[EarsIssueModel] = Field(default_factory=list)
 
 
 class AddFilesRequest(BaseModel):
@@ -380,9 +484,17 @@ def health():
     }
 
 
+def _normalize_session_mode(mode: str) -> str:
+    m = (mode or "vibe").strip().lower()
+    if m not in ("vibe", "spec"):
+        raise HTTPException(status_code=400, detail=f"Invalid session_mode: {mode}")
+    return m
+
+
 @app.post("/sessions", response_model=SessionInfo)
 def create_session(body: CreateSessionRequest):
     try:
+        mode = _normalize_session_mode(body.session_mode)
         router_payload = (
             body.model_router.model_dump() if body.model_router is not None else None
         )
@@ -402,6 +514,8 @@ def create_session(body: CreateSessionRequest):
             auto_load=body.auto_load,
             auto_save_session_name=body.auto_save_session_name,
             chat_history_file=body.chat_history_file,
+            spec_focus=body.spec_focus or mode == "spec",
+            session_mode=mode,  # type: ignore[arg-type]
         )
     except FileNotFoundError as err:
         raise HTTPException(status_code=404, detail=str(err)) from err
@@ -552,7 +666,77 @@ def _patch_todo_api(api: WorkspaceTodos, todo_id: str, body: PatchTodoRequest) -
         )
     except ValueError as err:
         raise HTTPException(status_code=404, detail=str(err)) from err
-    return PatchTodoResponse(item=_todo_item_model(item), auto_completed=auto_completed)
+    ears_ok: bool | None = None
+    ears_errors: int | None = None
+    if body.requirements is not None:
+        lint = _ears_lint_response(item.requirements)
+        ears_ok = lint.ok
+        ears_errors = lint.error_count
+    return PatchTodoResponse(
+        item=_todo_item_model(item),
+        auto_completed=auto_completed,
+        ears_requirements_ok=ears_ok,
+        ears_error_count=ears_errors,
+    )
+
+
+def _ears_lint_response(requirements: str, *, source_path: str | None = None) -> EarsLintResponse:
+    from bright_vision_core.ears import analyze_requirements
+
+    result = analyze_requirements(requirements, source_path=source_path)
+    return EarsLintResponse.model_validate(result.to_dict())
+
+
+def _spec_index_response(api: WorkspaceTodos) -> SpecIndexResponse:
+    from bright_vision_core.ears import build_spec_index
+
+    store = api.load()
+    task_ids = [t.id for t in store.todos]
+    result = build_spec_index(api.root, task_ids=task_ids)
+    return SpecIndexResponse.model_validate(result.to_dict())
+
+
+def _trace_todo_spec(
+    api: WorkspaceTodos,
+    todo_id: str,
+    body: TraceSpecRequest | None,
+) -> TraceabilityResponse:
+    from bright_vision_core.ears import analyze_traceability
+
+    store = api.load()
+    item = next((t for t in store.todos if t.id == todo_id), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    requirements = item.requirements
+    design = item.design
+    tasks_md = item.tasks_md
+    if body is not None:
+        if body.requirements is not None:
+            requirements = body.requirements
+        if body.design is not None:
+            design = body.design
+        if body.tasks_md is not None:
+            tasks_md = body.tasks_md
+    result = analyze_traceability(requirements, design, tasks_md)
+    return TraceabilityResponse.model_validate(result.to_dict())
+
+
+def _lint_todo_requirements(
+    api: WorkspaceTodos,
+    todo_id: str,
+    body: LintRequirementsRequest | None,
+) -> EarsLintResponse:
+    store = api.load()
+    item = next((t for t in store.todos if t.id == todo_id), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    text = item.requirements
+    if body is not None and body.requirements is not None:
+        text = body.requirements
+    return _ears_lint_response(
+        text,
+        source_path=f".cecli/specs/{todo_id}/requirements.md",
+    )
 
 
 def _todo_item_model(item: TodoItem) -> TodoItemModel:
@@ -707,6 +891,11 @@ def _job_status_response(job) -> GenerateTodoSpecJobStatus:
         tasks_md=job.tasks_md,
         raw=job.raw,
         item=_todo_item_model(item) if item else None,
+        ears_blocked=getattr(job, "ears_blocked", False),
+        ears_issues=[
+            EarsIssueModel.model_validate(i)
+            for i in (getattr(job, "ears_issues", None) or [])
+        ],
     )
 
 
@@ -731,6 +920,7 @@ def _start_spec_job(
         body.prompt,
         mode=body.mode,
         apply=body.apply,
+        enforce_ears=body.enforce_ears,
         model=model,
     )
     return GenerateTodoSpecJobStarted(job_id=job.job_id, status=job.status, todo_id=todo_id)
@@ -738,7 +928,7 @@ def _start_spec_job(
 
 def _wait_spec_job(job_id: str) -> GenerateTodoSpecResponse:
     try:
-        job = spec_job_store.wait(job_id, timeout_s=600.0)
+        job = spec_job_store.wait(job_id, timeout_s=spec_gen_timeout_s())
     except KeyError as err:
         raise HTTPException(status_code=404, detail=str(err)) from err
     except TimeoutError as err:
@@ -753,6 +943,11 @@ def _wait_spec_job(job_id: str) -> GenerateTodoSpecResponse:
         tasks_md=job.tasks_md,
         raw=job.raw,
         item=_todo_item_model(job.item) if job.item else None,
+        ears_blocked=getattr(job, "ears_blocked", False),
+        ears_issues=[
+            EarsIssueModel.model_validate(i)
+            for i in (getattr(job, "ears_issues", None) or [])
+        ],
     )
 
 
@@ -767,6 +962,51 @@ def sync_workspace_spec_files(workspace: str, todo_id: str):
     return _todo_item_model(item)
 
 
+@app.get("/workspaces/spec-index", response_model=SpecIndexResponse)
+def get_workspace_spec_index(workspace: str):
+    """Scan ``.cecli/specs/**`` vs workspace task ids (roadmap #22)."""
+    return _spec_index_response(_todos_for_workspace(workspace))
+
+
+class RepairSpecFoldersResponse(BaseModel):
+    created_count: int
+    created_ids: list[str] = Field(default_factory=list)
+
+
+@app.post("/workspaces/todos/repair-spec-folders", response_model=RepairSpecFoldersResponse)
+def repair_workspace_spec_folders(workspace: str):
+    """Create missing spec folders and write three-layer markdown from todos.json."""
+    api = _todos_for_workspace(workspace)
+    count, ids = api.repair_spec_folders()
+    return RepairSpecFoldersResponse(created_count=count, created_ids=ids)
+
+
+@app.post(
+    "/workspaces/todos/{todo_id}/lint-requirements",
+    response_model=EarsLintResponse,
+)
+def lint_workspace_requirements(
+    workspace: str,
+    todo_id: str,
+    body: LintRequirementsRequest | None = None,
+):
+    """Deterministic EARS lint (see ``bright_vision_core.ears``)."""
+    return _lint_todo_requirements(_todos_for_workspace(workspace), todo_id, body)
+
+
+@app.post(
+    "/workspaces/todos/{todo_id}/trace-spec",
+    response_model=TraceabilityResponse,
+)
+def trace_workspace_spec(
+    workspace: str,
+    todo_id: str,
+    body: TraceSpecRequest | None = None,
+):
+    """REQ ↔ design ↔ tasks traceability for one task."""
+    return _trace_todo_spec(_todos_for_workspace(workspace), todo_id, body)
+
+
 @app.post("/sessions/{session_id}/todos/{todo_id}/sync-spec-files", response_model=TodoItemModel)
 def sync_session_spec_files(session_id: str, todo_id: str):
     session = _get_session(session_id)
@@ -775,6 +1015,38 @@ def sync_session_spec_files(session_id: str, todo_id: str):
     except ValueError as err:
         raise HTTPException(status_code=404, detail=str(err)) from err
     return _todo_item_model(item)
+
+
+@app.post(
+    "/sessions/{session_id}/todos/{todo_id}/lint-requirements",
+    response_model=EarsLintResponse,
+)
+def lint_session_requirements(
+    session_id: str,
+    todo_id: str,
+    body: LintRequirementsRequest | None = None,
+):
+    session = _get_session(session_id)
+    return _lint_todo_requirements(_workspace_todos(session), todo_id, body)
+
+
+@app.get("/sessions/{session_id}/spec-index", response_model=SpecIndexResponse)
+def get_session_spec_index(session_id: str):
+    session = _get_session(session_id)
+    return _spec_index_response(_workspace_todos(session))
+
+
+@app.post(
+    "/sessions/{session_id}/todos/{todo_id}/trace-spec",
+    response_model=TraceabilityResponse,
+)
+def trace_session_spec(
+    session_id: str,
+    todo_id: str,
+    body: TraceSpecRequest | None = None,
+):
+    session = _get_session(session_id)
+    return _trace_todo_spec(_workspace_todos(session), todo_id, body)
 
 
 @app.get("/workspaces/todos/generate-spec/{job_id}", response_model=GenerateTodoSpecJobStatus)
@@ -910,6 +1182,7 @@ def post_message(session_id: str, body: MessageRequest):
                 preproc=body.preproc,
                 active_todo_id=body.active_todo_id,
                 inject_todo_spec=body.inject_todo_spec,
+                spec_focus=body.spec_focus,
                 force_tier=body.force_tier,
                 escalate_from_last=body.escalate_from_last,
             ):

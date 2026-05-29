@@ -36,6 +36,8 @@ export const TODO_TEMPLATES = ['feature', 'bugfix', 'refactor', 'spec-driven'] a
 export interface PatchTodoResult {
   item: TodoItem
   auto_completed: boolean
+  ears_requirements_ok?: boolean | null
+  ears_error_count?: number | null
 }
 
 export const EMPTY_TODO_STORE: TodoStore = {

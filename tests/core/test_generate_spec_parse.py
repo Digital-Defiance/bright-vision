@@ -1,0 +1,49 @@
+"""Parse + sanity checks for generate/refine spec output (no LLM)."""
+
+from __future__ import annotations
+
+import unittest
+
+from bright_vision_core.spec_layers import normalize_spec_layer_traceability
+from bright_vision_core.todo_spec_generate import parse_generated_layers
+
+from spec_layer_assertions import (
+    SAMPLE_GENERATED_MARKDOWN,
+    assess_generated_spec_layers,
+)
+
+
+class TestGenerateSpecParse(unittest.TestCase):
+    def test_parse_three_sections(self):
+        layers = parse_generated_layers(SAMPLE_GENERATED_MARKDOWN)
+        self.assertIn("REQ-001", layers.get("requirements", ""))
+        self.assertIn("Overview", layers.get("design", ""))
+        self.assertRegex(layers.get("tasks_md", ""), r"1\.\s+Add route")
+
+    def test_sample_passes_sanity(self):
+        layers = parse_generated_layers(SAMPLE_GENERATED_MARKDOWN)
+        ok, issues = assess_generated_spec_layers(
+            layers.get("requirements", ""),
+            layers.get("design", ""),
+            layers.get("tasks_md", ""),
+        )
+        self.assertTrue(ok, issues)
+
+    def test_normalize_adds_design_traceability(self):
+        layers = {
+            "requirements": "### REQ-001\n**WHEN** x\n**THE** system **SHALL** a.\n",
+            "design": "## Overview\nHTTP API only.",
+            "tasks_md": "- [ ] 1. Step (depends: none)",
+        }
+        out = normalize_spec_layer_traceability(layers)
+        self.assertIn("REQ-001", out["design"])
+        ok, issues = assess_generated_spec_layers(
+            out["requirements"],
+            out["design"],
+            out["tasks_md"],
+        )
+        self.assertTrue(ok, issues)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -6,6 +6,7 @@ Uses a short-lived headless session so the user's chat session stays free.
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 import uuid
@@ -18,6 +19,16 @@ JobStatus = Literal["pending", "running", "completed", "error"]
 
 _MAX_JOBS = 64
 _JOB_TTL_S = 3600
+_DEFAULT_WAIT_S = 900.0
+
+
+def spec_gen_timeout_s() -> float:
+    """Wall-clock cap for background generate-spec jobs (pytest + HTTP sync wait)."""
+    raw = os.environ.get("LLM_SPEC_GEN_TIMEOUT_S", str(int(_DEFAULT_WAIT_S)))
+    try:
+        return max(60.0, float(raw))
+    except ValueError:
+        return _DEFAULT_WAIT_S
 
 
 @dataclass
@@ -32,6 +43,8 @@ class SpecGenerationJob:
     tasks_md: str = ""
     raw: str = ""
     item: Any = None
+    ears_blocked: bool = False
+    ears_issues: list[dict] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
 
@@ -58,6 +71,7 @@ class SpecJobStore:
         *,
         mode: str = "generate",
         apply: bool = True,
+        enforce_ears: bool = True,
         model: str | None = None,
     ) -> SpecGenerationJob:
         job_id = uuid.uuid4().hex
@@ -82,6 +96,7 @@ class SpecJobStore:
                     prompt,
                     mode=mode,
                     apply=apply,
+                    enforce_ears=enforce_ears,
                 )
                 with self._lock:
                     j = self._jobs.get(job_id)
@@ -93,6 +108,8 @@ class SpecJobStore:
                     j.tasks_md = result.get("tasks_md", "")
                     j.raw = result.get("raw", "")
                     j.item = result.get("item")
+                    j.ears_blocked = bool(result.get("ears_blocked"))
+                    j.ears_issues = list(result.get("ears_issues") or [])
                     j.updated_at = time.time()
             except Exception as err:
                 self._set_error(job_id, str(err))
@@ -119,7 +136,8 @@ class SpecJobStore:
         with self._lock:
             return self._jobs.get(job_id)
 
-    def wait(self, job_id: str, *, timeout_s: float = 600.0) -> SpecGenerationJob:
+    def wait(self, job_id: str, *, timeout_s: float | None = None) -> SpecGenerationJob:
+        timeout_s = spec_gen_timeout_s() if timeout_s is None else timeout_s
         deadline = time.time() + timeout_s
         while time.time() < deadline:
             job = self.get(job_id)

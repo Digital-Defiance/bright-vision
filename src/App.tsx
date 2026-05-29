@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { CssBaseline, ThemeProvider } from '@mui/material'
 import ChatIcon from '@mui/icons-material/Chat'
+import ArticleIcon from '@mui/icons-material/Article'
 import ChecklistRtlIcon from '@mui/icons-material/ChecklistRtl'
 import GitHubIcon from '@mui/icons-material/GitHub'
 import SettingsIcon from '@mui/icons-material/Settings'
@@ -76,6 +77,7 @@ import {
   saveSuggestedFilesPrefs,
   type SuggestedFilesPrefs,
 } from './theme/suggestedFilesPrefs'
+import { loadSpecFocusPref, saveSpecFocusPref } from './theme/specFocusPrefs'
 import { SessionContextChip } from './components/session/SessionContextChip'
 import {
   buildEmptyLlmRetryMessage,
@@ -97,6 +99,7 @@ import { normalizeRepoPath } from './utils/proposedEdits'
 import { isRedundantEditToolOutput } from './utils/suppressDuplicateToolOutput'
 import { appendTimingStatsCsvRow } from './ipc/timingStatsCsv'
 import { ChatPanel, type ChatMessage, type ToolEvent } from './components/chat/ChatPanel'
+import { SpecAgentPanel } from './components/spec/SpecAgentPanel'
 import { TodoPanel } from './components/todos/TodoPanel'
 import { GitPanel } from './components/GitPanel'
 import { useWorkspaceTodos } from './hooks/useWorkspaceTodos'
@@ -208,7 +211,7 @@ import {
 
 const WELCOME_DISMISSED_KEY = 'vision-welcome-dismissed'
 
-type TabId = 'chat' | 'terminal' | 'git' | 'editor' | 'settings' | 'tasks'
+type TabId = 'chat' | 'spec' | 'terminal' | 'git' | 'editor' | 'settings' | 'tasks'
 
 function migrateConfig(raw: Partial<VisionConfig> & Record<string, unknown>): VisionConfig {
   const merged: VisionConfig = { ...DEFAULT_CONFIG, ...raw }
@@ -248,6 +251,9 @@ function migrateConfig(raw: Partial<VisionConfig> & Record<string, unknown>): Vi
   if (typeof merged.autoSaveSessionName !== 'string' || !merged.autoSaveSessionName.trim()) {
     merged.autoSaveSessionName = 'brightvision'
   }
+  if (merged.sessionMode !== 'vibe' && merged.sessionMode !== 'spec') {
+    merged.sessionMode = 'vibe'
+  }
   if (merged.coreEnginePath === 'bright-vision-core' || merged.coreEnginePath === 'BrightVision-core') {
     merged.coreEnginePath = '.'
   }
@@ -271,6 +277,7 @@ interface TerminalLine {
 
 const NAV: { id: TabId; label: string; icon: ReactNode }[] = [
   { id: 'chat', label: 'Chat', icon: <ChatIcon /> },
+  { id: 'spec', label: 'Spec', icon: <ArticleIcon /> },
   { id: 'tasks', label: 'Tasks', icon: <ChecklistRtlIcon /> },
   { id: 'terminal', label: 'Terminal', icon: <TerminalIcon /> },
   { id: 'git', label: 'Git', icon: <GitHubIcon /> },
@@ -318,6 +325,8 @@ function AppShell({
   const [config, setConfig] = useState<VisionConfig>(DEFAULT_CONFIG)
   const [savedConfig, setSavedConfig] = useState<VisionConfig>(DEFAULT_CONFIG)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [specChatMessages, setSpecChatMessages] = useState<ChatMessage[]>([])
+  const [specInputValue, setSpecInputValue] = useState('')
   const [toolEvents, setToolEvents] = useState<ToolEvent[]>([])
   const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([])
   const [inputValue, setInputValue] = useState('')
@@ -341,9 +350,16 @@ function AppShell({
   )
   const [engineInstallPath, setEngineInstallPath] = useState<string | undefined>()
   const [gitRefreshKey, setGitRefreshKey] = useState(0)
+  const [specFocusMode, setSpecFocusMode] = useState(() => loadSpecFocusPref())
   const [specGenerating, setSpecGenerating] = useState(false)
+  const [specAgentEarsLinting, setSpecAgentEarsLinting] = useState(false)
+  const [specAgentTracing, setSpecAgentTracing] = useState(false)
   const specGenerateAbortRef = useRef<AbortController | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const specChatEndRef = useRef<HTMLDivElement>(null)
+  const specTurnCaptureRef = useRef(false)
+  const specStreamingAssistantId = useRef<number | null>(null)
+  const specPendingUserMessageIdsRef = useRef<number[]>([])
   const terminalEndRef = useRef<HTMLDivElement>(null)
   const streamingAssistantId = useRef<number | null>(null)
   const pendingUserMessageIdsRef = useRef<number[]>([])
@@ -355,6 +371,8 @@ function AppShell({
   savedConfigRef.current = savedConfig
   const chatMessagesRef = useRef(chatMessages)
   chatMessagesRef.current = chatMessages
+  const specChatMessagesRef = useRef(specChatMessages)
+  specChatMessagesRef.current = specChatMessages
   const ingestSuggestionsRef = useRef<(content: string) => void>(() => {})
   const suggestedFilesPrefsRef = useRef(suggestedFilesPrefs)
   suggestedFilesPrefsRef.current = suggestedFilesPrefs
@@ -604,6 +622,17 @@ function AppShell({
     [nextChatMessageId]
   )
 
+  const appendUserMessageToSpecChat = useCallback(
+    (content: string, trackPending: boolean) => {
+      const id = nextChatMessageId()
+      if (trackPending) specPendingUserMessageIdsRef.current.push(id)
+      setSpecChatMessages((prev) =>
+        capList([...prev, { id, role: 'user' as const, content }], MAX_CHAT_MESSAGES)
+      )
+    },
+    [nextChatMessageId]
+  )
+
   const hydrateChatFromTranscript = useCallback(
     (rows: TranscriptRow[]) => {
       const mapped = transcriptToChatMessages(rows, nextChatMessageId)
@@ -671,8 +700,12 @@ function AppShell({
           startTurnTimingRef.current(chars, wall)
         }
         const serverText = String(ev.text ?? '')
-        const pendingId = shiftPendingUserMessageId(pendingUserMessageIdsRef.current)
-        setChatMessages((prev) =>
+        const specCap = specTurnCaptureRef.current
+        const pendingId = shiftPendingUserMessageId(
+          specCap ? specPendingUserMessageIdsRef.current : pendingUserMessageIdsRef.current
+        )
+        const setMsgs = specCap ? setSpecChatMessages : setChatMessages
+        setMsgs((prev) =>
           capList(
             reconcileUserMessageInChat(
               prev,
@@ -693,29 +726,32 @@ function AppShell({
           lastAssistantStreamRef.current,
           chunk
         )
-        let sid = streamingAssistantId.current
+        const specCap = specTurnCaptureRef.current
+        const streamRef = specCap ? specStreamingAssistantId : streamingAssistantId
+        const setMsgs = specCap ? setSpecChatMessages : setChatMessages
+        let sid = streamRef.current
         if (sid === null) {
           sid = orderId
-          streamingAssistantId.current = sid
+          streamRef.current = sid
           turnAssistantMessageIdRef.current = sid
           turnHadAssistantOutputRef.current = true
-          setChatMessages((prev) => {
+          setMsgs((prev) => {
             const next = capList(
               [...prev, { id: sid!, role: 'assistant' as const, content: chunk }],
               MAX_CHAT_MESSAGES
             )
-            thinkingTimingRef.current.syncContent(chunk)
+            if (!specCap) thinkingTimingRef.current.syncContent(chunk)
             return next
           })
         } else {
           const captureSid = sid
           turnHadAssistantOutputRef.current = true
-          setChatMessages((prev) => {
+          setMsgs((prev) => {
             const next = capList(
               prev.map((m) => {
                 if (m.id !== captureSid) return m
                 const content = appendStreamingToken(m.content, chunk)
-                thinkingTimingRef.current.syncContent(content)
+                if (!specCap) thinkingTimingRef.current.syncContent(content)
                 return { ...m, content }
               }),
               MAX_CHAT_MESSAGES
@@ -738,7 +774,9 @@ function AppShell({
         lastModelRouteRef.current = snapshot
         setLastModelRoute(snapshot)
         const routeText = formatModelRouteEvent(snapshot)
-        setChatMessages((prev) =>
+        const specCapRoute = specTurnCaptureRef.current
+        const setRouteMsgs = specCapRoute ? setSpecChatMessages : setChatMessages
+        setRouteMsgs((prev) =>
           capList(
             [
               ...prev,
@@ -889,6 +927,7 @@ function AppShell({
       case 'assistant_complete':
         break
       case 'done': {
+        const specCapDone = specTurnCaptureRef.current
         const applied =
           ev.edited_files && Array.isArray(ev.edited_files)
             ? (ev.edited_files as string[])
@@ -898,7 +937,7 @@ function AppShell({
         const hadAssistantOutput = turnHadAssistantOutputRef.current
         let turnTiming: TurnThinkingTiming | null = null
         if (wallStart != null) {
-          const prev = chatMessagesRef.current
+          const prev = specCapDone ? specChatMessagesRef.current : chatMessagesRef.current
           const target =
             turnAssistantId != null
               ? prev.find((m) => m.id === turnAssistantId && m.role === 'assistant')
@@ -972,7 +1011,8 @@ function AppShell({
           thinkingTimingRef.current.reset()
           pendingTurnTimingQueueRef.current = []
         }
-        setChatMessages((prev) => {
+        const setDoneMsgs = specCapDone ? setSpecChatMessages : setChatMessages
+        setDoneMsgs((prev) => {
           const attachId =
             turnAssistantId ??
             (hadAssistantOutput
@@ -996,6 +1036,10 @@ function AppShell({
             MAX_CHAT_MESSAGES
           )
         })
+        if (specCapDone) {
+          specTurnCaptureRef.current = false
+          specStreamingAssistantId.current = null
+        }
         if (applied.length > 0) {
           setTerminalLines((prev) => [
             ...prev,
@@ -1140,13 +1184,22 @@ function AppShell({
     setSuggestedPaths((prev) => filterPathsNotInChat(prev, filesInChat))
   }, [filesInChat])
 
+  const removeLastPendingSpecUserMessage = useCallback(() => {
+    const id = popPendingUserMessageId(specPendingUserMessageIdsRef.current)
+    setSpecChatMessages((prev) => removeChatMessageById(prev, id))
+  }, [])
+
   const onOutboundMessage = useCallback(
     (content: string) => {
       if (content.trim() === '/clear') return
-      appendUserMessageToChat(content, true)
+      if (specTurnCaptureRef.current) {
+        appendUserMessageToSpecChat(content, true)
+      } else {
+        appendUserMessageToChat(content, true)
+      }
       startTurnTimingRef.current(content.length, Date.now())
     },
-    [appendUserMessageToChat]
+    [appendUserMessageToChat, appendUserMessageToSpecChat]
   )
 
   const {
@@ -1341,8 +1394,9 @@ function AppShell({
     () => ({
       client: httpClient ?? todoApiClient,
       workspace: savedConfig.workingDir,
+      sessionId: sessionInfo?.session_id ?? null,
     }),
-    [httpClient, todoApiClient, savedConfig.workingDir]
+    [httpClient, todoApiClient, savedConfig.workingDir, sessionInfo?.session_id]
   )
 
   const { paths: pathSuggestions, active: pathAssistActive } = usePathCompletion(
@@ -1358,6 +1412,10 @@ function AppShell({
     deleteTodo,
     moveTodo,
     syncSpecFromDisk,
+    lintRequirements,
+    fetchSpecIndex,
+    traceSpec,
+    repairSpecFolders,
     setActiveTodo,
     markDone,
     recordTurnLinks,
@@ -1366,14 +1424,21 @@ function AppShell({
     importMarkdown,
     httpReady: todosHttpReady,
     tauriLocal: todosTauriLocal,
-  } = useWorkspaceTodos(savedConfig.workingDir, workspaceTodosApi, () => {
+  } = useWorkspaceTodos(savedConfig.workingDir, workspaceTodosApi, {
+    onAutoCompleted: () => {
       setSnackbar({
         message: 'Task marked done — all checklist items complete',
         severity: 'info',
       })
       void reloadTodos()
-    }
-  )
+    },
+    onEarsRegression: (_id, errorCount) => {
+      setSnackbar({
+        message: `Requirements saved with ${errorCount} EARS error(s) — use Validate EARS`,
+        severity: 'warning',
+      })
+    },
+  })
 
   recordTurnLinksRef.current = recordTurnLinks
   reloadTodosRef.current = reloadTodos
@@ -1460,6 +1525,10 @@ function AppShell({
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatMessages])
+
+  useEffect(() => {
+    if (activeTab === 'spec') specChatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [specChatMessages, activeTab])
 
   useEffect(() => {
     terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -1618,11 +1687,16 @@ function AppShell({
       setTerminalLines([
         {
           id: Date.now(),
-          text: `${prefixForUserFacing('vision')} Started ${DISPLAY_CORE} (session ${info.session_id.slice(0, 8)}…).`,
+          text: `${prefixForUserFacing('vision')} Started ${DISPLAY_CORE} (${savedConfig.sessionMode} session ${info.session_id.slice(0, 8)}…).`,
           type: 'stdout',
           source: 'vision',
         },
       ])
+      if (savedConfig.sessionMode === 'spec') {
+        setActiveTab('spec')
+        setSpecFocusMode(true)
+        saveSpecFocusPref(true)
+      }
       const files = info.files_in_chat?.length ? info.files_in_chat.join(', ') : '(repo map)'
       setStatusMessage(`Session active — ${files}`)
       dismissWelcome()
@@ -1872,7 +1946,18 @@ function AppShell({
       lastAssistantStreamRef.current = ''
       setRouterEscalateOffer(null)
       stallWatch.touchEvent('user_send')
-      const result = await send(text, { ...todoOptions, ...sendExtras })
+      let merged: SendMessageOptions | undefined = todoOptions
+        ? { activeTodoId: todoOptions.activeTodoId, injectTodoSpec: todoOptions.injectTodoSpec }
+        : undefined
+      if (specFocusMode) {
+        merged = {
+          ...merged,
+          specFocus: true,
+          activeTodoId: merged?.activeTodoId ?? activeTodo?.id,
+          injectTodoSpec: true,
+        }
+      }
+      const result = await send(text, { ...merged, ...sendExtras })
       if (result.queued) {
         const trimmed = text.trim()
         setSnackbar({
@@ -1885,7 +1970,7 @@ function AppShell({
       }
       return result
     },
-    [send, stallWatch]
+    [send, stallWatch, specFocusMode, activeTodo]
   )
 
   const handleEscalateRouter = useCallback(async () => {
@@ -2100,18 +2185,26 @@ function AppShell({
         severity: 'info',
       })
       try {
-        await client.generateWorkspaceTodoSpec(
+        const gen = await client.generateWorkspaceTodoSpec(
           savedConfig.workingDir,
           sid,
           todoId,
-          { prompt, mode, apply: true, background: true },
+          { prompt, mode, apply: true, enforce_ears: true, background: true },
           ac.signal
         )
         await reloadTodos()
-        setSnackbar({
-          message: mode === 'refine' ? 'Spec refined and saved' : 'Spec generated and saved',
-          severity: 'info',
-        })
+        if (gen.ears_blocked) {
+          setSnackbar({
+            message:
+              'Spec draft returned but not saved — fix EARS errors (Validate EARS), then refine again',
+            severity: 'warning',
+          })
+        } else {
+          setSnackbar({
+            message: mode === 'refine' ? 'Spec refined and saved' : 'Spec generated and saved',
+            severity: 'info',
+          })
+        }
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return
         setSnackbar({
@@ -2128,6 +2221,40 @@ function AppShell({
     },
     [sessionInfo?.session_id, httpClient, todoApiClient, isRunning, savedConfig.workingDir, reloadTodos]
   )
+
+  const handleSpecSend = async () => {
+    if (!specInputValue.trim() || !isRunning || !activeTodo) return
+    const text = specInputValue.trim()
+    setSpecInputValue('')
+    rememberUserMessageForRetry(text)
+    specTurnCaptureRef.current = true
+    const todoOptions = { activeTodoId: activeTodo.id, injectTodoSpec: true }
+    try {
+      const result = await deliverUserMessage(text, todoOptions, {
+        specFocus: true,
+        preproc: false,
+      })
+      if (!result.queued) void reloadTodos()
+    } catch (err) {
+      specTurnCaptureRef.current = false
+      turnWallStartMsRef.current = null
+      turnAssistantMessageIdRef.current = null
+      turnHadAssistantOutputRef.current = false
+      turnTimingActiveRef.current = false
+      setTrackTurnResources(false)
+      thinkingTimingRef.current.reset()
+      if (err instanceof Error && err.name === 'AbortError') {
+        setStatusMessage('Stopped')
+        return
+      }
+      removeLastPendingSpecUserMessage()
+      setSpecInputValue(text)
+      setSnackbar({
+        message: err instanceof Error ? err.message : String(err),
+        severity: 'error',
+      })
+    }
+  }
 
   const handleImplementStep = useCallback(
     async (todo: TodoItem, step: ImplementationStep) => {
@@ -2342,6 +2469,17 @@ function AppShell({
           </Button>
         </>
       )}
+      {isRunning && savedConfig.sessionMode === 'spec' && (
+        <Chip
+          label="Spec session"
+          size="small"
+          color="primary"
+          variant="outlined"
+          data-testid="session-mode-spec"
+          onClick={() => setActiveTab('spec')}
+          sx={{ cursor: 'pointer' }}
+        />
+      )}
       {activeTodo && (
         <Chip
           label={`Task: ${activeTodo.title}`}
@@ -2456,6 +2594,96 @@ function AppShell({
             </>
           )}
 
+          {activeTab === 'spec' && (
+            <SpecAgentPanel
+              messages={specChatMessages}
+              inputValue={specInputValue}
+              isRunning={isRunning}
+              isBusy={isBusy}
+              sessionReady={isRunning && Boolean(sessionInfo?.session_id) && todosHttpReady}
+              activeTodo={activeTodo}
+              specGenerating={specGenerating}
+              earsLinting={specAgentEarsLinting}
+              specTracing={specAgentTracing}
+              chatEndRef={specChatEndRef}
+              onInputChange={setSpecInputValue}
+              onSend={() => void handleSpecSend()}
+              onCancelSend={handleCancelSend}
+              onOpenTasks={() => setActiveTab('tasks')}
+              onClearHistory={() => setSpecChatMessages([])}
+              onGenerateSpec={
+                activeTodo && isRunning
+                  ? () =>
+                      void handleGenerateSpec(
+                        activeTodo.id,
+                        activeTodo.title ? `Feature: ${activeTodo.title}` : 'Generate spec layers',
+                        'generate'
+                      )
+                  : undefined
+              }
+              onRefineSpec={
+                activeTodo && isRunning
+                  ? () =>
+                      void handleGenerateSpec(
+                        activeTodo.id,
+                        'Review for EARS consistency across requirements, design, and tasks.',
+                        'refine'
+                      )
+                  : undefined
+              }
+              onValidateEars={
+                activeTodo && todosHttpReady
+                  ? () => {
+                      setSpecAgentEarsLinting(true)
+                      void lintRequirements(activeTodo.id, activeTodo.requirements ?? '')
+                        .then((r) => {
+                          setSnackbar({
+                            message: r.ok
+                              ? 'EARS OK for active task requirements'
+                              : `${r.error_count} EARS error(s) on requirements`,
+                            severity: r.ok ? 'info' : 'warning',
+                          })
+                        })
+                        .catch((err) => {
+                          setSnackbar({
+                            message: err instanceof Error ? err.message : String(err),
+                            severity: 'error',
+                          })
+                        })
+                        .finally(() => setSpecAgentEarsLinting(false))
+                    }
+                  : undefined
+              }
+              onTraceSpec={
+                activeTodo && todosHttpReady
+                  ? () => {
+                      setSpecAgentTracing(true)
+                      void traceSpec(activeTodo.id, {
+                        requirements: activeTodo.requirements ?? '',
+                        design: activeTodo.design ?? '',
+                        tasks_md: activeTodo.tasks_md ?? '',
+                      })
+                        .then((r) => {
+                          setSnackbar({
+                            message: r.ok
+                              ? `Trace: ${r.req_ids.length} REQ id(s), ${r.warning_count} warning(s)`
+                              : `Trace: ${r.error_count} error(s)`,
+                            severity: r.ok ? 'info' : 'warning',
+                          })
+                        })
+                        .catch((err) => {
+                          setSnackbar({
+                            message: err instanceof Error ? err.message : String(err),
+                            severity: 'error',
+                          })
+                        })
+                        .finally(() => setSpecAgentTracing(false))
+                    }
+                  : undefined
+              }
+            />
+          )}
+
           {activeTab === 'tasks' && (
             <TodoPanel
               loading={todosLoading}
@@ -2477,6 +2705,46 @@ function AppShell({
                   })
                 }
               }}
+              onLintRequirements={(id, draft) => lintRequirements(id, draft)}
+              onFetchSpecIndex={
+                todosHttpReady ? () => fetchSpecIndex() : undefined
+              }
+              onRepairSpecFolders={
+                todosHttpReady
+                  ? async () => {
+                      const r = await repairSpecFolders()
+                      setSnackbar({
+                        message:
+                          r.created_count > 0
+                            ? `Created ${r.created_count} spec folder(s) and synced markdown`
+                            : 'Spec folders synced from tasks',
+                        severity: 'info',
+                      })
+                      return r
+                    }
+                  : undefined
+              }
+              specFocusMode={specFocusMode}
+              onSpecFocusChange={(on) => {
+                setSpecFocusMode(on)
+                saveSpecFocusPref(on)
+                setSnackbar({
+                  message: on
+                    ? 'Spec focus on — chat will inject steering + active task spec'
+                    : 'Spec focus off',
+                  severity: 'info',
+                })
+              }}
+              onTraceSpec={
+                todosHttpReady
+                  ? (id, draft) =>
+                      traceSpec(id, {
+                        requirements: draft.requirements,
+                        design: draft.design,
+                        tasks_md: draft.tasks_md,
+                      })
+                  : undefined
+              }
               onCancelSpecGenerate={() => specGenerateAbortRef.current?.abort()}
               onSetActive={(id) => void setActiveTodo(id)}
               onMarkDone={(id) => void markDone(id)}

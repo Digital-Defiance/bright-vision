@@ -7,6 +7,7 @@ from __future__ import annotations
 import re
 from typing import Literal
 
+from bright_vision_core.ears.prompt import format_spec_quality_for_prompt
 from bright_vision_core.workspace_todos import TodoItem
 
 GenerateMode = Literal["generate", "refine"]
@@ -24,6 +25,7 @@ Feature request:
 {prompt}
 
 {existing}
+{ears_context}
 
 Respond with markdown only, using exactly these three level-2 headings (no other top-level structure):
 
@@ -31,7 +33,7 @@ Respond with markdown only, using exactly these three level-2 headings (no other
 Use EARS-style bullets: **WHEN** … **THE** system **SHALL** …
 
 ## Design
-Overview, architecture, components, and data flow for this repo.
+Overview, architecture, components, and data flow. Cite each requirement id from Requirements (e.g. REQ-001, REQ-002).
 
 ## Implementation tasks
 Numbered checklist items, one per line, format:
@@ -54,8 +56,9 @@ Task title: {title}
 {tasks_md}
 
 User note: {prompt}
+{ears_context}
 
-Output an improved version with the same three ## headings. Fix contradictions between layers and align implementation tasks with requirements and design.
+Output an improved version with the same three ## headings. Fix contradictions between layers and align implementation tasks with requirements and design. Resolve every EARS error listed above.
 """
 
 
@@ -65,6 +68,13 @@ def build_generate_message(
     mode: GenerateMode = "generate",
     item: TodoItem | None = None,
 ) -> str:
+    ears_context = ""
+    if item:
+        ears_context = format_spec_quality_for_prompt(
+            item.requirements,
+            item.design,
+            item.tasks_md,
+        )
     if mode == "refine" and item:
         return _REFINE_TEMPLATE.format(
             title=item.title,
@@ -72,6 +82,7 @@ def build_generate_message(
             design=item.design.strip() or "(empty)",
             tasks_md=item.tasks_md.strip() or "(empty)",
             prompt=prompt.strip() or "Review for consistency.",
+            ears_context=ears_context,
         )
     existing = ""
     if item and (item.requirements or item.design or item.tasks_md):
@@ -81,7 +92,11 @@ def build_generate_message(
             f"Design:\n{item.design}\n\n"
             f"Implementation tasks:\n{item.tasks_md}\n"
         )
-    return _GENERATE_TEMPLATE.format(prompt=prompt.strip(), existing=existing)
+    return _GENERATE_TEMPLATE.format(
+        prompt=prompt.strip(),
+        existing=existing,
+        ears_context=ears_context,
+    )
 
 
 def parse_generated_layers(text: str) -> dict[str, str]:

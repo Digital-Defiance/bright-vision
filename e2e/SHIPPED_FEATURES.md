@@ -15,7 +15,11 @@ Map every **Done** roadmap slice to automated verification. Add a row when you s
 | `/add` Tab | `path-completion.spec.ts` | — | — |
 | Attach images | `file-upload.spec.ts` | — | — |
 | Settings / commit prefs | `settings-config.spec.ts` | — | — |
-| Tasks / generate-spec | `tasks-workspace.spec.ts` | `tasks-seeded` | `integration/tasks-seeded-workspace` |
+| Tasks / generate-spec | `tasks-workspace.spec.ts`, `tasks-generate-spec.spec.ts` | `tasks-seeded` | `test_http_generate_spec_mock.py`, `test_generate_spec_parse.py` |
+| Spec generate (LLM) | — | — | `spec-generate-llm.spec.ts` @spec-gen, `test_generate_spec_llm.py` |
+| EARS validate (Tasks) | `tasks-ears.spec.ts` | — | `test_http_ears_lint.py`, `test_ears_lint.py` |
+| Spec index & trace (Tasks) | `tasks-ears-index.spec.ts` | — | `test_ears_index.py`, `test_ears_trace.py`, `test_http_ears_index_trace.py` |
+| Spec agent rail | `spec-agent.spec.ts` | — | E6 / #20 |
 | Submodule verify | `release-hygiene.spec.ts` | — | `yarn verify:submodule` |
 | Git tab (desktop) | `tauri-git.spec.ts` | — | — |
 | Git poll | `git-polling.spec.ts` | — | — |
@@ -23,7 +27,7 @@ Map every **Done** roadmap slice to automated verification. Add a row when you s
 | UpdateTodoList (LLM JSON) | — | — | `todo-list-llm` @todo, `test_todo_list_llm.py` |
 | Proposed edit (LLM) | `proposed-edits-apply.spec.ts` | `proposed-edit` | `edit-block-llm` @edit, `test_edit_block_llm.py` |
 | Session transcript (live) | `session-transcript-hydrate.spec.ts` | `session-transcript` | `transcript-llm` @transcript, `test_transcript_llm.py` |
-| Superproject workspace | — | — | `test_superproject_dogfood.py`, opt-in `superproject-llm` @superproject |
+| Superproject workspace | — | — | `test_superproject_dogfood.py`; opt-in `superproject-llm` @superproject (Vision API + README in `files`, `preproc: false`) |
 | Suggested files | `suggested-files.spec.ts` | `suggested-files` | — |
 | Thinking timers | `chat-ux.spec.ts` | `default` | — |
 | Context chip | `session-context.spec.ts` | `default` | — |

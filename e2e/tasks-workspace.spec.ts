@@ -45,6 +45,6 @@ test.describe('Tasks workspace (roadmap #18, charter § spec-driven)', () => {
     await page.getByRole('button', { name: 'Generate spec' }).click()
     await expect(page.getByRole('dialog')).toBeVisible()
     await page.getByRole('button', { name: 'Run' }).click()
-    await expect(page.getByText('Generated requirements')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('REQ-001')).toBeVisible({ timeout: 15_000 })
   })
 })

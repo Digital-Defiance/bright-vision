@@ -5,6 +5,7 @@ import { isTauriRuntime } from '../ipc/isTauri'
 import { loadTodoStore, normalizeTodo, saveTodoStore } from '../todos/storage'
 import { exportTodoStore, importTodoStore } from '../todos/markdown'
 import { applyLayerTemplate, applyTodoTemplate } from '../todos/templates'
+import type { EarsLintResult, SpecIndexResult, TraceabilityResult } from '../todos/earsTypes'
 import type { ChecklistItem, TodoItem, TodoStore, TodoStatus } from '../todos/types'
 
 function nowIso(): string {
@@ -18,6 +19,7 @@ function checklistComplete(checklist: ChecklistItem[]): boolean {
 export interface WorkspaceTodosApi {
   client: CoreHttpClient
   workspace: string
+  sessionId?: string | null
 }
 
 type TodoPatch = Partial<
@@ -40,8 +42,13 @@ type TodoPatch = Partial<
 export function useWorkspaceTodos(
   workingDir: string,
   api?: WorkspaceTodosApi | null,
-  onAutoCompleted?: (todoId: string) => void
+  callbacks?: {
+    onAutoCompleted?: (todoId: string) => void
+    onEarsRegression?: (todoId: string, errorCount: number) => void
+  }
 ) {
+  const onAutoCompleted = callbacks?.onAutoCompleted
+  const onEarsRegression = callbacks?.onEarsRegression
   const [store, setStore] = useState<TodoStore | null>(null)
   const [loading, setLoading] = useState(true)
   const [httpReady, setHttpReady] = useState(false)
@@ -187,8 +194,14 @@ export function useWorkspaceTodos(
       if (httpReady && api) {
         const result = await api.client.patchWorkspaceTodo(api.workspace, id, patch)
         if (result.auto_completed) onAutoCompleted?.(id)
+        if (
+          result.ears_requirements_ok === false &&
+          (result.ears_error_count ?? 0) > 0
+        ) {
+          onEarsRegression?.(id, result.ears_error_count ?? 0)
+        }
         await reload()
-        return
+        return result
       }
       if (!store) return
       let todos = store.todos.map((t) =>
@@ -301,6 +314,54 @@ export function useWorkspaceTodos(
     [httpReady, api, tauriLocal, workingDir, reload]
   )
 
+  const lintRequirements = useCallback(
+    async (id: string, draftRequirements?: string): Promise<EarsLintResult> => {
+      if (!httpReady || !api) {
+        throw new Error('Validate EARS requires a running Vision API session (Terminal → Start)')
+      }
+      const draft =
+        draftRequirements !== undefined ? { requirements: draftRequirements } : undefined
+      if (api.sessionId) {
+        return api.client.lintSessionRequirements(api.sessionId, id, draft)
+      }
+      return api.client.lintWorkspaceRequirements(api.workspace, id, draft)
+    },
+    [httpReady, api]
+  )
+
+  const fetchSpecIndex = useCallback(async (): Promise<SpecIndexResult> => {
+    if (!httpReady || !api) {
+      throw new Error('Spec index requires a running Vision API (Terminal → Start)')
+    }
+    if (api.sessionId) {
+      return api.client.getSessionSpecIndex(api.sessionId)
+    }
+    return api.client.getWorkspaceSpecIndex(api.workspace)
+  }, [httpReady, api])
+
+  const repairSpecFolders = useCallback(async (): Promise<{ created_count: number; created_ids: string[] }> => {
+    if (!httpReady || !api) {
+      throw new Error('Repair spec folders requires a running Vision API')
+    }
+    return api.client.repairWorkspaceSpecFolders(api.workspace)
+  }, [httpReady, api])
+
+  const traceSpec = useCallback(
+    async (
+      id: string,
+      draft?: { requirements?: string; design?: string; tasks_md?: string }
+    ): Promise<TraceabilityResult> => {
+      if (!httpReady || !api) {
+        throw new Error('Trace coverage requires a running Vision API (Terminal → Start)')
+      }
+      if (api.sessionId) {
+        return api.client.traceSessionSpec(api.sessionId, id, draft)
+      }
+      return api.client.traceWorkspaceSpec(api.workspace, id, draft)
+    },
+    [httpReady, api]
+  )
+
   const moveTodo = useCallback(
     async (id: string, direction: 'up' | 'down') => {
       if (httpReady && api) {
@@ -361,5 +422,9 @@ export function useWorkspaceTodos(
     importMarkdown,
     moveTodo,
     syncSpecFromDisk,
+    lintRequirements,
+    fetchSpecIndex,
+    traceSpec,
+    repairSpecFolders,
   }
 }

@@ -55,7 +55,22 @@ POST   /sessions/{session_id}/todos/{id}/generate-spec   {"prompt", "mode", "app
 GET    /workspaces/todos/generate-spec/{job_id}   poll job status
 DELETE /sessions/{session_id}/todos/{id}
 PUT    /sessions/{session_id}/todos/active   {"activeId": "…" | null}
+POST   /workspaces/todos/{id}/lint-requirements?workspace=…   optional {"requirements": "draft markdown"}
+POST   /sessions/{session_id}/todos/{id}/lint-requirements   same body — deterministic EARS lint (`bright_vision_core/ears`)
+GET    /workspaces/spec-index?workspace=…   scan `.cecli/specs/**` vs `todos.json` task ids
+GET    /sessions/{session_id}/spec-index   same for session workspace
+POST   /workspaces/todos/{id}/trace-spec?workspace=…   optional {"requirements","design","tasks_md"} drafts
+POST   /sessions/{session_id}/todos/{id}/trace-spec   REQ ↔ design ↔ tasks traceability report
+POST   /workspaces/todos/repair-spec-folders?workspace=…   create missing `.cecli/specs/{id}/` + sync markdown
 ```
+
+Generate spec body adds `enforce_ears` (default true). Completed jobs may return `ears_blocked` + `ears_issues` when apply was skipped.
+
+Message body adds `spec_focus` (steering + inject active task spec) and optional `preproc: false` (Spec tab).
+
+Session create accepts `session_mode`: `"vibe"` (default) or `"spec"` (steering + task spec on every turn).
+
+`PATCH …/todos/{id}` returns optional `ears_requirements_ok` / `ears_error_count` when `requirements` is updated.
 
 Send a message with task context:
 

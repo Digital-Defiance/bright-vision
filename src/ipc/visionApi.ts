@@ -120,6 +120,7 @@ export function createVisionApiSession(
           auto_load: cfg.autoLoadSession,
           auto_save_session_name: cfg.autoSaveSessionName,
           chat_history_file: cfg.chatHistoryFile,
+          session_mode: cfg.sessionMode,
         })
         sessionId = session.session_id
         sessionInfo = session

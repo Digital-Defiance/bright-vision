@@ -3,6 +3,7 @@
  * Use when not running inside Tauri (e.g. Vite-only dev against core on :8741).
  */
 
+import type { EarsLintResult, SpecIndexResult, TraceabilityResult } from '../todos/earsTypes'
 import type { PatchTodoResult, TodoItem, TodoStore } from '../todos/types'
 import { normalizeStore, normalizeTodo } from '../todos/storage'
 import type { CoreEventBase } from './events'
@@ -33,6 +34,7 @@ export interface ModelRouterApiConfig {
 export interface SendMessageOptions {
   activeTodoId?: string
   injectTodoSpec?: boolean
+  specFocus?: boolean
   preproc?: boolean
   forceTier?: 'fast' | 'heavy'
   escalateFromLast?: boolean
@@ -163,6 +165,8 @@ export class CoreHttpClient {
     auto_load?: boolean
     auto_save_session_name?: string
     chat_history_file?: boolean
+    spec_focus?: boolean
+    session_mode?: 'vibe' | 'spec'
   }): Promise<CoreSessionInfo> {
     const res = await fetch(`${this.baseUrl}/sessions`, {
       method: 'POST',
@@ -284,7 +288,12 @@ export class CoreHttpClient {
     )
     if (!res.ok) throw new Error(`patch workspace todo: ${res.status} ${await res.text()}`)
     const data = (await res.json()) as PatchTodoResult
-    return { item: normalizeTodo(data.item), auto_completed: Boolean(data.auto_completed) }
+    return {
+      item: normalizeTodo(data.item),
+      auto_completed: Boolean(data.auto_completed),
+      ears_requirements_ok: data.ears_requirements_ok ?? null,
+      ears_error_count: data.ears_error_count ?? null,
+    }
   }
 
   async deleteWorkspaceTodo(workspace: string, todoId: string): Promise<void> {
@@ -302,6 +311,102 @@ export class CoreHttpClient {
     )
     if (!res.ok) throw new Error(`sync spec files: ${res.status} ${await res.text()}`)
     return normalizeTodo(await res.json())
+  }
+
+  async lintWorkspaceRequirements(
+    workspace: string,
+    todoId: string,
+    draft?: { requirements?: string }
+  ): Promise<EarsLintResult> {
+    const res = await fetch(
+      `${this.baseUrl}/workspaces/todos/${todoId}/lint-requirements?${this.workspaceQs(workspace)}`,
+      {
+        method: 'POST',
+        headers: this.headers(),
+        body: JSON.stringify(draft?.requirements != null ? { requirements: draft.requirements } : {}),
+      }
+    )
+    if (!res.ok) throw new Error(`lint requirements: ${res.status} ${await res.text()}`)
+    return (await res.json()) as EarsLintResult
+  }
+
+  async lintSessionRequirements(
+    sessionId: string,
+    todoId: string,
+    draft?: { requirements?: string }
+  ): Promise<EarsLintResult> {
+    const res = await fetch(
+      `${this.baseUrl}/sessions/${sessionId}/todos/${todoId}/lint-requirements`,
+      {
+        method: 'POST',
+        headers: this.headers(),
+        body: JSON.stringify(draft?.requirements != null ? { requirements: draft.requirements } : {}),
+      }
+    )
+    if (!res.ok) throw new Error(`lint requirements: ${res.status} ${await res.text()}`)
+    return (await res.json()) as EarsLintResult
+  }
+
+  async getWorkspaceSpecIndex(workspace: string): Promise<SpecIndexResult> {
+    const res = await fetch(
+      `${this.baseUrl}/workspaces/spec-index?${this.workspaceQs(workspace)}`,
+      { headers: this.headers(false) }
+    )
+    if (!res.ok) throw new Error(`spec index: ${res.status} ${await res.text()}`)
+    return (await res.json()) as SpecIndexResult
+  }
+
+  async repairWorkspaceSpecFolders(
+    workspace: string
+  ): Promise<{ created_count: number; created_ids: string[] }> {
+    const res = await fetch(
+      `${this.baseUrl}/workspaces/todos/repair-spec-folders?${this.workspaceQs(workspace)}`,
+      { method: 'POST', headers: this.headers(false) }
+    )
+    if (!res.ok) throw new Error(`repair spec folders: ${res.status} ${await res.text()}`)
+    return (await res.json()) as { created_count: number; created_ids: string[] }
+  }
+
+  async getSessionSpecIndex(sessionId: string): Promise<SpecIndexResult> {
+    const res = await fetch(`${this.baseUrl}/sessions/${sessionId}/spec-index`, {
+      headers: this.headers(false),
+    })
+    if (!res.ok) throw new Error(`spec index: ${res.status} ${await res.text()}`)
+    return (await res.json()) as SpecIndexResult
+  }
+
+  async traceWorkspaceSpec(
+    workspace: string,
+    todoId: string,
+    draft?: { requirements?: string; design?: string; tasks_md?: string }
+  ): Promise<TraceabilityResult> {
+    const body: Record<string, string> = {}
+    if (draft?.requirements != null) body.requirements = draft.requirements
+    if (draft?.design != null) body.design = draft.design
+    if (draft?.tasks_md != null) body.tasks_md = draft.tasks_md
+    const res = await fetch(
+      `${this.baseUrl}/workspaces/todos/${todoId}/trace-spec?${this.workspaceQs(workspace)}`,
+      { method: 'POST', headers: this.headers(), body: JSON.stringify(body) }
+    )
+    if (!res.ok) throw new Error(`trace spec: ${res.status} ${await res.text()}`)
+    return (await res.json()) as TraceabilityResult
+  }
+
+  async traceSessionSpec(
+    sessionId: string,
+    todoId: string,
+    draft?: { requirements?: string; design?: string; tasks_md?: string }
+  ): Promise<TraceabilityResult> {
+    const body: Record<string, string> = {}
+    if (draft?.requirements != null) body.requirements = draft.requirements
+    if (draft?.design != null) body.design = draft.design
+    if (draft?.tasks_md != null) body.tasks_md = draft.tasks_md
+    const res = await fetch(
+      `${this.baseUrl}/sessions/${sessionId}/todos/${todoId}/trace-spec`,
+      { method: 'POST', headers: this.headers(), body: JSON.stringify(body) }
+    )
+    if (!res.ok) throw new Error(`trace spec: ${res.status} ${await res.text()}`)
+    return (await res.json()) as TraceabilityResult
   }
 
   async moveWorkspaceTodo(
@@ -406,7 +511,12 @@ export class CoreHttpClient {
     })
     if (!res.ok) throw new Error(`patch todo: ${res.status} ${await res.text()}`)
     const data = (await res.json()) as PatchTodoResult
-    return { item: normalizeTodo(data.item), auto_completed: Boolean(data.auto_completed) }
+    return {
+      item: normalizeTodo(data.item),
+      auto_completed: Boolean(data.auto_completed),
+      ears_requirements_ok: data.ears_requirements_ok ?? null,
+      ears_error_count: data.ears_error_count ?? null,
+    }
   }
 
   async deleteTodo(sessionId: string, todoId: string): Promise<void> {
@@ -423,6 +533,7 @@ export class CoreHttpClient {
     tasks_md?: string
     raw?: string
     item?: TodoItem | null
+    ears_blocked?: boolean
   }) {
     return {
       requirements: data.requirements ?? '',
@@ -430,6 +541,7 @@ export class CoreHttpClient {
       tasks_md: data.tasks_md ?? '',
       raw: data.raw ?? '',
       item: data.item ? normalizeTodo(data.item) : null,
+      ears_blocked: Boolean(data.ears_blocked),
     }
   }
 
@@ -441,6 +553,7 @@ export class CoreHttpClient {
     tasks_md: string
     raw: string
     item: TodoItem | null
+    ears_blocked?: boolean
   }> {
     const url = `${this.baseUrl}/workspaces/todos/generate-spec/${jobId}`
     for (let attempt = 0; attempt < 600; attempt++) {
@@ -455,6 +568,7 @@ export class CoreHttpClient {
         tasks_md?: string
         raw?: string
         item?: TodoItem | null
+        ears_blocked?: boolean
       }
       if (data.status === 'completed') {
         return { status: data.status, ...this.mapSpecJobResult(data) }
@@ -475,6 +589,7 @@ export class CoreHttpClient {
       prompt: string
       mode?: 'generate' | 'refine'
       apply?: boolean
+      enforce_ears?: boolean
       background?: boolean
     },
     signal?: AbortSignal
@@ -484,6 +599,7 @@ export class CoreHttpClient {
     tasks_md: string
     raw: string
     item: TodoItem | null
+    ears_blocked?: boolean
   }> {
     const qs = `${this.workspaceQs(workspace)}&session_id=${encodeURIComponent(sessionId)}`
     const res = await fetch(`${this.baseUrl}/workspaces/todos/${todoId}/generate-spec?${qs}`, {
@@ -493,6 +609,7 @@ export class CoreHttpClient {
         prompt: body.prompt,
         mode: body.mode ?? 'generate',
         apply: body.apply ?? true,
+        enforce_ears: body.enforce_ears ?? true,
         background: body.background ?? true,
       }),
       signal,
@@ -506,6 +623,7 @@ export class CoreHttpClient {
         tasks_md: done.tasks_md,
         raw: done.raw,
         item: done.item,
+        ears_blocked: done.ears_blocked,
       }
     }
     if (!res.ok) throw new Error(`generate spec: ${res.status} ${await res.text()}`)
@@ -519,6 +637,7 @@ export class CoreHttpClient {
       prompt: string
       mode?: 'generate' | 'refine'
       apply?: boolean
+      enforce_ears?: boolean
       background?: boolean
     },
     signal?: AbortSignal
@@ -528,6 +647,7 @@ export class CoreHttpClient {
     tasks_md: string
     raw: string
     item: TodoItem | null
+    ears_blocked?: boolean
   }> {
     const res = await fetch(
       `${this.baseUrl}/sessions/${sessionId}/todos/${todoId}/generate-spec`,
@@ -552,6 +672,7 @@ export class CoreHttpClient {
         tasks_md: done.tasks_md,
         raw: done.raw,
         item: done.item,
+        ears_blocked: done.ears_blocked,
       }
     }
     if (!res.ok) throw new Error(`generate spec: ${res.status} ${await res.text()}`)
@@ -593,6 +714,7 @@ export class CoreHttpClient {
         preproc: options?.preproc ?? true,
         active_todo_id: options?.activeTodoId ?? null,
         inject_todo_spec: options?.injectTodoSpec ?? false,
+        spec_focus: options?.specFocus ?? false,
         force_tier: options?.forceTier ?? null,
         escalate_from_last: options?.escalateFromLast ?? false,
       }),

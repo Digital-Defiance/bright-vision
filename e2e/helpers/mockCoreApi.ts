@@ -10,6 +10,7 @@ import {
 import { formatSse } from './sse'
 import { importAgentPlanFromDisk } from './agentTodoImportDisk'
 import { normalizeWorkspacePath } from './workspacePath'
+import { MOCK_SANE_SPEC_LAYERS } from '../../src/utils/specLayers'
 
 export interface MockCoreOptions {
   sessionId?: string
@@ -431,6 +432,36 @@ export async function installMockCoreApi(page: Page, opts: MockCoreOptions = {})
   )
 
   await page.route(
+    (url) => url.pathname.includes('/lint-requirements'),
+    async (route) => {
+      const body = route.request().postDataJSON() as { requirements?: string }
+      const text = body?.requirements ?? ''
+      const ok = /\bshall\b/i.test(text) && /\bwhen\b/i.test(text)
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok,
+          error_count: ok ? 0 : 1,
+          warning_count: 0,
+          issues: ok
+            ? []
+            : [
+                {
+                  code: 'EARS_NO_SHALL',
+                  message: 'Requirement clause should include SHALL',
+                  severity: 'error',
+                  line: 2,
+                  req_id: 'REQ-001',
+                },
+              ],
+          clauses: ok ? [{ id: 'REQ-001', line: 1, text: 'mock clause' }] : [],
+        }),
+      })
+    }
+  )
+
+  await page.route(
     (url) => /\/workspaces\/todos\/[^/]+\/generate-spec$/.test(url.pathname),
     async (route) => {
     const url = new URL(route.request().url())
@@ -455,9 +486,9 @@ export async function installMockCoreApi(page: Page, opts: MockCoreOptions = {})
       const t = todoStore.todos[idx]!
       const updated: TodoItem = {
         ...t,
-        requirements: '# Generated requirements\n\nWHEN user acts THEN system SHALL respond.',
-        design: '## Generated design\n\nDetails.',
-        tasks_md: '- [ ] Generated step',
+        requirements: MOCK_SANE_SPEC_LAYERS.requirements,
+        design: MOCK_SANE_SPEC_LAYERS.design,
+        tasks_md: MOCK_SANE_SPEC_LAYERS.tasks_md,
         updated_at: new Date().toISOString(),
       }
       const todos = [...todoStore.todos]
