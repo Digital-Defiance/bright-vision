@@ -82,27 +82,30 @@ export async function openTasks(
   page: Page,
   opts?: { waitForAgentPlanImport?: boolean }
 ) {
-  const importPlan = opts?.waitForAgentPlanImport
-    ? page.waitForResponse(
-        (res) =>
-          res.request().method() === 'POST' &&
-          res.url().includes('/workspaces/todos/import-agent-plan') &&
-          res.ok(),
-        { timeout: 30_000 }
-      )
-    : null
-  const todosLoaded = page.waitForResponse(
-    (res) =>
-      res.request().method() === 'GET' &&
-      res.url().includes('/workspaces/todos') &&
-      !res.url().includes('import-agent-plan') &&
-      res.ok(),
-    { timeout: 15_000 }
-  )
-  await page.getByTestId('nav-tasks').click()
-  if (importPlan) await importPlan
-  await todosLoaded
-  await expect(page.getByTestId('todo-panel')).toBeVisible()
+  if (opts?.waitForAgentPlanImport) {
+    const importPlan = page.waitForResponse(
+      (res) =>
+        res.request().method() === 'POST' &&
+        res.url().includes('/workspaces/todos/import-agent-plan') &&
+        res.ok(),
+      { timeout: 30_000 }
+    )
+    await page.getByTestId('nav-tasks').click()
+    await importPlan
+  } else {
+    await page.getByTestId('nav-tasks').click()
+  }
+  const panel = page.getByTestId('todo-panel')
+  await expect(panel).toBeVisible()
+  await expect(panel.getByText('Loading…')).toHaveCount(0, { timeout: 15_000 })
+}
+
+/** Wait for mocked/core todo list (e.g. sampleTodoStore "First task"). */
+export async function expectTasksListReady(page: Page, taskTitle = 'First task') {
+  await expect(page.getByTestId('todo-new')).toBeEnabled({ timeout: 15_000 })
+  await expect(
+    page.getByTestId('todo-panel').getByRole('button', { name: taskTitle })
+  ).toBeVisible({ timeout: 15_000 })
 }
 
 /** MUI Select for new-task template (not a native `<select>`). */

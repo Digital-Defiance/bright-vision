@@ -25,7 +25,7 @@ export default defineConfig({
   workers: 1,
   timeout: Math.max(
     900_000,
-    (Number(process.env.LLM_SPEC_GEN_TIMEOUT_S) || 600) * 1000 + 600_000
+    (Number(process.env.LLM_SPEC_GEN_TIMEOUT_S) || 600) * 1000 * 4 + 600_000
   ),
   forbidOnly: !!process.env.CI,
   retries: 0,

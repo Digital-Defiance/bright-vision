@@ -904,6 +904,69 @@ fn todo_specs_dir(working_dir: &str, todo_id: &str) -> PathBuf {
         .join(todo_id)
 }
 
+fn write_todo_spec_files(working_dir: &str, item: &TodoItemJson) -> Result<(), String> {
+    let folder = todo_specs_dir(working_dir, &item.id);
+    std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
+    std::fs::write(folder.join("requirements.md"), &item.requirements).map_err(|e| e.to_string())?;
+    std::fs::write(folder.join("design.md"), &item.design).map_err(|e| e.to_string())?;
+    std::fs::write(folder.join("tasks.md"), &item.tasks_md).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Remove ``.cecli/specs/{id}/`` for a deleted task.
+#[tauri::command]
+fn delete_todo_spec_folder(working_dir: String, todo_id: String) -> Result<(), String> {
+    let folder = todo_specs_dir(&working_dir, &todo_id);
+    if folder.is_dir() {
+        std::fs::remove_dir_all(&folder).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// Delete ``.cecli/specs/{id}/`` folders that are not in todos.json.
+#[tauri::command]
+fn prune_orphan_spec_folders(working_dir: String) -> Result<Vec<String>, String> {
+    let store = read_workspace_todos(working_dir.clone())?;
+    let known: std::collections::HashSet<&str> = store.todos.iter().map(|t| t.id.as_str()).collect();
+    let specs_root = normalize_project_workspace(&working_dir)
+        .join(WORKSPACE_META_DIR)
+        .join("specs");
+    let mut removed = Vec::new();
+    if !specs_root.is_dir() {
+        return Ok(removed);
+    }
+    let entries: Vec<_> = std::fs::read_dir(&specs_root)
+        .map_err(|e| e.to_string())?
+        .filter_map(|e| e.ok())
+        .collect();
+    for entry in entries {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.starts_with('.') || known.contains(name.as_str()) {
+            continue;
+        }
+        std::fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
+        removed.push(name);
+    }
+    removed.sort();
+    Ok(removed)
+}
+
+/// Write three-layer markdown from todos.json to ``.cecli/specs/{id}/``.
+#[tauri::command]
+fn export_todo_spec_files(working_dir: String, todo_id: String) -> Result<(), String> {
+    let store = read_workspace_todos(working_dir.clone())?;
+    let item = store
+        .todos
+        .iter()
+        .find(|t| t.id == todo_id)
+        .ok_or_else(|| format!("Unknown task: {todo_id}"))?;
+    write_todo_spec_files(&working_dir, item)
+}
+
 /// Load requirements/design/tasks markdown from ``.cecli/specs/{id}/`` into todos.json.
 #[tauri::command]
 fn import_todo_spec_files(working_dir: String, todo_id: String) -> Result<TodoItemJson, String> {
@@ -1173,6 +1236,9 @@ fn main() {
             read_workspace_text_file,
             write_workspace_text_file,
             import_todo_spec_files,
+            export_todo_spec_files,
+            prune_orphan_spec_folders,
+            delete_todo_spec_folder,
             estimate_paths_context_chars,
             resource_monitor::get_resource_snapshot,
             ntfy_notify::ntfy_send_push,

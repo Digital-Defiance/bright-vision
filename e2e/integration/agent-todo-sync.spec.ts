@@ -5,6 +5,7 @@ import {
   ensureIntegrationWorkspace,
   integrationTodosPath,
   isIntegrationE2eEnabled,
+  postImportAgentPlan,
   readIntegrationTodoStore,
   resetIntegrationCecliState,
   writeAgentTodoFile,
@@ -36,16 +37,10 @@ test.describe('Agent todo → Tasks (real core + real HTTP)', () => {
     await primeIntegrationApp(page)
     await startIntegrationSession(page)
 
-    const importPlan = page.waitForResponse(
-      (res) =>
-        res.request().method() === 'POST' &&
-        res.url().includes('/workspaces/todos/import-agent-plan') &&
-        res.ok(),
-      { timeout: 30_000 }
-    )
+    const importRes = await postImportAgentPlan(workspace)
+    expect(importRes.ok, await importRes.text()).toBe(true)
 
     await openTasks(page)
-    await importPlan
 
     const taskRow = page.getByTestId('todo-panel').getByRole('button', {
       name: /Draft roadmap items in docs\/ROADMAP\.md/,
@@ -70,16 +65,10 @@ test.describe('Agent todo → Tasks (real core + real HTTP)', () => {
     await primeIntegrationApp(page)
     await startIntegrationSession(page)
 
-    const importPlan = page.waitForResponse(
-      (res) =>
-        res.request().method() === 'POST' &&
-        res.url().includes('/workspaces/todos/import-agent-plan') &&
-        res.ok(),
-      { timeout: 30_000 }
-    )
+    const importRes = await postImportAgentPlan(workspace)
+    expect(importRes.ok, await importRes.text()).toBe(true)
 
     await openTasks(page)
-    await importPlan
 
     const taskRow = page.getByTestId('todo-panel').getByRole('button', {
       name: /Explore the codebase/,

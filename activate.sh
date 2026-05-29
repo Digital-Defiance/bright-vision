@@ -83,6 +83,9 @@ if [ ! -d "$VENV" ]; then
 fi
 
 PYTHON="${VENV}/bin/python3"
+if [ ! -e "${VENV}/bin/python" ]; then
+  ln -sf python3 "${VENV}/bin/python" 2>/dev/null || true
+fi
 export PATH="${VENV}/bin:${PATH}"
 # Parent repo has a `cecli/` submodule dir; cwd on sys.path shadows the installed package.
 export PYTHONSAFEPATH=1

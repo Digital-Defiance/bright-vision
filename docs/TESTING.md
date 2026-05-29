@@ -18,6 +18,7 @@ All checks run on **your machine**. Nothing here requires GitHub Actions — wor
 | Full dogfood gate only | `yarn dogfood:gate` | release tier; optional `DOGFOOD_LLM=1` |
 | Scenario matrix (all registered SSE outputs) | `yarn test:e2e shipped-scenarios` | ~2–3 min |
 | Fixture-pack structure preflight | `yarn test:e2e:fixtures` | ~1s |
+| **100% automated confidence** (dogfood check + release + fixtures + full LLM incl. superproject) | `yarn test:everything` / `sh scripts/test-everything.sh` | ~20–35 min with Ollama; superset of `DOGFOOD_LLM=1 DOGFOOD_SUPERPROJECT_LLM=1 yarn dogfood:agent` + `test:e2e:fixtures` |
 
 Same tiers via shell:
 
@@ -111,8 +112,9 @@ yarn test:e2e
 | `chat-context.spec.ts` | Folder attach |
 | `tasks-workspace.spec.ts` | Tasks + generate-spec |
 | `tasks-generate-spec.spec.ts` | Three-layer generate/refine + `ears_blocked` snackbar (mock) |
+| `tasks-spec-wizard.spec.ts` | Phased wizard: tab gates, nudges, per-tab generate labels, `section` POST body, All layers |
 | `tasks-ears.spec.ts` | Validate EARS (mock lint) |
-| `spec-generate-llm.spec.ts` | Real Ollama generate-spec + layer sanity (`E2E_LLM=1`, `@spec-gen`) |
+| `spec-generate-llm.spec.ts` | Real Ollama phased wizard (req → design → tasks) + legacy all-layers (`E2E_LLM=1`, `@spec-gen`) |
 | `settings-config.spec.ts` | Settings persistence; Cecli session encrypt/auto-save API flags |
 | `tauri-git.spec.ts` | Git panel (mock Tauri) |
 | `path-completion.spec.ts` | `/add` Tab (desktop vs web) |
@@ -172,6 +174,9 @@ yarn test:e2e:llm:router
 # Opt-in: repo root workspace (slow RepoSet map; README via contextFiles at session start)
 E2E_SUPERPROJECT_LLM=1 yarn test:e2e:llm:superproject
 
+# All of the above + dogfood:check + release + fixtures (100% confidence bar)
+source activate.sh && yarn test:everything
+
 # Same as test:e2e:llm with explicit default model tag
 yarn test:e2e:llm:single
 
@@ -198,6 +203,7 @@ Optional env:
 | `E2E_SUPERPROJECT_LLM` | `1` runs `superproject-llm.spec.ts` (BrightVision repo root; slow) |
 | `DOGFOOD_LLM` | `1` with `yarn dogfood:gate` runs `test:llm:core` + `test:e2e:llm` when Ollama is up |
 | `LLM_SPEC_GEN_TIMEOUT_S` | Background generate-spec job wait (pytest `test_generate_spec_llm`, HTTP sync poll, `spec-generate-llm` e2e; default `900` in `test:llm:core`) |
+| `LLM_SPEC_GEN_TURN_TIMEOUT_S` | Per one-shot LLM turn inside generate-spec (`run_one_shot`; `test:llm:core` sets `600`; else `max(LLM_TEST_TURN_TIMEOUT_S, LLM_SPEC_GEN_TIMEOUT_S/2)`) |
 | `LLM_TEST_TURN_TIMEOUT_S` | Per-turn SSE read cap in `test:llm:core` (default `300`; `/agent` uses max with `VISION_AGENT_PREPROC_TIMEOUT_S`) |
 | `VISION_AGENT_PREPROC_TIMEOUT_S` | Wall-clock cap for `/agent` preproc in core + pytest (default `480` in `test:llm:core`; `0` = no cap in dev) |
 | `VISION_SLASH_PREPROC_TIMEOUT_S` | Cap for other slash preproc (default `240` in `test:llm:core`, `300` in product) |

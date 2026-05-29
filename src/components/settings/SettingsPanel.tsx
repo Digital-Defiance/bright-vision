@@ -47,6 +47,10 @@ import { NtfyAlertsSection } from './NtfyAlertsSection'
 import { AgentsSection } from './AgentsSection'
 import type { AppVersions } from '../../hooks/useAppVersions'
 import type { SubAgentInfo } from '../../ipc/agentCommands'
+import {
+  SessionModeToggle,
+  type SessionMode,
+} from '../session/SessionModeToggle'
 
 interface SettingsPanelProps {
   config: VisionConfig
@@ -72,6 +76,8 @@ interface SettingsPanelProps {
   modelRouterPrefs: ModelRouterPrefs
   onModelRouterPrefsChange: (prefs: ModelRouterPrefs) => void
   sessionModel: string
+  onSessionModeChange: (mode: SessionMode) => void
+  liveSessionMode?: SessionMode | null
   onSave: () => void
   onReset: () => void
   appVersions: AppVersions
@@ -106,6 +112,8 @@ export function SettingsPanel({
   modelRouterPrefs,
   onModelRouterPrefsChange,
   sessionModel,
+  onSessionModeChange,
+  liveSessionMode = null,
   onSave,
   onReset,
   appVersions,
@@ -374,25 +382,21 @@ export function SettingsPanel({
             }
             helperText="Automatically answer Yes on the next N confirmation prompts (0 = always ask)."
           />
-          <TextField
-            label="Default session mode"
-            fullWidth
-            size="small"
-            select
-            SelectProps={{ native: true }}
-            value={config.sessionMode}
-            onChange={(e) =>
-              onChange({
-                ...config,
-                sessionMode: e.target.value === 'spec' ? 'spec' : 'vibe',
-              })
-            }
-            helperText="Spec sessions open the Spec tab and inject steering + task spec on every turn (Kiro-style)."
-            data-testid="settings-session-mode"
-          >
-            <option value="vibe">Vibe — implementation chat (default)</option>
-            <option value="spec">Spec — spec-first session</option>
-          </TextField>
+          <Box>
+            <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+              Session mode (primary control on the Spec tab)
+            </Typography>
+            <SessionModeToggle
+              value={config.sessionMode}
+              onChange={onSessionModeChange}
+              liveMode={liveSessionMode}
+              sessionRunning={sessionActive}
+              size="medium"
+            />
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.75 }}>
+              ● active in this session · * pending (Stop and Start) · ○ applies on next Start
+            </Typography>
+          </Box>
           <TextField
             label="Prompt before commit"
             fullWidth

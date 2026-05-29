@@ -5,6 +5,7 @@ Workspace task list persisted in ``.cecli/todos.json`` (see ``workspace_paths``)
 from __future__ import annotations
 
 import json
+import shutil
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -241,6 +242,22 @@ class WorkspaceTodos:
             self.sync_spec_files(item)
         return len(created), created
 
+    def prune_orphan_spec_folders(self) -> tuple[int, list[str]]:
+        """Remove ``.cecli/specs/{id}/`` dirs with no matching task in todos.json."""
+        store = self.load()
+        known = {item.id for item in store.todos}
+        removed: list[str] = []
+        if not self.specs_root.is_dir():
+            return 0, removed
+        for entry in sorted(self.specs_root.iterdir()):
+            if not entry.is_dir() or entry.name.startswith("."):
+                continue
+            if entry.name in known:
+                continue
+            shutil.rmtree(entry)
+            removed.append(entry.name)
+        return len(removed), removed
+
     def sync_spec_files(self, item: TodoItem) -> None:
         """Write three-layer markdown under ``.cecli/specs/{id}/`` for external editing."""
         item = migrate_todo_layers(item)
@@ -425,7 +442,13 @@ class WorkspaceTodos:
         return store
 
     def delete(self, todo_id: str) -> None:
+        from bright_vision_core.agent_todos import parse_agent_todo_link
+
         store = self.load()
+        item = next((t for t in store.todos if t.id == todo_id), None)
+        if item is None:
+            raise ValueError(f"Unknown task: {todo_id}")
+        agent_relpath = parse_agent_todo_link(item.links)
         before = len(store.todos)
         store.todos = [t for t in store.todos if t.id != todo_id]
         if len(store.todos) == before:
@@ -433,6 +456,13 @@ class WorkspaceTodos:
         if store.active_id == todo_id:
             store.active_id = None
         self.save(store)
+        spec_folder = self.specs_root / todo_id
+        if spec_folder.is_dir():
+            shutil.rmtree(spec_folder)
+        if agent_relpath:
+            agent_path = self.root / agent_relpath
+            if agent_path.is_file():
+                agent_path.unlink()
 
     def set_active(self, todo_id: str | None) -> TodoStore:
         store = self.load()

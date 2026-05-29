@@ -31,6 +31,31 @@ def spec_gen_timeout_s() -> float:
         return _DEFAULT_WAIT_S
 
 
+def spec_gen_turn_timeout_s() -> float:
+    """Wall-clock cap for one LLM one-shot inside generate-spec (run_one_shot)."""
+    if os.environ.get("LLM_SPEC_GEN_TURN_TIMEOUT_S"):
+        try:
+            return max(60.0, float(os.environ["LLM_SPEC_GEN_TURN_TIMEOUT_S"]))
+        except ValueError:
+            pass
+    job_cap = spec_gen_timeout_s()
+    if os.environ.get("LLM_TEST_TURN_TIMEOUT_S"):
+        try:
+            chat_cap = float(os.environ["LLM_TEST_TURN_TIMEOUT_S"])
+        except ValueError:
+            chat_cap = 300.0
+    else:
+        chat_cap = 300.0
+    # Phased design/tasks prompts are larger than a chat turn; scale with job cap.
+    scaled = min(job_cap - 60.0, max(chat_cap, job_cap * 0.5))
+    return max(60.0, scaled)
+
+
+def spec_gen_section_wait_s() -> float:
+    """Poll cap for one phased section — slightly above one-shot turn cap."""
+    return min(spec_gen_timeout_s(), spec_gen_turn_timeout_s() + 120.0)
+
+
 @dataclass
 class SpecGenerationJob:
     job_id: str
@@ -70,8 +95,10 @@ class SpecJobStore:
         prompt: str,
         *,
         mode: str = "generate",
+        section: str = "all",
         apply: bool = True,
         enforce_ears: bool = True,
+        context_paths: list[str] | None = None,
         model: str | None = None,
     ) -> SpecGenerationJob:
         job_id = uuid.uuid4().hex
@@ -90,13 +117,17 @@ class SpecJobStore:
                     dry_run=True,
                     auto_commits=False,
                     echo_to_console=False,
+                    chat_history_file=False,
+                    map_tokens=0,
                 )
                 result = session.generate_todo_layers(
                     todo_id,
                     prompt,
                     mode=mode,
+                    section=section,
                     apply=apply,
                     enforce_ears=enforce_ears,
+                    context_paths=context_paths,
                 )
                 with self._lock:
                     j = self._jobs.get(job_id)

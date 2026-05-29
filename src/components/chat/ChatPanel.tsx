@@ -13,12 +13,12 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
-import { useEffect, useMemo, useRef } from 'react'
+import { useMemo } from 'react'
 import { mergeChatTimeline } from '../../utils/chatStream'
 import { DISPLAY_CORE } from '../../brand'
 import type { VisionCommand } from '../../ipc/commands'
 import type { CoreConfirmEvent } from '../../ipc/events'
-import { parseFileCommandInput, replaceFileCommandPath } from '../../utils/fileCommandComplete'
+import { useFileCommandKeyboard } from '../../hooks/useFileCommandKeyboard'
 import { ConfirmBanner } from '../ConfirmBanner'
 import { AssistantMessageBody } from './AssistantMessageBody'
 import { ChatFolderAttach } from './ChatFolderAttach'
@@ -178,12 +178,15 @@ export function ChatPanel({
   subagents = [],
   agentModeAvailable = false,
 }: ChatPanelProps) {
-  const pathTabIndex = useRef(0)
-  const pathPrefix = parseFileCommandInput(inputValue)?.pathPrefix ?? ''
-
-  useEffect(() => {
-    pathTabIndex.current = 0
-  }, [pathPrefix, pathSuggestions.length])
+  const { onKeyDown: onFileCommandKeyDown, onPickPath } = useFileCommandKeyboard({
+    inputValue,
+    pathSuggestions,
+    pathAssistActive,
+    commands,
+    onInputChange,
+    onPickCommand,
+    onSend,
+  })
 
   const meaningfulToolEvents = toolEvents.filter(
     (t) => t.type === 'tool_warning' || t.output?.trim() || t.type === 'tool_call'
@@ -444,7 +447,7 @@ export function ChatPanel({
         pathAssistActive={pathAssistActive}
         disabled={!isRunning}
         onPickCommand={onPickCommand}
-        onPickPath={(path) => onInputChange(replaceFileCommandPath(inputValue, path))}
+        onPickPath={onPickPath}
       />
 
       {modelRouterEnabled && onForceRouterTier && onEscalateRouter && (
@@ -496,33 +499,7 @@ export function ChatPanel({
           inputProps={{ 'data-testid': 'chat-input' }}
           value={inputValue}
           onChange={(e) => onInputChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              onSend()
-            }
-            if (e.key === 'Tab') {
-              if (pathAssistActive && pathSuggestions.length > 0) {
-                e.preventDefault()
-                const idx = pathTabIndex.current % pathSuggestions.length
-                pathTabIndex.current = idx + 1
-                onInputChange(replaceFileCommandPath(inputValue, pathSuggestions[idx]))
-                return
-              }
-              if (inputValue.trim().startsWith('/')) {
-                const token = inputValue.trim().split(/\s/)[0] ?? ''
-                const match = commands.find((c) =>
-                  c.name.toLowerCase().startsWith(token.toLowerCase())
-                )
-                if (match && match.name !== token) {
-                  e.preventDefault()
-                  onPickCommand(
-                    match.name + (inputValue.includes(' ') ? inputValue.slice(token.length) : ' ')
-                  )
-                }
-              }
-            }
-          }}
+          onKeyDown={onFileCommandKeyDown}
           placeholder={
             isRunning
               ? isBusy

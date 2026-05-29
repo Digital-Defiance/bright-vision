@@ -1,11 +1,14 @@
 import { invoke } from '@tauri-apps/api/core'
 import { isTauriRuntime } from './isTauri'
 import {
+  formatSpecJobCompleteNtfyBody,
   formatTurnCompleteNtfyBody,
   ntfyPriorityForDuration,
   ntfyPushTitle,
   shouldSendNtfyTurnAlert,
   type NtfyAlertsPrefs,
+  type SpecJobNtfyOutcome,
+  type SpecJobNtfySection,
 } from '../theme/ntfyAlertsPrefs'
 
 export async function sendNtfyPush(
@@ -51,5 +54,28 @@ export async function maybeNotifyTurnComplete(
     await sendNtfyPush(prefs, ntfyPushTitle(), message, priority)
   } catch {
     /* best-effort — do not interrupt the chat turn */
+  }
+}
+
+export async function maybeNotifySpecJobComplete(
+  prefs: NtfyAlertsPrefs,
+  opts: {
+    durationMs: number
+    documentVisible: boolean
+    mode: 'generate' | 'refine'
+    section: SpecJobNtfySection
+    taskTitle?: string
+    outcome: SpecJobNtfyOutcome
+  }
+): Promise<void> {
+  if (!shouldSendNtfyTurnAlert(prefs, { durationMs: opts.durationMs, documentVisible: opts.documentVisible })) {
+    return
+  }
+  const message = formatSpecJobCompleteNtfyBody(opts)
+  const priority = ntfyPriorityForDuration(opts.durationMs)
+  try {
+    await sendNtfyPush(prefs, ntfyPushTitle(), message, priority)
+  } catch {
+    /* best-effort */
   }
 }

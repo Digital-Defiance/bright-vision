@@ -35,6 +35,24 @@ class TestHttpGenerateSpecMock(unittest.TestCase):
                     f"/workspaces/todos/{todo_id}/generate-spec"
                     f"?workspace={temp_dir}&session_id={session_id}",
                     json={
+                        "prompt": "Design modules",
+                        "mode": "generate",
+                        "section": "design",
+                        "apply": True,
+                        "background": False,
+                        "enforce_ears": True,
+                    },
+                )
+            self.assertEqual(res.status_code, 200, res.text)
+            item = (res.json().get("item") or {})
+            self.assertIn("REQ-001", item.get("requirements", ""))
+            self.assertIn("Overview", item.get("design", ""))
+
+            with patch.object(Session, "run_one_shot", return_value=SAMPLE_GENERATED_MARKDOWN):
+                res = client.post(
+                    f"/workspaces/todos/{todo_id}/generate-spec"
+                    f"?workspace={temp_dir}&session_id={session_id}",
+                    json={
                         "prompt": "Ping counter feature",
                         "mode": "generate",
                         "apply": True,
@@ -53,6 +71,37 @@ class TestHttpGenerateSpecMock(unittest.TestCase):
             self.assertTrue(ok, issues)
             item = body.get("item") or {}
             self.assertIn("REQ-001", item.get("requirements", ""))
+
+    def test_background_spec_job_uses_ephemeral_chat_history(self):
+        from unittest.mock import MagicMock
+
+        from bright_vision_core.todo_spec_jobs import spec_job_store
+
+        mock_session = MagicMock()
+        mock_session.generate_todo_layers.return_value = {
+            "requirements": "",
+            "design": "",
+            "tasks_md": "",
+            "raw": SAMPLE_GENERATED_MARKDOWN,
+            "item": None,
+            "ears_blocked": False,
+            "ears_issues": [],
+        }
+
+        with patch.object(Session, "create", return_value=mock_session) as create:
+            job = spec_job_store.start(
+                "/tmp/workspace",
+                "todo-id",
+                "ping",
+                mode="generate",
+                apply=True,
+                enforce_ears=True,
+            )
+            finished = spec_job_store.wait(job.job_id, timeout_s=5.0)
+
+        self.assertEqual(finished.status, "completed", finished.error)
+        create.assert_called_once()
+        self.assertIs(create.call_args.kwargs.get("chat_history_file"), False)
 
 
 if __name__ == "__main__":

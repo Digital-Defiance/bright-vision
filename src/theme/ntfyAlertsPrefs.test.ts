@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  formatSpecJobCompleteNtfyBody,
   formatTurnCompleteNtfyBody,
   ntfyAppSubscribeUrl,
   ntfySubscribeUrl,
@@ -11,6 +12,28 @@ describe('ntfyAlertsPrefs', () => {
     expect(
       formatTurnCompleteNtfyBody({ durationMs: 32 * 60_000 + 21_000, queuedRemaining: 0, editedCount: 0 })
     ).toBe('Turn finished in 32m 21s. Ready in BrightVision.')
+  })
+
+  it('formats spec job body without prompt text', () => {
+    expect(
+      formatSpecJobCompleteNtfyBody({
+        durationMs: 95_000,
+        mode: 'generate',
+        section: 'requirements',
+        taskTitle: 'Colonize the moon',
+        outcome: 'saved',
+      })
+    ).toBe(
+      'Requirements generation (“Colonize the moon”) finished in 1m 35s. Ready in BrightVision.'
+    )
+    expect(
+      formatSpecJobCompleteNtfyBody({
+        durationMs: 12_000,
+        mode: 'refine',
+        section: 'all',
+        outcome: 'ears_blocked',
+      })
+    ).toMatch(/Spec refine finished in 12s but was not saved \(EARS\)/)
   })
 
   it('builds subscribe URL', () => {

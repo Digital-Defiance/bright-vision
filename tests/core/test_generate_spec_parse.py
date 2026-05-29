@@ -44,6 +44,22 @@ class TestGenerateSpecParse(unittest.TestCase):
         )
         self.assertTrue(ok, issues)
 
+    def test_normalize_after_merge_for_phased_design(self):
+        """Phased design parse omits requirements; merge must precede normalize."""
+        parsed_only = {
+            "requirements": "",
+            "design": "## Overview\nHTTP API only.",
+            "tasks_md": "",
+        }
+        self.assertNotIn("REQ-001", normalize_spec_layer_traceability(parsed_only)["design"])
+        merged = {
+            "requirements": "### REQ-001\n**WHEN** x\n**THE** system **SHALL** a.\n",
+            "design": "## Overview\nHTTP API only.",
+            "tasks_md": "",
+        }
+        out = normalize_spec_layer_traceability(merged)
+        self.assertIn("REQ-001", out["design"])
+
 
 if __name__ == "__main__":
     unittest.main()

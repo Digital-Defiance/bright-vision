@@ -3,12 +3,12 @@ import { agentPlanTitleLooksValid } from './helpers/agentTodoFixture'
 import { openTasks, startMockSession } from './helpers/session'
 
 /**
- * Post-/agent path: char-split UpdateTodoList on disk → import-agent-plan on Tasks reload.
+ * Char-split agent todo.txt on disk → mock core preloads import at session mock install.
  */
 test.describe('Agent todo char-split → Tasks title', () => {
   test('import from disk shows recovered task title, not [', async ({ page }) => {
     await startMockSession(page, { scenario: 'agent-todo-char-split' })
-    await openTasks(page, { waitForAgentPlanImport: true })
+    await openTasks(page)
 
     const taskButton = page.getByTestId('todo-panel').getByRole('button', {
       name: /Explore the codebase/,

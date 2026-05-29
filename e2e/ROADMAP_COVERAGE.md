@@ -17,7 +17,8 @@ Run: `yarn test:full` or `sh scripts/test-local.sh full`. **Release tier:** `sh 
 | **#12** `/add` Tab paths | Done (Tauri) | `path-completion.spec.ts` (mock Tauri) |
 | **#16** Images/PDF | Done | `file-upload.spec.ts` |
 | **#17** Prompt before commit | Done | `settings-config.spec.ts` |
-| **#18** Tasks / generate-spec | Done | `tasks-workspace.spec.ts` |
+| **#18** Tasks / generate-spec | Done | `tasks-workspace.spec.ts`, `tasks-generate-spec.spec.ts` (activity bar, ears_blocked) |
+| **#23** Phased spec wizard | Done | `tasks-spec-wizard.spec.ts` (tab gates, nudges, per-section POST, All layers) |
 | **#19** Submodule / superproject | Done (automated) | `yarn dogfood:agent`, `test_superproject_dogfood.py`, `release-hygiene.spec.ts`, `test_git_workspace.py`, `test_superproject_integration.py`, `yarn verify:submodule`; LLM: `superproject-llm` (opt-in); **optional GUI:** [SUBMODULE_VERIFICATION.md](../docs/SUBMODULE_VERIFICATION.md) A–D |
 | **#23–24** Process + chat | Done | lifecycle + chat suites |
 | **#26** Git poll (not inotify) | Partial | `git-polling.spec.ts`, `useGitStatus.test.ts` — **Open:** native FS watcher |
@@ -29,14 +30,14 @@ Run: `yarn test:full` or `sh scripts/test-local.sh full`. **Release tier:** `sh 
 | **#36** LLM ping | Done | `local-llm-ping.spec.ts`, mock `llm_ping` |
 | **#33** Resource overlay | Done | `resource-overlay.spec.ts` — **Open:** process-scoped CPU, non-NVIDIA GPU |
 | **#40** cecli agents in Vision | Done (v1) | `agents-bar.spec.ts`, mock `GET …/subagents` — **Open:** `POST …/agents/invoke`, header pill |
-| **#42** Mobile alerts (ntfy) | Done (settings) | `ntfy-alerts.spec.ts` — **Open:** turn-`done` push e2e (needs desktop + network) |
+| **#42** Mobile alerts (ntfy) | Done | `ntfy-alerts.spec.ts` — settings ping, turn-`done`, spec job push (mock Tauri) |
 | **Real LLM hello** | Opt-in | `hello-llm.spec.ts`, `agent-llm.spec.ts`, `test_hello_llm.py`, `test_agent_llm.py` |
 | **Real LLM + file context** | Opt-in | `context-llm.spec.ts`, `test_context_llm.py` — `e2e/fixtures/context-workspace` |
 | **Real core integration** | Done | `yarn test:e2e:integration`; `test_http_agent_todo_import.py`, `test_agent_todos.py` |
 | **#30** Web parity | Partial | context + settings + path-completion web branch — **Open:** `/add` Tab on web-only |
 | **#31** Release hygiene | Done (automated) | `release-hygiene.spec.ts`, [RELEASE.md](../docs/RELEASE.md) operator steps |
 | **#33** Session persistence | Partial | `settings-config.spec.ts`, `session-transcript-hydrate.spec.ts`, `shipped-scenarios` (`session-transcript`), `test_session_*` — **Open:** encrypt `chat.history` |
-| **#20–22** Kiro-depth spec | Open | `roadmap-gaps.spec.ts` (buttons only) |
+| **#20–22** Kiro-depth spec | Partial | `spec-agent.spec.ts`, `tasks-ears-index.spec.ts`, `tasks-generate-spec.spec.ts`, `tasks-spec-wizard.spec.ts`; pytest `test_ears_index.py`, `test_workspace_todos.py` (prune/delete spec folders) |
 | **#29** Plugins | Longer-term | — |
 
 ## Helpers

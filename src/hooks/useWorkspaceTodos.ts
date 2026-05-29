@@ -67,11 +67,30 @@ export function useWorkspaceTodos(
   const reloadGenerationRef = useRef(0)
   const tauriLocal = isTauriRuntime()
 
+  const exportSpecToDisk = useCallback(
+    async (id: string) => {
+      if (httpReady && api) {
+        await api.client.exportWorkspaceSpecFiles(api.workspace, id)
+        return
+      }
+      if (tauriLocal) {
+        await invoke('export_todo_spec_files', { workingDir, todoId: id })
+      }
+    },
+    [httpReady, api, tauriLocal, workingDir]
+  )
+
   const mirrorToDisk = useCallback(
     async (next: TodoStore) => {
-      if (tauriLocal) await saveTodoStore(workingDir, next)
+      if (!tauriLocal) return
+      await saveTodoStore(workingDir, next)
+      if (!httpReady) {
+        for (const t of next.todos) {
+          await invoke('export_todo_spec_files', { workingDir, todoId: t.id })
+        }
+      }
     },
-    [tauriLocal, workingDir]
+    [tauriLocal, workingDir, httpReady]
   )
 
   const persistLocal = useCallback(
@@ -94,11 +113,8 @@ export function useWorkspaceTodos(
       if (api?.client) {
         try {
           await api.client.health()
-          try {
-            await api.client.importAgentTodoPlan(api.workspace)
-          } catch {
-            // Agent plan import is best-effort; list still loads local/API store.
-          }
+          // Agent todo.txt sync runs on session create (cecli), not on every list —
+          // re-import here resurrected tasks after delete.
           if (stale()) return
           const data = await api.client.listWorkspaceTodos(api.workspace)
           if (stale()) return
@@ -196,9 +212,10 @@ export function useWorkspaceTodos(
           }
       const base = store ?? { version: 1, activeId: null, todos: [] }
       await persistLocal({ ...base, todos: [item, ...base.todos] })
+      if (layers) await exportSpecToDisk(item.id)
       return item
     },
-    [httpReady, api, store, persistLocal, reload]
+    [httpReady, api, store, persistLocal, reload, exportSpecToDisk]
   )
 
   const updateTodo = useCallback(
@@ -236,8 +253,9 @@ export function useWorkspaceTodos(
       const layers = specLayersInPatch(patch)
       if (layers) onSpecLayersSaved?.(id, layers)
       await persistLocal({ ...store, todos, activeId })
+      if (layers) await exportSpecToDisk(id)
     },
-    [httpReady, api, store, persistLocal, reload, onAutoCompleted, onSpecLayersSaved]
+    [httpReady, api, store, persistLocal, reload, onAutoCompleted, onSpecLayersSaved, exportSpecToDisk]
   )
 
   const deleteTodo = useCallback(
@@ -251,8 +269,11 @@ export function useWorkspaceTodos(
       const todos = store.todos.filter((t) => t.id !== id)
       const activeId = store.activeId === id ? null : store.activeId
       await persistLocal({ ...store, todos, activeId })
+      if (tauriLocal) {
+        await invoke('delete_todo_spec_folder', { workingDir, todoId: id })
+      }
     },
-    [httpReady, api, store, persistLocal, reload]
+    [httpReady, api, store, persistLocal, reload, tauriLocal, workingDir]
   )
 
   const setActiveTodo = useCallback(
@@ -315,19 +336,31 @@ export function useWorkspaceTodos(
 
   const syncSpecFromDisk = useCallback(
     async (id: string) => {
-      if (httpReady && api) {
-        await api.client.syncWorkspaceSpecFiles(api.workspace, id)
-        await reload()
-        return
+      const importFromDisk = async () => {
+        if (httpReady && api) {
+          await api.client.syncWorkspaceSpecFiles(api.workspace, id)
+          return
+        }
+        if (tauriLocal) {
+          await invoke('import_todo_spec_files', { workingDir, todoId: id })
+          return
+        }
+        throw new Error('Sync from disk requires the desktop app or a running Vision API session')
       }
-      if (tauriLocal) {
-        await invoke('import_todo_spec_files', { workingDir, todoId: id })
-        await reload()
-        return
+      try {
+        await importFromDisk()
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        const missingOnDisk =
+          /empty|No spec folder|Spec folder has no|404/.test(msg) ||
+          msg.includes('not found')
+        if (!missingOnDisk) throw err
+        await exportSpecToDisk(id)
+        await importFromDisk()
       }
-      throw new Error('Sync from disk requires the desktop app or a running Vision API session')
+      await reload()
     },
-    [httpReady, api, tauriLocal, workingDir, reload]
+    [httpReady, api, tauriLocal, workingDir, reload, exportSpecToDisk]
   )
 
   const lintRequirements = useCallback(
@@ -361,6 +394,17 @@ export function useWorkspaceTodos(
     }
     return api.client.repairWorkspaceSpecFolders(api.workspace)
   }, [httpReady, api])
+
+  const pruneOrphanSpecFolders = useCallback(async (): Promise<{ removed_count: number; removed_ids: string[] }> => {
+    if (httpReady && api) {
+      return api.client.pruneOrphanWorkspaceSpecFolders(api.workspace)
+    }
+    if (tauriLocal) {
+      const removed_ids = await invoke<string[]>('prune_orphan_spec_folders', { workingDir })
+      return { removed_count: removed_ids.length, removed_ids }
+    }
+    throw new Error('Remove orphan spec folders requires the desktop app or a running Vision API')
+  }, [httpReady, api, tauriLocal, workingDir])
 
   const traceSpec = useCallback(
     async (
@@ -438,9 +482,11 @@ export function useWorkspaceTodos(
     importMarkdown,
     moveTodo,
     syncSpecFromDisk,
+    exportSpecToDisk,
     lintRequirements,
     fetchSpecIndex,
     traceSpec,
     repairSpecFolders,
+    pruneOrphanSpecFolders,
   }
 }

@@ -44,7 +44,7 @@ case "$TIER" in
     yarn test
     yarn test:rust
     yarn test:e2e
-    if [ -x ".venv/bin/python" ]; then
+    if [ -x ".venv/bin/python3" ]; then
       yarn test:bright-core
       yarn test:e2e:integration
       yarn verify:submodule

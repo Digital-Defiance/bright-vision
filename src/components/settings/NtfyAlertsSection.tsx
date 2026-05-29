@@ -79,7 +79,7 @@ export function NtfyAlertsSection({ prefs, onChange, onMessage }: NtfyAlertsSect
         Mobile alerts (ntfy)
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-        When a long chat turn finishes, BrightVision can POST to{' '}
+        When a long chat turn or spec generate/refine job finishes, BrightVision can POST to{' '}
         <a href="https://ntfy.sh" target="_blank" rel="noopener noreferrer">
           ntfy
         </a>
@@ -96,7 +96,7 @@ export function NtfyAlertsSection({ prefs, onChange, onMessage }: NtfyAlertsSect
               data-testid="settings-ntfy-enabled"
             />
           }
-          label="Notify when turns complete"
+          label="Notify when work completes"
         />
 
         <TextField
@@ -147,7 +147,7 @@ export function NtfyAlertsSection({ prefs, onChange, onMessage }: NtfyAlertsSect
               minDurationSec: Math.max(0, Number(e.target.value) || 0),
             })
           }
-          helperText="0 = notify on every completed turn that passes other filters"
+          helperText="0 = notify on every completed turn or spec job that passes other filters"
           disabled={!prefs.enabled}
         />
 

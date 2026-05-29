@@ -51,7 +51,7 @@ Todos live in `.cecli/todos.json` under the session workspace.
 GET    /sessions/{session_id}/todos
 POST   /sessions/{session_id}/todos          {"title", "spec?", "template?"}
 PATCH  /sessions/{session_id}/todos/{id}     partial update: title, spec, requirements, design, tasks_md, depends_on, branch, pr_url, checklist, status, links
-POST   /sessions/{session_id}/todos/{id}/generate-spec   {"prompt", "mode", "apply", "background": true} → 202 {job_id} or 200 when complete
+POST   /sessions/{session_id}/todos/{id}/generate-spec   {"prompt", "mode", "section", "context_paths", "apply", "background": true} → 202 {job_id} or 200 when complete
 GET    /workspaces/todos/generate-spec/{job_id}   poll job status
 DELETE /sessions/{session_id}/todos/{id}
 PUT    /sessions/{session_id}/todos/active   {"activeId": "…" | null}
@@ -110,6 +110,8 @@ POST   /workspaces/todos/import   {"workspace", "markdown", "merge": false}
 POST   /workspaces/todos/{id}/generate-spec?workspace=…&session_id=…   same body as session route
 POST   /workspaces/todos/{id}/move?workspace=…   {"direction": "up"|"down"}
 POST   /workspaces/todos/{id}/sync-spec-files?workspace=…   import specs from `.cecli/specs/{id}/`
+POST   /workspaces/todos/{id}/export-spec-files?workspace=…   write specs from todos.json to `.cecli/specs/{id}/`
+POST   /workspaces/todos/prune-orphan-spec-folders?workspace=…   delete `.cecli/specs/{id}/` with no task in todos.json
 ```
 
 `auto_completed` is true when a PATCH checklist update completes every item (task marked done).

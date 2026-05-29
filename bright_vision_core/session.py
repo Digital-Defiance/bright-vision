@@ -5,6 +5,7 @@ Headless cecli sessions for API / web frontends.
 from __future__ import annotations
 
 import base64
+import concurrent.futures
 import os
 import threading
 import time
@@ -38,7 +39,6 @@ from bright_vision_core.headless_persistence import apply_persistence_to_args
 from bright_vision_core.ears.prompt import requirements_pass_ears
 from bright_vision_core.spec_steering import build_spec_focus_preamble
 from bright_vision_core.spec_layers import normalize_spec_layer_traceability
-from bright_vision_core.todo_spec_generate import build_generate_message, parse_generated_layers
 from bright_vision_core.roadmap_hints import maybe_append_roadmap_hint
 from bright_vision_core.slash_helpers import (
     fast_slash_preproc_timeout_s,
@@ -397,6 +397,7 @@ class Session:
         message: str,
         *,
         preproc: bool = True,
+        skip_workspace_init: bool = False,
         active_todo_id: str | None = None,
         inject_todo_spec: bool = False,
         spec_focus: bool = False,
@@ -424,17 +425,18 @@ class Session:
         self.coder.interrupt_event.clear()
 
         try:
-            emit_progress(self.io, label="Vision", message="Preparing workspace…")
-            yield from _drain_io_events(self.io)
+            if not skip_workspace_init:
+                emit_progress(self.io, label="Vision", message="Preparing workspace…")
+                yield from _drain_io_events(self.io)
 
-            for item in _run_blocking_with_sse_pulses(
-                self.io,
-                self.coder.init_before_message,
-                label="Vision",
-                message="Preparing workspace",
-            ):
-                if isinstance(item, dict):
-                    yield item
+                for item in _run_blocking_with_sse_pulses(
+                    self.io,
+                    self.coder.init_before_message,
+                    label="Vision",
+                    message="Preparing workspace",
+                ):
+                    if isinstance(item, dict):
+                        yield item
             self.io.user_input(user_text)
 
             user_msg = user_text
@@ -773,14 +775,41 @@ class Session:
         undo_last_aider_commit_for_coder(self.coder, self.io)
         return self.io.drain_events()
 
-    def run_one_shot(self, message: str) -> str:
-        parts: list[str] = []
-        for event in self.run_message(message, preproc=False):
-            if event.get("type") == "token":
-                parts.append(str(event.get("text") or ""))
-            elif event.get("type") == "done":
-                return str(event.get("assistant_text") or "".join(parts))
-        return "".join(parts)
+    def run_one_shot(
+        self,
+        message: str,
+        *,
+        timeout_s: float | None = None,
+        skip_workspace_init: bool = False,
+    ) -> str:
+        def _consume() -> str:
+            parts: list[str] = []
+            for event in self.run_message(
+                message,
+                preproc=False,
+                skip_workspace_init=skip_workspace_init,
+            ):
+                if event.get("type") == "token":
+                    parts.append(str(event.get("text") or ""))
+                elif event.get("type") == "done":
+                    return str(event.get("assistant_text") or "".join(parts))
+            return "".join(parts)
+
+        if timeout_s is None:
+            return _consume()
+
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        fut = pool.submit(_consume)
+        try:
+            return fut.result(timeout=timeout_s)
+        except concurrent.futures.TimeoutError as err:
+            try:
+                self.interrupt_turn()
+            except Exception:
+                pass
+            raise TimeoutError(f"One-shot turn timed out after {int(timeout_s)}s") from err
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
 
     def generate_todo_layers(
         self,
@@ -788,35 +817,63 @@ class Session:
         prompt: str,
         *,
         mode: str = "generate",
+        section: str = "all",
         apply: bool = True,
         enforce_ears: bool = True,
+        context_paths: list[str] | None = None,
     ) -> dict[str, Any]:
+        from bright_vision_core.todo_spec_generate import (
+            SpecSection,
+            build_generate_message,
+            merge_generated_layers,
+            parse_generated_layers,
+            validate_section_prerequisites,
+        )
+
         api = WorkspaceTodos(self.coder.root)
         item = api.get(todo_id)
-        msg = build_generate_message(prompt, mode=mode, item=item)  # type: ignore[arg-type]
-        raw = self.run_one_shot(msg)
-        layers = normalize_spec_layer_traceability(parse_generated_layers(raw))
+        sec: SpecSection = section if section in ("all", "requirements", "design", "tasks_md") else "all"
+        if sec != "all" and mode != "generate":
+            sec = "all"
+        validate_section_prerequisites(item, sec)
+        for path in context_paths or []:
+            if str(path).strip():
+                self.add_files([str(path).strip()])
+        msg = build_generate_message(prompt, mode=mode, item=item, section=sec)  # type: ignore[arg-type]
+        from bright_vision_core.todo_spec_jobs import spec_gen_turn_timeout_s
+
+        raw = self.run_one_shot(
+            msg,
+            timeout_s=spec_gen_turn_timeout_s(),
+            skip_workspace_init=True,
+        )
+        parsed = parse_generated_layers(raw, section=sec)
+        merged = normalize_spec_layer_traceability(
+            merge_generated_layers(item, parsed, section=sec)
+        )
         ears_blocked = False
         ears_issues: list[dict] = []
-        req_text = layers.get("requirements", "")
-        if apply and any(layers.values()):
+        req_text = merged.get("requirements", "")
+        if apply and any(merged.values()):
             ok, ears_issues = requirements_pass_ears(req_text)
-            if enforce_ears and not ok:
+            ears_gate = sec in ("all", "requirements")
+            if enforce_ears and ears_gate and not ok:
                 apply = False
                 ears_blocked = True
             else:
                 item, _ = api.update(
                     todo_id,
                     requirements=req_text,
-                    design=layers.get("design", ""),
-                    tasks_md=layers.get("tasks_md", ""),
+                    design=merged.get("design", ""),
+                    tasks_md=merged.get("tasks_md", ""),
                 )
         return {
-            "requirements": layers.get("requirements", ""),
-            "design": layers.get("design", ""),
-            "tasks_md": layers.get("tasks_md", ""),
+            "requirements": merged.get("requirements", ""),
+            "design": merged.get("design", ""),
+            "tasks_md": merged.get("tasks_md", ""),
             "raw": raw,
             "item": item,
             "ears_blocked": ears_blocked,
             "ears_issues": ears_issues,
+            "section": sec,
         }

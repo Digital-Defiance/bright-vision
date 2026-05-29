@@ -22,6 +22,20 @@ export function sampleTodoStore(): TodoStore {
   }
 }
 
+/** Empty spec layers — for phased wizard tab gates and nudges. */
+export function wizardEmptyTodoStore(): TodoStore {
+  const todo = makeTodo('task-wizard', 'Wizard task', 'open')
+  todo.requirements = ''
+  todo.design = ''
+  todo.tasks_md = ''
+  return {
+    version: 1,
+    activeId: null,
+    todos: [todo],
+    templates: ['feature', 'bugfix', 'refactor', 'spec-driven'],
+  }
+}
+
 /** Cecli agent UpdateTodoList imported into workspace Tasks (dogfood bridge). */
 export function agentPlanTodoStore(): TodoStore {
   const now = '2026-01-01T00:00:00.000Z'

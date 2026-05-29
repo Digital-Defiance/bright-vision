@@ -50,6 +50,7 @@ Shorthand:
 | `yarn dogfood:check` | Fast preflight (~20s) |
 | `yarn dogfood:gate` | Full gate without LLM |
 | `yarn dogfood:agent` | **Default** — check + gate (alias for agent workflow) |
+| `yarn test:everything` | **Max bar** — check + release + fixtures + full LLM incl. superproject (see [TESTING.md](./TESTING.md)) |
 
 ## One-time machine setup
 

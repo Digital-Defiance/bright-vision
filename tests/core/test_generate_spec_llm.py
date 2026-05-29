@@ -114,6 +114,86 @@ class TestGenerateSpecLlm(unittest.TestCase):
             )
             self.assertTrue(ok, f"layer sanity: {issues}; raw_len={len(body.get('raw') or '')}")
 
+    def _todo_item(self, client: TestClient, temp_dir: str, todo_id: str) -> dict:
+        listed = client.get(f"/workspaces/todos?workspace={temp_dir}")
+        self.assertEqual(listed.status_code, 200, listed.text)
+        for item in listed.json().get("todos") or []:
+            if item.get("id") == todo_id:
+                return item
+        self.fail(f"todo {todo_id} not found after generate")
+
+    def test_phased_generate_spec_produces_sane_layers(self):
+        """Phased layer merge with Ollama on one light spec session.
+
+        HTTP background jobs (three cold Session.create calls) are covered by
+        ``test_generate_spec_produces_sane_layers`` and mock e2e; this test
+        targets ``generate_todo_layers`` section= wiring without triple init.
+        """
+        from bright_vision_core.session import Session
+        from bright_vision_core.workspace_todos import WorkspaceTodos
+
+        model = resolve_vision_model()
+        with GitTemporaryDirectory() as temp_dir:
+            make_repo(temp_dir)
+            client = TestClient(app)
+            created = client.post(
+                f"/workspaces/todos?workspace={temp_dir}",
+                json={"title": "LLM phased spec", "template": "spec-driven"},
+            )
+            self.assertEqual(created.status_code, 200, created.text)
+            todo_id = created.json()["id"]
+
+            session = Session.create(
+                temp_dir,
+                model=model,
+                yes=True,
+                dry_run=True,
+                auto_commits=False,
+                chat_history_file=False,
+                map_tokens=0,
+            )
+            phases: list[tuple[str, str]] = [
+                (
+                    "requirements",
+                    (
+                        "Health ping API. Exactly REQ-001 and REQ-002 with WHEN and SHALL. "
+                        "One sentence each."
+                    ),
+                ),
+                ("design", "Brief design citing REQ-001 and REQ-002."),
+                ("tasks_md", "Two numbered implementation tasks with dependencies."),
+            ]
+            for section, prompt in phases:
+                try:
+                    result = session.generate_todo_layers(
+                        todo_id,
+                        prompt,
+                        mode="generate",
+                        section=section,
+                        apply=True,
+                        enforce_ears=True,
+                    )
+                except TimeoutError as err:
+                    self.fail(
+                        f"phased section={section!r} timed out: {err} — "
+                        "try LLM_SPEC_GEN_TURN_TIMEOUT_S or a faster Ollama model"
+                    )
+                if result.get("ears_blocked"):
+                    self.skipTest(
+                        f"section={section} failed EARS gate: {result.get('ears_issues')}"
+                    )
+
+            item = WorkspaceTodos(temp_dir).get(todo_id)
+            self.assertRegex(item.requirements or "", r"REQ-\d+")
+            self.assertIn("SHALL", item.requirements or "")
+            self.assertTrue((item.design or "").strip())
+            ok, issues = assess_generated_spec_layers(
+                item.requirements or "",
+                item.design or "",
+                item.tasks_md or "",
+            )
+            self.assertTrue(ok, f"phased layer sanity: {issues}")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -17,6 +17,7 @@ target/
 dist/
 vite.config.js
 vite.config.d.ts
+vite.config.ts.timestamp-*.mjs
 
 # IDE & Editor
 .vscode/

@@ -60,3 +60,57 @@ export async function expectRequirementsPopulated(
     .toBe(true)
   return page.getByLabel('Requirements (EARS-style)').inputValue()
 }
+
+export async function expectDesignPopulated(page: Page, timeoutMs = 60_000): Promise<string> {
+  await expect
+    .poll(
+      async () => {
+        const text = await page.getByLabel('Design').inputValue()
+        return text.trim().length > 24
+      },
+      { timeout: timeoutMs }
+    )
+    .toBe(true)
+  return page.getByLabel('Design').inputValue()
+}
+
+export async function expectTasksPopulated(page: Page, timeoutMs = 60_000): Promise<string> {
+  await expect
+    .poll(
+      async () => {
+        const text = await page.getByLabel('Implementation tasks').inputValue()
+        return /^\s*[-*]\s*\[\s*[ xX]\s*\]\s*\d+\./m.test(text)
+      },
+      { timeout: timeoutMs }
+    )
+    .toBe(true)
+  return page.getByLabel('Implementation tasks').inputValue()
+}
+
+/** Open wizard dialog on the active spec tab, optionally edit prompt, Run, wait for job. */
+export async function runWizardGenerateSpecDialog(
+  page: Page,
+  opts?: { prompt?: string; timeoutMs?: number }
+) {
+  const timeoutMs = opts?.timeoutMs ?? specGenTimeoutMs()
+  await page.getByTestId('todo-generate-spec-wizard').click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  if (opts?.prompt !== undefined) {
+    await dialog.getByRole('textbox').fill(opts.prompt)
+  }
+  await runGenerateSpecDialog(page, timeoutMs)
+}
+
+/** Legacy one-shot generate via **All layers** button. */
+export async function runAllLayersGenerateSpecDialog(
+  page: Page,
+  prompt: string,
+  timeoutMs = specGenTimeoutMs()
+) {
+  await page.getByTestId('todo-generate-spec-all').click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toContainText('Generate all spec layers')
+  await dialog.getByRole('textbox').fill(prompt)
+  await runGenerateSpecDialog(page, timeoutMs)
+}

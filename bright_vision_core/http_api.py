@@ -357,6 +357,14 @@ class TraceabilityResponse(BaseModel):
 class GenerateTodoSpecRequest(BaseModel):
     prompt: str = Field(..., min_length=1)
     mode: str = Field("generate", description="generate | refine")
+    section: str = Field(
+        "all",
+        description="all | requirements | design | tasks_md — phased Kiro-style wizard",
+    )
+    context_paths: list[str] = Field(
+        default_factory=list,
+        description="Workspace-relative paths (/add context) included in the ephemeral generate session",
+    )
     apply: bool = Field(True, description="Write parsed layers back to the task")
     enforce_ears: bool = Field(
         True,
@@ -879,6 +887,11 @@ def _validate_generate_mode(mode: str) -> None:
         raise HTTPException(status_code=400, detail=f"Invalid mode: {mode}")
 
 
+def _validate_generate_section(section: str) -> None:
+    if section not in ("all", "requirements", "design", "tasks_md"):
+        raise HTTPException(status_code=400, detail=f"Invalid section: {section}")
+
+
 def _job_status_response(job) -> GenerateTodoSpecJobStatus:
     item = job.item
     return GenerateTodoSpecJobStatus(
@@ -907,6 +920,7 @@ def _start_spec_job(
     model: str | None,
 ) -> GenerateTodoSpecJobStarted:
     _validate_generate_mode(body.mode)
+    _validate_generate_section(body.section)
     root = Path(workspace).resolve()
     if not root.is_dir():
         raise HTTPException(status_code=404, detail=f"Not a directory: {workspace}")
@@ -919,8 +933,10 @@ def _start_spec_job(
         todo_id,
         body.prompt,
         mode=body.mode,
+        section=body.section,
         apply=body.apply,
         enforce_ears=body.enforce_ears,
+        context_paths=body.context_paths,
         model=model,
     )
     return GenerateTodoSpecJobStarted(job_id=job.job_id, status=job.status, todo_id=todo_id)
@@ -962,6 +978,18 @@ def sync_workspace_spec_files(workspace: str, todo_id: str):
     return _todo_item_model(item)
 
 
+@app.post("/workspaces/todos/{todo_id}/export-spec-files", response_model=TodoItemModel)
+def export_workspace_spec_files(workspace: str, todo_id: str):
+    """Write three-layer markdown from todos.json to ``.cecli/specs/{id}/``."""
+    api = _todos_for_workspace(workspace)
+    try:
+        item = api.get(todo_id)
+    except ValueError as err:
+        raise HTTPException(status_code=404, detail=str(err)) from err
+    api.sync_spec_files(item)
+    return _todo_item_model(item)
+
+
 @app.get("/workspaces/spec-index", response_model=SpecIndexResponse)
 def get_workspace_spec_index(workspace: str):
     """Scan ``.cecli/specs/**`` vs workspace task ids (roadmap #22)."""
@@ -973,12 +1001,28 @@ class RepairSpecFoldersResponse(BaseModel):
     created_ids: list[str] = Field(default_factory=list)
 
 
+class PruneOrphanSpecFoldersResponse(BaseModel):
+    removed_count: int
+    removed_ids: list[str] = Field(default_factory=list)
+
+
 @app.post("/workspaces/todos/repair-spec-folders", response_model=RepairSpecFoldersResponse)
 def repair_workspace_spec_folders(workspace: str):
     """Create missing spec folders and write three-layer markdown from todos.json."""
     api = _todos_for_workspace(workspace)
     count, ids = api.repair_spec_folders()
     return RepairSpecFoldersResponse(created_count=count, created_ids=ids)
+
+
+@app.post(
+    "/workspaces/todos/prune-orphan-spec-folders",
+    response_model=PruneOrphanSpecFoldersResponse,
+)
+def prune_workspace_orphan_spec_folders(workspace: str):
+    """Delete ``.cecli/specs/{id}/`` folders that are not in todos.json."""
+    api = _todos_for_workspace(workspace)
+    count, ids = api.prune_orphan_spec_folders()
+    return PruneOrphanSpecFoldersResponse(removed_count=count, removed_ids=ids)
 
 
 @app.post(

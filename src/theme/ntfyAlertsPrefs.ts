@@ -82,9 +82,7 @@ export function formatTurnCompleteNtfyBody(opts: {
   queuedRemaining: number
   editedCount: number
 }): string {
-  const mins = Math.floor(opts.durationMs / 60_000)
-  const secs = Math.round((opts.durationMs % 60_000) / 1000)
-  const dur = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`
+  const dur = formatNtfyDuration(opts.durationMs)
   let line = `Turn finished in ${dur}.`
   if (opts.queuedRemaining > 0) {
     line += ` ${opts.queuedRemaining} message${opts.queuedRemaining === 1 ? '' : 's'} still queued.`
@@ -95,6 +93,54 @@ export function formatTurnCompleteNtfyBody(opts: {
     line += ` ${opts.editedCount} file${opts.editedCount === 1 ? '' : 's'} edited.`
   }
   return line
+}
+
+export type SpecJobNtfyOutcome = 'saved' | 'ears_blocked' | 'error'
+
+export type SpecJobNtfySection = 'requirements' | 'design' | 'tasks_md' | 'all'
+
+export function specJobNtfyLabel(
+  mode: 'generate' | 'refine',
+  section: SpecJobNtfySection
+): string {
+  if (mode === 'refine') return 'Spec refine'
+  switch (section) {
+    case 'requirements':
+      return 'Requirements generation'
+    case 'design':
+      return 'Design generation'
+    case 'tasks_md':
+      return 'Tasks generation'
+    case 'all':
+      return 'Spec generation'
+  }
+}
+
+export function formatSpecJobCompleteNtfyBody(opts: {
+  durationMs: number
+  mode: 'generate' | 'refine'
+  section: SpecJobNtfySection
+  taskTitle?: string
+  outcome: SpecJobNtfyOutcome
+}): string {
+  const dur = formatNtfyDuration(opts.durationMs)
+  const label = specJobNtfyLabel(opts.mode, opts.section)
+  const task = opts.taskTitle?.trim()
+  const subject = task ? `${label} (“${task}”)` : label
+  switch (opts.outcome) {
+    case 'saved':
+      return `${subject} finished in ${dur}. Ready in BrightVision.`
+    case 'ears_blocked':
+      return `${subject} finished in ${dur} but was not saved (EARS). Open BrightVision.`
+    case 'error':
+      return `${subject} failed after ${dur}. Open BrightVision.`
+  }
+}
+
+function formatNtfyDuration(durationMs: number): string {
+  const mins = Math.floor(durationMs / 60_000)
+  const secs = Math.round((durationMs % 60_000) / 1000)
+  return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`
 }
 
 export function shouldSendNtfyTurnAlert(

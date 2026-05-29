@@ -105,7 +105,7 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 | **38** | **Done** | **Editor** — left-rail tab; file tabs + CM6 + explorer + git badges + open-from-chat; optional language packs (Settings). See [§ #38](#38--editor-rail-tab--file-tabs--explorer) |
 | **39** | **Done** | **Local model router** — hopper, Tauri preload/swap, chat escalate + force tier. **Tests:** `router-llm.spec.ts` (LLM lane), existing unit coverage. See [§ #39](#39--local-model-router) |
 | **40** | **Done** | **cecli agents in Vision (v1)** — chat agent bar, Settings registry, `GET …/subagents`, slash fallbacks. **Tests:** `agents-bar.spec.ts`. **Open (v2):** `POST …/agents/invoke`, header pill. See [§ #40](#40--cecli-agents-in-vision) |
-| **42** | **Done** | **Mobile alerts (ntfy)** — Settings topic + test ping; Tauri POST on turn `done`. **Tests:** `ntfy-alerts.spec.ts` (settings test ping + mock turn-`done` push). See [MOBILE_ALERTS.md](./MOBILE_ALERTS.md) |
+| **42** | **Done** | **Mobile alerts (ntfy)** — Settings topic + test ping; Tauri POST on turn `done` and spec generate/refine job complete. **Tests:** `ntfy-alerts.spec.ts` (settings ping, turn-`done`, spec job). See [MOBILE_ALERTS.md](./MOBILE_ALERTS.md) |
 | **43** | **Done** | **LLM fixture packs for e2e** — external curated workspace collection via `E2E_FIXTURE_PACK_ROOT` (submodule-friendly), in-repo fallback, plus `scripts/verify-e2e-fixture-pack.sh` (`yarn test:e2e:fixtures`) for structure + optional pin-status preflight. |
 | **44** | **Done** | **Session debug export** — `GET /sessions/{id}/debug` JSON bundle (messages, tool_calls, duplicate hints, agent todo, EventIO ring); Settings **Session history → Export debug bundle**. See [IPC.md](./IPC.md). |
 
@@ -119,7 +119,7 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 | v2 | **Done** | Session todos HTTP API, `active_todo_id` / `inject_todo_spec`, templates, checklist |
 | v3 | **Done** | Workspace todos HTTP, checklist auto-complete, markdown import/export |
 | v4a | **Done** | Three-layer specs, `depends_on`, `spec-driven` template, `.cecli/specs/{id}/` sync |
-| v4b | **Done** | AI generate/refine spec, steered **Implement** per implementation task. **Tests:** `tasks-generate-spec.spec.ts`, `test_generate_spec_parse.py`, `test_http_generate_spec_mock.py`; LLM: `spec-generate-llm.spec.ts` @spec-gen, `test_generate_spec_llm.py` (`E2E_LLM=1`) |
+| v4b | **Done** | AI generate/refine spec, steered **Implement** per implementation task. **Tests:** `tasks-spec-wizard.spec.ts`, `tasks-generate-spec.spec.ts`, `test_generate_spec_parse.py`, `test_http_generate_spec_mock.py`, `test_todo_spec_phased.py`; LLM: `spec-generate-llm.spec.ts` phased + all-layers @spec-gen, `test_generate_spec_llm.py` (`E2E_LLM=1`) |
 | v5 | **Done** | Background `generate-spec` jobs; ephemeral session; job poll |
 
 | # | Status | Item |
@@ -130,9 +130,10 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 
 | # | Status | Item |
 |---|--------|------|
-| **20** | **Partial** | **Spec agent** — **Spec** tab + **session mode**; spec_focus; `.cecli/steering`; **save hooks:** spec index refresh + trace snackbar on layer PATCH in `spec` session. **Open:** richer spec-agent automation. |
+| **20** | **Done** | **Spec agent v1** — **Spec** tab + **session mode** (stays on Spec after start); spec_focus rail; trace → **Refine to fix** hint from `buildSpecTraceHint`; save hooks refresh index + trace snackbar/hint; optional `yarn install-git-hooks` → `verify:ears`. Deeper Kiro parity → longer-term. |
 | **21** | **Done** | **EARS module v1** — `bright_vision_core/ears/`, lint/index/trace HTTP + Tasks, blur lint, generate/refine gate, `yarn verify:ears`. Kiro-depth → [EARS_MODULE.md](./EARS_MODULE.md) E7+. |
 | **22** | **Done** | Repo-wide spec index — `GET …/spec-index`, Check/Repair UI, auto-refresh on generate-spec and layer save. |
+| **23** | **Done** | **Phased spec wizard (Kiro-style)** — per-layer generate prompts, tab gates, `/add` context on generate-spec (`section` + `context_paths`). |
 
 ---
 
@@ -441,7 +442,7 @@ Prefer **permissive licenses** and **small bundle** ([AGENTS.md](../AGENTS.md)).
 2. **Friction from dogfood** — promote to **Open** rows or fix immediately (lifecycle, git tab, context attach, tasks sync).
 3. **#28 / #32** (if context picking hurts) — **#32** suggested-files tray + queued `/add`; file-tree / modified-file highlights over **#26** watcher unless git poll is insufficient.
 4. **#31** — [RELEASE.md](./RELEASE.md) when sharing builds or pinning submodule for collaborators.
-5. **#20 spec agent** — richer automation (proactive refine prompts, spec-session defaults). **#29–30** plugins / web parity (longer horizon).
+5. **#29–30** plugins / web parity (longer horizon).
 6. **#29, #30** — Plugins, remaining web parity (longer horizon).
 7. **#33** — Resource overlay when local LLM / long runs make CPU/GPU visibility painful (CPU/RAM first; GPU best-effort).
 8. **#38** — Editor left-rail tab + file tabs + explorer after core chat/context loop is stable; spike CodeMirror + `react-resizable-panels`; extend `TabId` / `NAV` — do not merge Chat into a top tab row.

@@ -462,6 +462,28 @@ export async function installMockCoreApi(page: Page, opts: MockCoreOptions = {})
   )
 
   await page.route(
+    (url) => url.pathname.endsWith('/repair-spec-folders'),
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ created_count: 0, created_ids: [] }),
+      })
+    }
+  )
+
+  await page.route(
+    (url) => url.pathname.endsWith('/prune-orphan-spec-folders'),
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ removed_count: 0, removed_ids: [] }),
+      })
+    }
+  )
+
+  await page.route(
     (url) => /\/workspaces\/todos\/[^/]+\/generate-spec$/.test(url.pathname),
     async (route) => {
     const url = new URL(route.request().url())

@@ -39,9 +39,9 @@ Legacy single `spec` is migrated into `requirements` on load when layers are emp
 
 ## v4b (shipped)
 
-1. **Generate spec** / **Refine spec** — Tasks tab buttons; requires active session + Vision API.  
+1. **Generate spec** / **Refine spec** — Tasks tab wizard (per-layer **Generate requirements** / **design** / **tasks** + optional **All layers**). Requires active session + Vision API.  
    `POST /sessions/{id}/todos/{todo_id}/generate-spec` or workspace route with `session_id` query.  
-   Body: `{ "prompt", "mode": "generate"|"refine", "apply": true }`.
+   Body: `{ "prompt", "mode": "generate"|"refine", "section": "requirements"|"design"|"tasks_md"|"all", "context_paths": [], "apply": true }`.
 2. **Steered implementation** — parsed numbered lines in `tasks_md`; **Implement** per step prefills chat.
 3. **Dependency order** — task list sorted topologically by `depends_on`.
 
@@ -50,6 +50,21 @@ Legacy single `spec` is migrated into `requirements` on load when layers are emp
 - **Background jobs** — `POST …/generate-spec` with `background: true` returns `202` + `job_id`.
 - **Ephemeral session** — `dry_run` headless session in a worker thread; chat session unchanged.
 - **Poll** — `GET /workspaces/todos/generate-spec/{job_id}` until `completed` or `error`.
+
+## v5b — Phased spec wizard (shipped)
+
+Kiro-style **Requirements → Design → Tasks** with edit-between steps:
+
+| Step | Prompt includes | Optional partial draft |
+|------|-----------------|------------------------|
+| `section=requirements` | User prompt | Existing `requirements` |
+| `section=design` | User prompt + **requirements** | Existing `design` |
+| `section=tasks_md` | User prompt + **requirements** + **design** | Existing `tasks_md` |
+
+- **Tasks tab** — wizard nudges on each layer tab; tab switches blocked until prerequisites exist.
+- **Context** — `context_paths` are the session’s `files_in_chat`. Add in the **Spec prompt** with `/add path` (Tab completes on desktop; Enter attaches) or **Add folder** beside the prompt; on **Tasks**, use the context bar or **Open Spec**. Same files as Chat `/add`.
+- **All layers** — `section=all` (or **All layers** button) keeps the original one-shot behavior.
+- **LLM regression** — `yarn test:llm:core` / `yarn test:e2e:llm` (`spec-generate-llm.spec.ts`) run phased `section=requirements` → `design` → `tasks_md` against Ollama.
 
 ## Spec file sync (shipped)
 
@@ -64,7 +79,7 @@ Legacy single `spec` is migrated into `requirements` on load when layers are emp
 | EARS validation & formal spec analysis | Validate EARS, trace, lint in generate/refine, apply gate | **#21** Partial — [EARS_MODULE.md](./EARS_MODULE.md) |
 | Sync Files / repo-wide spec index | Spec index scan + **Repair folders** | **#22** Partial |
 | Steering files | `.cecli/STEERING.md`, `.cecli/steering/*.md` in spec-focus | Expand defaults / UI editor |
-| Vibe vs Spec session | **Settings → Default session mode** (`vibe` \| `spec`); spec opens **Spec** tab on start | Per-turn override via Spec tab / Spec focus toggle |
+| Vibe vs Spec session | **Spec tab → Session mode** (`Vibe` \| `Spec`); spec opens this tab on Start | Per-turn override via Spec focus toggle on Tasks |
 | Save → EARS check | `PATCH` returns `ears_*` fields; UI snackbar on regression | Optional file-watcher hook (longer-term) |
 
 ## API

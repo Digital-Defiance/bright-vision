@@ -41,6 +41,43 @@ test.describe('Tasks spec index & trace (roadmap #22)', () => {
     await expect(page.getByTestId('spec-index-issues')).toContainText('SPEC_REQ_ID_GLOBAL_DUP')
   })
 
+  test('Remove orphans calls prune API and refreshes spec index', async ({ page }) => {
+    let pruneCalled = false
+    await page.route(
+      (url) => url.pathname.endsWith('/prune-orphan-spec-folders'),
+      async (route) => {
+        pruneCalled = true
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ removed_count: 2, removed_ids: ['orphan-a', 'orphan-b'] }),
+        })
+      }
+    )
+    await page.route(
+      (url) => url.pathname.endsWith('/spec-index'),
+      async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ok: true,
+            error_count: 0,
+            warning_count: 0,
+            task_ids: ['task-a'],
+            folders: [{ todo_id: 'task-a', has_requirements: true }],
+            issues: [],
+          }),
+        })
+      }
+    )
+
+    await page.getByTestId('todo-prune-orphan-spec-folders').click()
+    await expect.poll(() => pruneCalled).toBe(true)
+    await expect(page.getByText(/Removed 2 orphan/i)).toBeVisible()
+    await expect(page.getByTestId('spec-index-summary')).toContainText('Spec index OK')
+  })
+
   test('Trace coverage shows gaps for active task', async ({ page }) => {
     await page.route(
       (url) => url.pathname.includes('/trace-spec'),

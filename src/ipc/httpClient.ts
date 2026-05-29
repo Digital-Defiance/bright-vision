@@ -313,6 +313,15 @@ export class CoreHttpClient {
     return normalizeTodo(await res.json())
   }
 
+  async exportWorkspaceSpecFiles(workspace: string, todoId: string): Promise<TodoItem> {
+    const res = await fetch(
+      `${this.baseUrl}/workspaces/todos/${todoId}/export-spec-files?${this.workspaceQs(workspace)}`,
+      { method: 'POST', headers: this.headers(false) }
+    )
+    if (!res.ok) throw new Error(`export spec files: ${res.status} ${await res.text()}`)
+    return normalizeTodo(await res.json())
+  }
+
   async lintWorkspaceRequirements(
     workspace: string,
     todoId: string,
@@ -365,6 +374,17 @@ export class CoreHttpClient {
     )
     if (!res.ok) throw new Error(`repair spec folders: ${res.status} ${await res.text()}`)
     return (await res.json()) as { created_count: number; created_ids: string[] }
+  }
+
+  async pruneOrphanWorkspaceSpecFolders(
+    workspace: string
+  ): Promise<{ removed_count: number; removed_ids: string[] }> {
+    const res = await fetch(
+      `${this.baseUrl}/workspaces/todos/prune-orphan-spec-folders?${this.workspaceQs(workspace)}`,
+      { method: 'POST', headers: this.headers(false) }
+    )
+    if (!res.ok) throw new Error(`prune orphan spec folders: ${res.status} ${await res.text()}`)
+    return (await res.json()) as { removed_count: number; removed_ids: string[] }
   }
 
   async getSessionSpecIndex(sessionId: string): Promise<SpecIndexResult> {
@@ -588,6 +608,8 @@ export class CoreHttpClient {
     body: {
       prompt: string
       mode?: 'generate' | 'refine'
+      section?: 'all' | 'requirements' | 'design' | 'tasks_md'
+      context_paths?: string[]
       apply?: boolean
       enforce_ears?: boolean
       background?: boolean
@@ -608,6 +630,8 @@ export class CoreHttpClient {
       body: JSON.stringify({
         prompt: body.prompt,
         mode: body.mode ?? 'generate',
+        section: body.section ?? 'all',
+        context_paths: body.context_paths ?? [],
         apply: body.apply ?? true,
         enforce_ears: body.enforce_ears ?? true,
         background: body.background ?? true,
