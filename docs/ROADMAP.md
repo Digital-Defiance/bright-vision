@@ -130,9 +130,9 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 
 | # | Status | Item |
 |---|--------|------|
-| **20** | **Partial** | **Spec agent** — **Spec** tab + **Settings → session mode** (`vibe` \| `spec`); spec_focus; `.cecli/steering`. **Open:** save-triggered hook automation (beyond PATCH EARS fields). |
-| **21** | **Partial** | **EARS module** — **v1 shipped:** `bright_vision_core/ears/`, lint/index/trace HTTP + Tasks, generate/refine gate, **lint on requirements blur**, Spec tab; pytest + mocked/LLM e2e. **Open:** stricter trace, pre-commit gate. [EARS_MODULE.md](./EARS_MODULE.md) |
-| **22** | **Partial** | Repo-wide spec index — **v1 shipped:** `GET …/spec-index`, **Check spec index**, **Repair folders**, auto-refresh after generate-spec save, `tasks-ears-index.spec.ts`. **Open:** re-index on manual PATCH. |
+| **20** | **Partial** | **Spec agent** — **Spec** tab + **session mode**; spec_focus; `.cecli/steering`; **save hooks:** spec index refresh + trace snackbar on layer PATCH in `spec` session. **Open:** richer spec-agent automation. |
+| **21** | **Done** | **EARS module v1** — `bright_vision_core/ears/`, lint/index/trace HTTP + Tasks, blur lint, generate/refine gate, `yarn verify:ears`. Kiro-depth → [EARS_MODULE.md](./EARS_MODULE.md) E7+. |
+| **22** | **Done** | Repo-wide spec index — `GET …/spec-index`, Check/Repair UI, auto-refresh on generate-spec and layer save. |
 
 ---
 
@@ -441,7 +441,7 @@ Prefer **permissive licenses** and **small bundle** ([AGENTS.md](../AGENTS.md)).
 2. **Friction from dogfood** — promote to **Open** rows or fix immediately (lifecycle, git tab, context attach, tasks sync).
 3. **#28 / #32** (if context picking hurts) — **#32** suggested-files tray + queued `/add`; file-tree / modified-file highlights over **#26** watcher unless git poll is insufficient.
 4. **#31** — [RELEASE.md](./RELEASE.md) when sharing builds or pinning submodule for collaborators.
-5. **#21–22 v1 → Done** — dogfood on superproject Tasks (Validate EARS, spec index, generate-spec); then **lint on requirements blur**, **re-index after generate-spec** (~2–3 days). **#20** save-triggered spec hooks in parallel.
+5. **#20 spec agent** — richer automation (proactive refine prompts, spec-session defaults). **#29–30** plugins / web parity (longer horizon).
 6. **#29, #30** — Plugins, remaining web parity (longer horizon).
 7. **#33** — Resource overlay when local LLM / long runs make CPU/GPU visibility painful (CPU/RAM first; GPU best-effort).
 8. **#38** — Editor left-rail tab + file tabs + explorer after core chat/context loop is stable; spike CodeMirror + `react-resizable-panels`; extend `TabId` / `NAV` — do not merge Chat into a top tab row.

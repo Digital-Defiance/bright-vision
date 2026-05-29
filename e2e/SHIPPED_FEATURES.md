@@ -17,7 +17,7 @@ Map every **Done** roadmap slice to automated verification. Add a row when you s
 | Settings / commit prefs | `settings-config.spec.ts` | — | — |
 | Tasks / generate-spec | `tasks-workspace.spec.ts`, `tasks-generate-spec.spec.ts` | `tasks-seeded` | `test_http_generate_spec_mock.py`, `test_generate_spec_parse.py` |
 | Spec generate (LLM) | — | — | `spec-generate-llm.spec.ts` @spec-gen, `test_generate_spec_llm.py` |
-| EARS validate (Tasks) | `tasks-ears.spec.ts` | — | `test_http_ears_lint.py`, `test_ears_lint.py` |
+| EARS validate (Tasks) | `tasks-ears.spec.ts` | — | `yarn verify:ears`, `test_http_ears_lint.py`, `test_ears_lint.py` |
 | Spec index & trace (Tasks) | `tasks-ears-index.spec.ts` | — | `test_ears_index.py`, `test_ears_trace.py`, `test_http_ears_index_trace.py` |
 | Spec agent rail | `spec-agent.spec.ts` | — | E6 / #20 |
 | Submodule verify | `release-hygiene.spec.ts` | — | `yarn verify:submodule` |

@@ -39,16 +39,28 @@ type TodoPatch = Partial<
   >
 >
 
+export type SpecLayerDraft = Partial<Pick<TodoItem, 'requirements' | 'design' | 'tasks_md'>>
+
+function specLayersInPatch(patch: TodoPatch): SpecLayerDraft | null {
+  const layers: SpecLayerDraft = {}
+  if (patch.requirements !== undefined) layers.requirements = patch.requirements
+  if (patch.design !== undefined) layers.design = patch.design
+  if (patch.tasks_md !== undefined) layers.tasks_md = patch.tasks_md
+  return Object.keys(layers).length > 0 ? layers : null
+}
+
 export function useWorkspaceTodos(
   workingDir: string,
   api?: WorkspaceTodosApi | null,
   callbacks?: {
     onAutoCompleted?: (todoId: string) => void
     onEarsRegression?: (todoId: string, errorCount: number) => void
+    onSpecLayersSaved?: (todoId: string, layers: SpecLayerDraft) => void
   }
 ) {
   const onAutoCompleted = callbacks?.onAutoCompleted
   const onEarsRegression = callbacks?.onEarsRegression
+  const onSpecLayersSaved = callbacks?.onSpecLayersSaved
   const [store, setStore] = useState<TodoStore | null>(null)
   const [loading, setLoading] = useState(true)
   const [httpReady, setHttpReady] = useState(false)
@@ -200,6 +212,8 @@ export function useWorkspaceTodos(
         ) {
           onEarsRegression?.(id, result.ears_error_count ?? 0)
         }
+        const layers = specLayersInPatch(patch)
+        if (layers) onSpecLayersSaved?.(id, layers)
         await reload()
         return result
       }
@@ -219,9 +233,11 @@ export function useWorkspaceTodos(
       if (!autoCompleted && patch.status === 'done' && activeId === id) {
         activeId = null
       }
+      const layers = specLayersInPatch(patch)
+      if (layers) onSpecLayersSaved?.(id, layers)
       await persistLocal({ ...store, todos, activeId })
     },
-    [httpReady, api, store, persistLocal, reload, onAutoCompleted]
+    [httpReady, api, store, persistLocal, reload, onAutoCompleted, onSpecLayersSaved]
   )
 
   const deleteTodo = useCallback(

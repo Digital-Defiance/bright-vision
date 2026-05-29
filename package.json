@@ -32,6 +32,7 @@
     "test:bright-core": "python -m pytest tests/core/test_git_workspace.py tests/core/test_workspace_paths.py tests/core/test_workspace_todos.py tests/core/test_agent_todos.py tests/core/test_http_api.py tests/core/test_http_interrupt.py tests/core/test_http_session_todos.py tests/core/test_http_session_persistence.py tests/core/test_http_agent_todo_import.py tests/core/test_http_ears_lint.py tests/core/test_ears_lint.py tests/core/test_generate_spec_parse.py tests/core/test_http_generate_spec_mock.py tests/core/test_superproject_integration.py tests/core/test_superproject_dogfood.py tests/core/test_headless_args.py tests/core/test_headless_persistence.py tests/core/test_headless_agent.py tests/core/test_session_crypto.py tests/core/test_session_transcript.py tests/core/test_sessions.py tests/core/test_llm_ollama.py tests/core/test_roadmap_hints.py tests/core/test_cecli_tool_json.py -q",
     "bench:leaderboard": "node scripts/build-bench-leaderboard.mjs",
     "verify:submodule": "sh scripts/verify_submodule.sh",
+    "verify:ears": "sh scripts/verify-ears.sh",
     "dogfood:check": "sh scripts/dogfood-check.sh",
     "dogfood:setup": "sh scripts/setup-m4-dogfood.sh",
     "sync:core": "bash cecli/scripts/sync_bright_vision.sh"

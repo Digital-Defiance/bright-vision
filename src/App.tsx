@@ -102,7 +102,7 @@ import { ChatPanel, type ChatMessage, type ToolEvent } from './components/chat/C
 import { SpecAgentPanel } from './components/spec/SpecAgentPanel'
 import { TodoPanel } from './components/todos/TodoPanel'
 import { GitPanel } from './components/GitPanel'
-import { useWorkspaceTodos } from './hooks/useWorkspaceTodos'
+import { useWorkspaceTodos, type SpecLayerDraft } from './hooks/useWorkspaceTodos'
 import { WelcomePanel } from './components/onboarding/WelcomePanel'
 import { AboutDialog } from './components/settings/AboutDialog'
 import { SettingsPanel } from './components/settings/SettingsPanel'
@@ -356,6 +356,9 @@ function AppShell({
   const [specAgentEarsLinting, setSpecAgentEarsLinting] = useState(false)
   const [specAgentTracing, setSpecAgentTracing] = useState(false)
   const specGenerateAbortRef = useRef<AbortController | null>(null)
+  const specLayersSavedRef = useRef<(id: string, layers: SpecLayerDraft) => void | Promise<void>>(
+    () => {}
+  )
   const chatEndRef = useRef<HTMLDivElement>(null)
   const specChatEndRef = useRef<HTMLDivElement>(null)
   const specTurnCaptureRef = useRef(false)
@@ -1439,7 +1442,37 @@ function AppShell({
         severity: 'warning',
       })
     },
+    onSpecLayersSaved: (id, layers) => {
+      setSpecIndexRefreshToken((n) => n + 1)
+      void specLayersSavedRef.current(id, layers)
+    },
   })
+
+  specLayersSavedRef.current = async (id, layers) => {
+    if (savedConfig.sessionMode !== 'spec' || !todosHttpReady) return
+    const item = todoStore?.todos.find((t) => t.id === id)
+    if (!item) return
+    try {
+      const result = await traceSpec(id, {
+        requirements: layers.requirements ?? item.requirements ?? '',
+        design: layers.design ?? item.design ?? '',
+        tasks_md: layers.tasks_md ?? item.tasks_md ?? '',
+      })
+      if (!result.ok) {
+        const parts: string[] = []
+        if (result.error_count > 0) parts.push(`${result.error_count} error(s)`)
+        if (result.warning_count > 0) parts.push(`${result.warning_count} warning(s)`)
+        if (parts.length) {
+          setSnackbar({
+            message: `Spec trace after save: ${parts.join(', ')}`,
+            severity: result.error_count > 0 ? 'warning' : 'info',
+          })
+        }
+      }
+    } catch {
+      // trace on save is best-effort
+    }
+  }
 
   recordTurnLinksRef.current = recordTurnLinks
   reloadTodosRef.current = reloadTodos
