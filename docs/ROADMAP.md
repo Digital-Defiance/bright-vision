@@ -131,8 +131,8 @@ Log dogfooding bugs as roadmap rows or issues with repro (workspace path, file p
 | # | Status | Item |
 |---|--------|------|
 | **20** | **Partial** | **Spec agent** — **Spec** tab + **Settings → session mode** (`vibe` \| `spec`); spec_focus; `.cecli/steering`. **Open:** save-triggered hook automation (beyond PATCH EARS fields). |
-| **21** | **Partial** | **EARS module** — **v1 shipped:** `bright_vision_core/ears/`, lint/index/trace HTTP + Tasks, generate/refine gate, Spec tab; pytest + mocked/LLM e2e (`tasks-ears*`, `spec-generate-llm`, `test_generate_spec_llm`). **Open:** lint-on-save blur, stricter trace, pre-commit gate. [EARS_MODULE.md](./EARS_MODULE.md) |
-| **22** | **Partial** | Repo-wide spec index — **v1 shipped:** `GET …/spec-index`, **Check spec index**, **Repair folders**, `tasks-ears-index.spec.ts`. **Open:** re-index after generate-spec / todo save. |
+| **21** | **Partial** | **EARS module** — **v1 shipped:** `bright_vision_core/ears/`, lint/index/trace HTTP + Tasks, generate/refine gate, **lint on requirements blur**, Spec tab; pytest + mocked/LLM e2e. **Open:** stricter trace, pre-commit gate. [EARS_MODULE.md](./EARS_MODULE.md) |
+| **22** | **Partial** | Repo-wide spec index — **v1 shipped:** `GET …/spec-index`, **Check spec index**, **Repair folders**, auto-refresh after generate-spec save, `tasks-ears-index.spec.ts`. **Open:** re-index on manual PATCH. |
 
 ---
 

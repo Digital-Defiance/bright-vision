@@ -352,6 +352,7 @@ function AppShell({
   const [gitRefreshKey, setGitRefreshKey] = useState(0)
   const [specFocusMode, setSpecFocusMode] = useState(() => loadSpecFocusPref())
   const [specGenerating, setSpecGenerating] = useState(false)
+  const [specIndexRefreshToken, setSpecIndexRefreshToken] = useState(0)
   const [specAgentEarsLinting, setSpecAgentEarsLinting] = useState(false)
   const [specAgentTracing, setSpecAgentTracing] = useState(false)
   const specGenerateAbortRef = useRef<AbortController | null>(null)
@@ -2200,6 +2201,7 @@ function AppShell({
             severity: 'warning',
           })
         } else {
+          setSpecIndexRefreshToken((n) => n + 1)
           setSnackbar({
             message: mode === 'refine' ? 'Spec refined and saved' : 'Spec generated and saved',
             severity: 'info',
@@ -2756,6 +2758,7 @@ function AppShell({
               sessionReady={isRunning && Boolean(sessionInfo?.session_id) && todosHttpReady}
               sessionBusy={isBusy}
               specGenerating={specGenerating}
+              specIndexRefreshToken={specIndexRefreshToken}
               onGenerateSpec={(id, prompt, mode) => handleGenerateSpec(id, prompt, mode)}
               onExportMarkdown={async () => {
                 try {

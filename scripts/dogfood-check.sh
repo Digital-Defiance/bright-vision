@@ -40,6 +40,13 @@ if [ -x .venv/bin/python3 ]; then
     tests/core/test_roadmap_hints.py \
     tests/core/test_cecli_tool_json.py \
     tests/core/test_llm_sse.py \
+    tests/core/test_ears_lint.py \
+    tests/core/test_ears_index.py \
+    tests/core/test_ears_trace.py \
+    tests/core/test_http_ears_lint.py \
+    tests/core/test_http_ears_index_trace.py \
+    tests/core/test_generate_spec_parse.py \
+    tests/core/test_http_generate_spec_mock.py \
     -q
 fi
 

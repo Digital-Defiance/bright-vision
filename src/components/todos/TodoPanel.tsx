@@ -118,6 +118,8 @@ interface TodoPanelProps {
     draft: { requirements: string; design: string; tasks_md: string }
   ) => Promise<TraceabilityResult>
   onCancelSpecGenerate?: () => void
+  /** Bumped after generate/refine saves layers — refreshes spec index panel. */
+  specIndexRefreshToken?: number
 }
 
 export function TodoPanel({
@@ -148,6 +150,7 @@ export function TodoPanel({
   onSpecFocusChange,
   onTraceSpec,
   onCancelSpecGenerate,
+  specIndexRefreshToken,
   currentBranch,
   tauriLocal,
 }: TodoPanelProps) {
@@ -209,6 +212,12 @@ export function TodoPanel({
     }
   }
 
+  useEffect(() => {
+    if (!specIndexRefreshToken || !onFetchSpecIndex) return
+    void runSpecIndex()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh when parent bumps token after generate-spec
+  }, [specIndexRefreshToken])
+
   const runTraceSpec = async () => {
     if (!selected || !onTraceSpec) return
     setSpecTracing(true)
@@ -259,6 +268,13 @@ export function TodoPanel({
       pr_url: prUrl,
       checklist,
     })
+  }
+
+  const persistRequirements = () => {
+    persistEditor()
+    if (onLintRequirements && requirements.trim()) {
+      void runEarsLint()
+    }
   }
 
   const handleNew = () => {
@@ -673,7 +689,7 @@ export function TodoPanel({
                     maxRows={16}
                     value={requirements}
                     onChange={(e) => setRequirements(e.target.value)}
-                    onBlur={persistEditor}
+                    onBlur={persistRequirements}
                     placeholder="WHEN … THE system SHALL …"
                   />
                   {earsLint && (
